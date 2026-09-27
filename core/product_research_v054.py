@@ -232,6 +232,7 @@ class ProductResearchEngineV054(ProductResearchEngine):
             "brand": brand,
             "model": model,
             "category": category,
+            "image_url": image_url,
         })
 
         for field, value in (
@@ -395,6 +396,7 @@ class ProductResearchEngineV054(ProductResearchEngine):
                         technical_specs
                     ),
                     "query": enrichment.get("query") or "",
+                    "discovery": enrichment.get("discovery") or {},
                 },
             },
         }
