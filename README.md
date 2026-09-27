@@ -78,3 +78,10 @@ memória operacional, inteligência e fusão de comentários, Decision Engine V2
 Silence Watchdog, Speech Planner, Sales Guard e contexto comercial ampliado do produto.
 
 Esta branch é testada em um serviço Railway separado antes de qualquer alteração da baseline `main`.
+
+
+## V0.5.1 — Ficha Inteligente do Produto
+
+A branch `v0.5.1-product-intelligence` separa dados permanentes do produto das condições temporárias da LIVE, registra origem/confiança dos campos e permite edição manual com prioridade sobre futuras pesquisas automáticas.
+
+A análise automática do link será ativada na V0.5.2.
