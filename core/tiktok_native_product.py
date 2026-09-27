@@ -278,15 +278,46 @@ class TikTokNativeProductExtractor:
                     wait_until="domcontentloaded",
                     timeout=35000,
                 )
-                page.wait_for_timeout(5000)
+                page.wait_for_timeout(2500)
+
+                # TikTok Shop carrega descrição, atributos e avaliações de
+                # forma preguiçosa conforme a página rola. Percorremos a
+                # página antes de capturar o DOM/rede.
+                try:
+                    for _ in range(8):
+                        page.mouse.wheel(0, 950)
+                        page.wait_for_timeout(450)
+                except Exception:
+                    pass
+
+                # Abre blocos colapsáveis quando existirem.
+                for label in (
+                    "Sobre este produto",
+                    "Descrição do produto",
+                    "Avaliações dos clientes",
+                    "Especificações",
+                    "Detalhes do produto",
+                ):
+                    try:
+                        locator = page.get_by_text(label, exact=False).first
+                        if locator.count() and locator.is_visible():
+                            locator.click(timeout=1200)
+                            page.wait_for_timeout(500)
+                    except Exception:
+                        pass
+
+                try:
+                    for _ in range(4):
+                        page.mouse.wheel(0, 1100)
+                        page.wait_for_timeout(450)
+                except Exception:
+                    pass
 
                 final_url = page.url
                 title = clean(page.title())
 
                 try:
-                    body_text = clean(
-                        page.locator("body").inner_text(timeout=5000)
-                    )
+                    body_text = page.locator("body").inner_text(timeout=5000)
                 except Exception:
                     body_text = ""
 
@@ -336,11 +367,15 @@ class TikTokNativeProductExtractor:
         if not result.get("title"):
             result["title"] = self._clean_page_title(title)
 
-        if body_text and not result.get("description"):
-            result["description"] = self._description_from_visible_text(
-                body_text,
-                result.get("title") or "",
-            )
+        if body_text:
+            visible = self._extract_from_visible_text(body_text)
+            self._merge(result, visible)
+
+            if not result.get("description"):
+                result["description"] = self._description_from_visible_text(
+                    body_text,
+                    result.get("title") or "",
+                )
 
         result["browser_used"] = True
         result["network_response_count"] = len(response_urls)
@@ -916,6 +951,189 @@ class TikTokNativeProductExtractor:
             "discount": discount,
         }
 
+    def _extract_from_visible_text(self, text: str) -> dict:
+        result = {
+            "title": "",
+            "description": "",
+            "brand": "",
+            "model": "",
+            "category": "",
+            "image_url": "",
+            "images": [],
+            "current_price": None,
+            "regular_price": None,
+            "discount": None,
+            "rating": None,
+            "review_count": None,
+            "sold_count": None,
+            "stock": None,
+            "seller": {},
+            "skus": [],
+            "sale_properties": [],
+            "attributes": [],
+            "shipping": {},
+            "benefits": "",
+            "care_instructions": "",
+            "notes": [],
+        }
+
+        raw = str(text or "")
+        lines = [clean(x) for x in raw.splitlines() if clean(x)]
+        joined = "\n".join(lines)
+
+        # Preço e reputação exibidos no PDP.
+        prices = re.findall(r"R\$\s*([0-9.]+,[0-9]{2})", joined)
+        parsed_prices = [safe_float(x) for x in prices]
+        parsed_prices = [x for x in parsed_prices if x is not None]
+        if parsed_prices:
+            result["current_price"] = min(parsed_prices)
+            result["regular_price"] = max(parsed_prices) if len(parsed_prices) > 1 else None
+
+        rating_match = re.search(
+            r"\b([1-5](?:[.,]\d)?)\s*[★☆]",
+            joined,
+        )
+        if rating_match:
+            result["rating"] = safe_float(rating_match.group(1))
+
+        review_match = re.search(
+            r"(\d[\d.]*)\s+avalia(?:ç|c)ões",
+            joined,
+            flags=re.I,
+        )
+        if review_match:
+            try:
+                result["review_count"] = int(
+                    review_match.group(1).replace(".", "")
+                )
+            except Exception:
+                pass
+
+        sold_match = re.search(
+            r"([0-9.,]+\s*[KkMm]?)\s+vendido",
+            joined,
+            flags=re.I,
+        )
+        if sold_match:
+            result["sold_count"] = clean(sold_match.group(1))
+
+        seller_match = re.search(
+            r"(?:Sold by|Vendido por)\s+([^\n]+)",
+            joined,
+            flags=re.I,
+        )
+        if seller_match:
+            result["seller"] = {"name": clean(seller_match.group(1))}
+
+        # Bloco "Descrição do produto" que aparece no próprio TikTok Shop.
+        description_start = None
+        for idx, line in enumerate(lines):
+            if "descrição do produto" in line.casefold():
+                description_start = idx + 1
+                break
+
+        if description_start is not None:
+            desc_lines = []
+            for line in lines[description_start:]:
+                low = line.casefold()
+                if any(
+                    stop in low
+                    for stop in (
+                        "instruções de cuidado",
+                        "informações sobre nossa forma",
+                        "avaliações dos clientes",
+                        "comprar agora",
+                    )
+                ):
+                    break
+                desc_lines.append(line)
+
+            full_desc = "\n".join(desc_lines).strip()
+            if full_desc:
+                result["description"] = full_desc[:5000]
+
+            benefit_index = next(
+                (
+                    i for i, line in enumerate(desc_lines)
+                    if line.casefold().rstrip(":") == "benefícios"
+                ),
+                None,
+            )
+            spec_index = next(
+                (
+                    i for i, line in enumerate(desc_lines)
+                    if "especificações técnicas" in line.casefold()
+                ),
+                None,
+            )
+
+            if benefit_index is not None:
+                end = spec_index if spec_index is not None else len(desc_lines)
+                benefits = [
+                    x for x in desc_lines[benefit_index + 1:end]
+                    if not x.startswith("-")
+                ]
+                result["benefits"] = " ".join(benefits).strip()[:1800]
+
+        # Especificações em formato "- Marca: Arno", "- Voltagem: ...".
+        attrs = []
+        for line in lines:
+            normalized = line.lstrip("-•> ").strip()
+            match = re.match(
+                r"([^:]{2,60}):\s*(.+)$",
+                normalized,
+            )
+            if not match:
+                continue
+
+            label = clean(match.group(1))
+            value = clean(match.group(2))
+            low = label.casefold()
+
+            if any(
+                key in low
+                for key in (
+                    "marca", "modelo", "cor", "voltagem", "tensão",
+                    "tensao", "potência", "potencia", "capacidade",
+                    "material", "tomada", "tipo de pino", "frequência",
+                    "frequencia", "temperatura", "dimens", "peso",
+                    "garantia",
+                )
+            ):
+                attrs.append({"name": label, "value": value})
+
+                if low == "marca" and not result["brand"]:
+                    result["brand"] = value
+                elif low == "modelo" and not result["model"]:
+                    result["model"] = value
+
+        result["attributes"] = attrs[:80]
+
+        # Cuidados/uso.
+        care_start = None
+        for idx, line in enumerate(lines):
+            if "instruções de cuidado" in line.casefold():
+                care_start = idx + 1
+                break
+
+        if care_start is not None:
+            care = []
+            for line in lines[care_start:]:
+                low = line.casefold()
+                if any(
+                    stop in low
+                    for stop in (
+                        "informações sobre nossa forma",
+                        "avaliações dos clientes",
+                        "comprar agora",
+                    )
+                ):
+                    break
+                care.append(line.lstrip("> ").strip())
+            result["care_instructions"] = " ".join(care).strip()[:1800]
+
+        return result
+
     def _description_from_visible_text(
         self,
         text: str,
@@ -1105,6 +1323,8 @@ class TikTokNativeProductExtractor:
             "review_count",
             "sold_count",
             "stock",
+            "benefits",
+            "care_instructions",
         )
 
         for field in scalar_fields:
