@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +18,17 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index_v054.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5.4-product-enrichment",
+    version="0.5.6-reliable-identity",
 )
 
 runtime = AGCNVoiceRuntime()
+
+# O site atual é apenas um protótipo temporário de validação. Ativamos o
+# Lens também nele para conseguir testar a lógica antes do executável Windows.
+os.environ["AGCN_LENS_ENABLED"] = "1"
+
 research_engine = ProductResearchEngineV054()
+research_engine.enrichment.lens.headless = True
 
 
 class LiveStartRequest(BaseModel):
@@ -82,7 +89,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5.4-product-enrichment",
+        "version": "0.5.6-reliable-identity",
     }
 
 
