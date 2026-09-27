@@ -364,6 +364,8 @@ class ProductResearchEngine:
                 "category": native.get("category"),
                 "description": native.get("description"),
                 "image_url": native.get("image_url"),
+                "key_benefits": native.get("benefits"),
+                "usage_info": native.get("care_instructions"),
             }
 
             for field, value in mapping.items():
