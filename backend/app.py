@@ -8,20 +8,23 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from core.product_research import ProductResearchEngine
+from core.product_research_v054 import ProductResearchEngineV054
 from core.runtime import AGCNVoiceRuntime
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
+WEB_FILE = PROJECT_ROOT / "test_web" / "index_v054.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5.3-tiktok-native-extractor",
+    version="0.5.5-web-lens-test",
 )
 
 runtime = AGCNVoiceRuntime()
-research_engine = ProductResearchEngine()
+import os
+os.environ["AGCN_LENS_ENABLED"] = "1"
+research_engine = ProductResearchEngineV054()
+research_engine.enrichment.lens.headless = True
 
 
 class LiveStartRequest(BaseModel):
@@ -82,7 +85,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5.3-tiktok-native-extractor",
+        "version": "0.5.5-web-lens-test",
     }
 
 
