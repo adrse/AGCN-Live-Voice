@@ -17,7 +17,7 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5.2-product-research",
+    version="0.5.3-tiktok-native-extractor",
 )
 
 runtime = AGCNVoiceRuntime()
@@ -82,7 +82,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5.2-product-research",
+        "version": "0.5.3-tiktok-native-extractor",
     }
 
 
