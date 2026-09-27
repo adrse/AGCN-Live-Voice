@@ -219,7 +219,14 @@ class ProductResearchEngine:
         if hint:
             seed["name"] = _clean(hint)
 
+        identity = self._identity_from_title(seed.get("name") or "")
+
+        for key in ("brand", "model", "category"):
+            if not seed.get(key) and identity.get(key):
+                seed[key] = identity[key]
+
         search_name = _first(
+            identity.get("search_name"),
             seed.get("name"),
             self._title_hint_from_url(resolved_url),
         )
@@ -228,12 +235,18 @@ class ProductResearchEngine:
         search_results = []
 
         if search_name:
-            search_results = self._search_public_web(search_name)
+            search_results = self._search_public_web(
+                search_name,
+                brand=seed.get("brand") or "",
+                model=seed.get("model") or "",
+                category=seed.get("category") or "",
+            )
             candidates = self._select_candidates(
                 search_name,
                 seed.get("brand") or "",
+                seed.get("model") or "",
                 search_results,
-                limit=6,
+                limit=8,
             )
 
             for candidate in candidates:
@@ -803,6 +816,54 @@ class ProductResearchEngine:
         )
         return _clean(title)[:220]
 
+    def _identity_from_title(self, title: str) -> dict:
+        text = self._clean_product_title(title)
+        if not text:
+            return {}
+
+        # Ex.: "Aurafit G6 Smartwatch para Esportes Relógio: ..."
+        # A identidade é deliberadamente curta para evitar contaminar a busca
+        # com dezenas de atributos promocionais do anúncio.
+        words = re.findall(r"[A-Za-zÀ-ÿ0-9-]+", text)
+        if not words:
+            return {}
+
+        brand = ""
+        model = ""
+        category = ""
+
+        # O primeiro token costuma ser a marca quando o título vem da própria
+        # ficha do produto. Evitamos termos genéricos.
+        generic_first = {
+            "smartwatch", "relogio", "relógio", "kit", "produto",
+            "oferta", "novo", "original",
+        }
+        first = words[0]
+        if first.casefold() not in generic_first and not first.isdigit():
+            brand = first
+
+        for token in words[1:8]:
+            if re.fullmatch(r"[A-Za-z]{0,5}\d+[A-Za-z0-9-]*", token):
+                model = token
+                break
+
+        low = text.casefold()
+        if "smartwatch" in low or "relógio" in low or "relogio" in low:
+            category = "Smartwatch"
+
+        parts = [x for x in (brand, model, category) if x]
+        search_name = " ".join(parts[:3]).strip()
+
+        if not search_name:
+            search_name = " ".join(words[:6])
+
+        return {
+            "brand": brand,
+            "model": model,
+            "category": category,
+            "search_name": search_name,
+        }
+
     def _title_hint_from_url(self, url: str) -> str:
         path = urlparse(url).path
         chunks = [
@@ -811,12 +872,27 @@ class ProductResearchEngine:
         ]
         return _clean(" ".join(chunks[-8:]))[:140]
 
-    def _search_public_web(self, query: str) -> list[dict]:
+    def _search_public_web(
+        self,
+        query: str,
+        *,
+        brand: str = "",
+        model: str = "",
+        category: str = "",
+    ) -> list[dict]:
+        compact = " ".join(
+            x for x in (brand, model, category) if x
+        ).strip() or query
+
         searches = [
-            f'"{query}" produto especificações',
-            f'"{query}" avaliações review',
-            f'"{query}" manual fabricante',
+            f'"{compact}"',
+            f'"{compact}" especificações',
+            f'"{compact}" avaliações review',
+            f'"{compact}" manual fabricante',
         ]
+
+        if brand and model:
+            searches.insert(0, f'"{brand}" "{model}"')
 
         seen = set()
         results = []
@@ -895,6 +971,7 @@ class ProductResearchEngine:
         self,
         name: str,
         brand: str,
+        model: str,
         results: list[dict],
         limit: int,
     ) -> list[dict]:
@@ -905,19 +982,37 @@ class ProductResearchEngine:
                 + " "
                 + result.get("snippet", "")
             )
+            low_haystack = haystack.casefold()
+            brand_match = bool(
+                brand and brand.casefold() in low_haystack
+            )
+            model_match = bool(
+                model and model.casefold() in low_haystack
+            )
+
+            # Quando temos marca + modelo vindos do link do TikTok,
+            # um resultado externo precisa conter os dois para ser aceito.
+            if brand and model and not (brand_match and model_match):
+                continue
+
             score = _similarity(name, haystack)
 
-            if brand and brand.casefold() in haystack.casefold():
-                score += 0.25
+            if brand_match:
+                score += 0.30
+            if model_match:
+                score += 0.35
 
             host = result.get("host", "")
+            if brand and brand.casefold() in host.casefold():
+                score += 0.18
+
             if any(k in host for k in (
                 "amazon.", "mercadolivre.", "magazineluiza.",
                 "shopee.", "kabum.", "carrefour.", "casasbahia.",
             )):
                 score += 0.05
 
-            if score >= 0.28:
+            if score >= 0.18:
                 scored.append((score, result))
 
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -946,7 +1041,14 @@ class ProductResearchEngine:
         direct_score = 0.88 if direct.get("ok") else 0.45
 
         for field, value in seed.items():
-            add(field, value, direct_score, direct)
+            score = direct_score
+            if field == "brand" and value:
+                score = max(score, 0.93)
+            elif field == "model" and value:
+                score = max(score, 0.94)
+            elif field == "category" and value:
+                score = max(score, 0.86)
+            add(field, value, score, direct)
 
         for source in sources:
             if not source.get("ok"):
