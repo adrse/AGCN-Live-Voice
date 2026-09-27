@@ -7,7 +7,7 @@ import time
 
 
 def clean(text) -> str:
-    return re.sub(r"\\s+", " ", str(text or "").strip())
+    return re.sub(r"\s+", " ", str(text or "").strip())
 
 
 def money(value) -> str | None:
