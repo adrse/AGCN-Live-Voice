@@ -325,6 +325,8 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
           <div id="researchNotes" class="intel-sub" style="margin-top:8px"></div>
           <div class="section-label" style="margin-top:10px">FONTES ENCONTRADAS</div>
           <div id="researchSourceList" class="research-list"></div>
+          <div class="section-label" style="margin-top:10px">CANDIDATOS VISUAIS</div>
+          <div id="researchCandidateList" class="research-list"></div>
           <div class="section-label" style="margin-top:10px">ESPECIFICAÇÕES TÉCNICAS ENCONTRADAS</div>
           <div id="researchSpecsList" class="research-list"></div>
           <div class="section-label" style="margin-top:10px">AVALIAÇÕES / PERCEPÇÕES</div>
@@ -818,6 +820,8 @@ function renderResearchResult(result){
   const notes=summary.notes||[];
   const native=summary.tiktok_native||{};
   const enrichment=summary.enrichment||{};
+  const discovery=enrichment.discovery||{};
+  const candidates=enrichment.candidate_matches||[];
   const specs=summary.technical_specs||[];
 
   $("#researchSources").textContent=summary.source_count||0;
@@ -830,10 +834,15 @@ function renderResearchResult(result){
   const nativeLine=native.used
     ? "TikTok: identidade confirmada"+(native.attribute_count?(" • "+String(native.attribute_count)+" atributos diretos"):"")
     : "TikTok: identidade obtida pelo link/metadados.";
+  const lensLine=discovery.lens_enabled
+    ? (discovery.lens_used
+        ? "Google Lens local: "+String(discovery.lens_marketplace_count||0)+" resultados de marketplace."
+        : "Google Lens local: não encontrou resultado utilizável"+(discovery.lens_reason?(" ("+discovery.lens_reason+")"):"")+".")
+    : "Google Lens local: desativado neste ambiente.";
   const enrichmentLine=enrichment.used
-    ? "Enriquecimento: "+String(enrichment.marketplace_source_count||0)+" marketplaces compatíveis • "+String(enrichment.technical_spec_count||0)+" especificações."
+    ? "Enriquecimento: "+String(enrichment.confirmed_match_count||0)+" correspondências confirmadas • "+String(enrichment.technical_spec_count||0)+" especificações."
     : "Enriquecimento externo não utilizado.";
-  $("#researchNotes").textContent=[nativeLine,enrichmentLine,...notes].filter(Boolean).join(" ");
+  $("#researchNotes").textContent=[nativeLine,lensLine,enrichmentLine,...notes].filter(Boolean).join(" ");
   const nativeRows=[];
   if(native.used){
     nativeRows.push(
@@ -847,6 +856,21 @@ function renderResearchResult(result){
     (sources.length
       ? sources.map(s=>'<div class="research-row"><b>'+esc(s.marketplace||s.host||"Fonte")+'</b><br>'+esc(s.title||s.url||"")+'</div>').join("")
       : '<div class="research-row">Nenhum marketplace compatível foi acessível.</div>'));
+
+  $("#researchCandidateList").innerHTML=candidates.length
+    ? candidates.slice(0,10).map(x=>{
+        const score=Math.round(Number(x.match_score||0)*100);
+        const imageScore=x.image_match&&x.image_match.score!==null&&x.image_match.score!==undefined
+          ? Math.round(Number(x.image_match.score||0)*100)
+          : null;
+        const status=x.verification==="confirmed"?"✅ Confirmado":"👆 Precisa confirmar";
+        return '<div class="research-row"><b>'+status+' • '+esc(x.marketplace||x.host||"Fonte")+'</b>'+
+          '<br>'+esc(x.title||x.url||"")+
+          '<br><span style="color:#718096">match '+esc(String(score))+'%'+
+          (imageScore!==null?(' • imagem '+esc(String(imageScore))+'%'):"")+
+          '</span></div>';
+      }).join("")
+    : '<div class="research-row">Nenhum candidato visual encontrado.</div>';
 
   $("#researchSpecsList").innerHTML=specs.length
     ? specs.slice(0,30).map(s=>{
@@ -966,6 +990,7 @@ function clearPreviousResearchFields(preserveFields=new Set()){
   $("#researchSourceList").innerHTML="";
   $("#researchReviewList").innerHTML="";
   $("#researchFaqList").innerHTML="";
+  if($("#researchCandidateList")) $("#researchCandidateList").innerHTML="";
   if($("#researchSpecsList")) $("#researchSpecsList").innerHTML="";
   $("#researchNotes").textContent="";
 }
