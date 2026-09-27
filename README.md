@@ -85,3 +85,12 @@ Esta branch é testada em um serviço Railway separado antes de qualquer altera�
 A branch `v0.5.1-product-intelligence` separa dados permanentes do produto das condições temporárias da LIVE, registra origem/confiança dos campos e permite edição manual com prioridade sobre futuras pesquisas automáticas.
 
 A análise automática do link será ativada na V0.5.2.
+
+
+## V0.5.2 — Product Research
+
+A branch `v0.5.2-product-research` ativa o botão **Analisar produto**.
+O sistema resolve o link, tenta extrair dados estruturados, procura fontes públicas relacionadas,
+monta um rascunho com origem/confiança e preserva qualquer campo travado manualmente pelo usuário.
+
+A pesquisa é conservadora: não contorna login, CAPTCHA ou bloqueios de sites.
