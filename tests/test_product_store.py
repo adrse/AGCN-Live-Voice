@@ -134,3 +134,48 @@ def test_live_conditions_are_separate_from_product_facts():
         }
         assert presenter["stock"] == 5.0
         assert presenter["live_offer"] is True
+
+
+
+def test_save_research_draft_preserves_origin():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ProductStore(Path(tmp) / "products.json")
+        product = store.add(
+            name="Relógio S20",
+            brand="Marca X",
+            battery_info="Até 7 dias",
+            manual_fields=[],
+            research_meta={
+                "name": {
+                    "confidence": 0.9,
+                    "sources": [{"url": "https://example.com"}],
+                },
+                "brand": {
+                    "confidence": 0.95,
+                    "sources": [{"url": "https://example.com"}],
+                },
+                "battery_info": {
+                    "confidence": 0.8,
+                    "sources": [{"url": "https://example.com"}],
+                },
+            },
+            research_summary={
+                "status": "completed",
+                "source_count": 1,
+            },
+        )
+
+        assert product["field_meta"]["brand"]["origin"] == "research"
+        assert product["field_meta"]["brand"]["locked_by_user"] is False
+        assert product["research"]["source_count"] == 1
+
+        updated = store.update(
+            product["id"],
+            brand="Marca corrigida",
+            manual_fields=["brand"],
+            research_meta={},
+        )
+
+        assert updated["brand"] == "Marca corrigida"
+        assert updated["field_meta"]["brand"]["origin"] == "user"
+        assert updated["field_meta"]["brand"]["locked_by_user"] is True
