@@ -28,7 +28,7 @@ class AGCNVoiceRuntime:
         self.current_speech = None
         self.current_speech_until = 0.0
 
-        active = self.store.active() or {}
+        active = self.store.active_for_presenter() or {}
         self.presenter = PresenterV2(active)
         self.product_signature = self._product_signature(active)
 
@@ -44,7 +44,7 @@ class AGCNVoiceRuntime:
         )
 
     def _sync_active_product_locked(self):
-        active = self.store.active() or {}
+        active = self.store.active_for_presenter() or {}
         signature = self._product_signature(active)
 
         if signature != self.product_signature:
@@ -208,7 +208,7 @@ class AGCNVoiceRuntime:
 
             data = {
                 **live,
-                "version": "0.5-presenter-behavior",
+                "version": "0.5.1-product-intelligence",
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
