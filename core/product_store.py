@@ -9,6 +9,19 @@ from threading import RLock
 from zoneinfo import ZoneInfo
 
 
+TEXT_FIELDS = {
+    "name", "description", "additional_info", "category", "image_url",
+    "brand", "key_benefits", "problems_solved", "differentials",
+    "included_items", "compatibility", "limitations", "size_info",
+    "battery_info", "usage_info", "shipping_info", "warranty",
+    "live_offer_text",
+}
+
+NUMBER_FIELDS = {
+    "regular_price", "current_price", "discount", "stock",
+}
+
+
 def agora_iso() -> str:
     return datetime.now(
         ZoneInfo("America/Araguaina")
@@ -28,14 +41,14 @@ def default_store_file() -> Path:
 
 
 class ProductStore:
-    """Product Store portável baseado na V0.2 aprovada no Colab."""
+    """Product Store portável e compatível com a V0.2."""
 
     def __init__(self, path: str | Path | None = None):
         self.path = Path(path) if path else default_store_file()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = RLock()
         self.data = {
-            "version": 1,
+            "version": 2,
             "active_product_id": None,
             "products": [],
         }
@@ -60,11 +73,12 @@ class ProductStore:
                         )
                 except Exception:
                     self.data = {
-                        "version": 1,
+                        "version": 2,
                         "active_product_id": None,
                         "products": [],
                     }
 
+            self.data["version"] = 2
             self._repair_active()
             self.save()
 
@@ -82,7 +96,11 @@ class ProductStore:
     def _repair_active(self) -> None:
         ids = {p.get("id") for p in self.data["products"]}
         if self.data["active_product_id"] not in ids:
-            self.data["active_product_id"] = None
+            self.data["active_product_id"] = (
+                self.data["products"][0]["id"]
+                if self.data["products"]
+                else None
+            )
 
     def list(self) -> list[dict]:
         with self.lock:
@@ -112,35 +130,53 @@ class ProductStore:
                 return None
             return self.get(active_id)
 
-    def add(
-        self,
-        *,
-        name,
-        description="",
-        regular_price=None,
-        current_price=None,
-        discount=None,
-        additional_info="",
-        category="",
-        image_url="",
-    ) -> dict:
-        name = str(name or "").strip()
+    def add(self, **payload) -> dict:
+        name = str(payload.get("name") or "").strip()
         if not name:
             raise ValueError("O nome do produto é obrigatório.")
 
         product = {
             "id": uuid.uuid4().hex[:12],
             "name": name,
-            "description": str(description or "").strip(),
-            "regular_price": self._number_or_none(regular_price),
-            "current_price": self._number_or_none(current_price),
-            "discount": self._number_or_none(discount),
-            "additional_info": str(additional_info or "").strip(),
-            "category": str(category or "").strip(),
-            "image_url": str(image_url or "").strip(),
+            "description": "",
+            "regular_price": None,
+            "current_price": None,
+            "discount": None,
+            "additional_info": "",
+            "category": "",
+            "image_url": "",
+            "brand": "",
+            "key_benefits": "",
+            "problems_solved": "",
+            "differentials": "",
+            "included_items": "",
+            "compatibility": "",
+            "limitations": "",
+            "size_info": "",
+            "battery_info": "",
+            "usage_info": "",
+            "shipping_info": "",
+            "warranty": "",
+            "stock": None,
+            "live_offer": False,
+            "live_offer_text": "",
             "created_at": agora_iso(),
             "updated_at": agora_iso(),
         }
+
+        for key in TEXT_FIELDS:
+            if key == "name":
+                continue
+            if key in payload:
+                product[key] = str(payload.get(key) or "").strip()
+
+        for key in NUMBER_FIELDS:
+            if key in payload:
+                product[key] = self._number_or_none(payload.get(key))
+
+        product["live_offer"] = self._bool_value(
+            payload.get("live_offer", False)
+        )
 
         with self.lock:
             self.data["products"].append(product)
@@ -165,29 +201,13 @@ class ProductStore:
             if not product:
                 raise KeyError("Produto não encontrado.")
 
-            allowed = {
-                "name",
-                "description",
-                "regular_price",
-                "current_price",
-                "discount",
-                "additional_info",
-                "category",
-                "image_url",
-            }
-
             for key, value in changes.items():
-                if key not in allowed:
-                    continue
-
-                if key in {
-                    "regular_price",
-                    "current_price",
-                    "discount",
-                }:
-                    product[key] = self._number_or_none(value)
-                else:
+                if key in TEXT_FIELDS:
                     product[key] = str(value or "").strip()
+                elif key in NUMBER_FIELDS:
+                    product[key] = self._number_or_none(value)
+                elif key == "live_offer":
+                    product[key] = self._bool_value(value)
 
             if not product.get("name"):
                 raise ValueError("O nome do produto é obrigatório.")
@@ -199,13 +219,11 @@ class ProductStore:
     def delete(self, product_id: str) -> bool:
         with self.lock:
             before = len(self.data["products"])
-
             self.data["products"] = [
                 p
                 for p in self.data["products"]
                 if p.get("id") != product_id
             ]
-
             removed = len(self.data["products"]) < before
 
             if self.data.get("active_product_id") == product_id:
@@ -233,13 +251,10 @@ class ProductStore:
             return None
 
         if isinstance(value, str):
-            value = (
-                value.strip()
-                .replace("R$", "")
-                .replace(" ", "")
-                .replace(".", "")
-                .replace(",", ".")
-            )
+            raw = value.strip().replace("R$", "").replace(" ", "")
+            if "," in raw:
+                raw = raw.replace(".", "").replace(",", ".")
+            value = raw
 
         try:
             return float(value)
@@ -247,6 +262,14 @@ class ProductStore:
             raise ValueError(
                 f"Valor numérico inválido: {value}"
             ) from exc
+
+    @staticmethod
+    def _bool_value(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().casefold() in {
+            "1", "true", "sim", "yes", "on"
+        }
 
     def presenter_context(self) -> dict:
         product = self.active()
@@ -259,15 +282,5 @@ class ProductStore:
 
         return {
             "ready": True,
-            "product": {
-                "id": product.get("id"),
-                "name": product.get("name"),
-                "description": product.get("description"),
-                "regular_price": product.get("regular_price"),
-                "current_price": product.get("current_price"),
-                "discount": product.get("discount"),
-                "additional_info": product.get("additional_info"),
-                "category": product.get("category"),
-                "image_url": product.get("image_url"),
-            },
+            "product": dict(product),
         }
