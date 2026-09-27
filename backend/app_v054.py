@@ -26,6 +26,7 @@ runtime = AGCNVoiceRuntime()
 # O site atual é apenas um protótipo temporário de validação. Ativamos o
 # Lens também nele para conseguir testar a lógica antes do executável Windows.
 os.environ["AGCN_LENS_ENABLED"] = "1"
+os.environ["AGCN_TIKTOK_BROWSER_ENABLED"] = "0"
 
 research_engine = ProductResearchEngineV054()
 research_engine.enrichment.lens.headless = True
