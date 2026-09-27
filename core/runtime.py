@@ -208,7 +208,7 @@ class AGCNVoiceRuntime:
 
             data = {
                 **live,
-                "version": "0.5.2-product-research",
+                "version": "0.5.3-tiktok-native-extractor",
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
@@ -275,7 +275,7 @@ class AGCNVoiceRuntime:
         passed = sum(1 for ok in checks.values() if ok)
 
         lines = [
-            "AGCN LIVE VOICE — TESTE V0.5.2 PRODUCT RESEARCH",
+            "AGCN LIVE VOICE — TESTE V0.5.3 TIKTOK NATIVE EXTRACTOR",
             "",
             f"LIVE: {data.get('username') or 'NÃO INICIADA'}",
             f"Status: {data.get('status', '—')}",
