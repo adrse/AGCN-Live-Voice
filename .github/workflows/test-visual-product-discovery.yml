@@ -26,7 +26,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p .ci
-          pytest -q tests/test_visual_product_discovery.py > .ci/visual-product-test.txt 2>&1
+          PYTHONPATH=. pytest -q tests/test_visual_product_discovery.py > .ci/visual-product-test.txt 2>&1
       - name: Persist diagnostics
         if: steps.focused.outcome == 'failure'
         run: |
