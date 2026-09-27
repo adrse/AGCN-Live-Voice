@@ -209,6 +209,13 @@ class ProductResearchEngine:
 
         seed = self._seed_from_source(direct)
 
+        if not seed.get("name"):
+            inferred_name = self._name_from_description(
+                direct.get("description") or ""
+            )
+            if inferred_name:
+                seed["name"] = inferred_name
+
         if metadata.get("name"):
             seed["name"] = metadata["name"]
         if metadata.get("image_url"):
@@ -816,6 +823,46 @@ class ProductResearchEngine:
         )
         return _clean(title)[:220]
 
+    def _name_from_description(self, description: str) -> str:
+        text = _clean(description)
+        if not text:
+            return ""
+
+        # Páginas de marketplace às vezes expõem apenas uma meta description:
+        # "Compre NOME DO PRODUTO na Shopee/TikTok Shop...".
+        text = re.sub(
+            r"^(compre|comprar|oferta de|encontre)\s+",
+            "",
+            text,
+            flags=re.I,
+        )
+
+        separators = [
+            r"\s+no\s+tiktok\s+shop\b",
+            r"\s+na\s+shopee\b",
+            r"\s+na\s+amazon\b",
+            r"\s+no\s+mercado\s+livre\b",
+            r"\.\s*descubra\b",
+            r"\.\s*aproveite\b",
+            r"\s+por\s+apenas\b",
+        ]
+
+        for pattern in separators:
+            parts = re.split(pattern, text, maxsplit=1, flags=re.I)
+            if len(parts) > 1:
+                text = parts[0]
+                break
+
+        text = _clean(text).strip(" -|:;,.")
+        if not (5 <= len(text) <= 180):
+            return ""
+
+        # Rejeita descrições genéricas de segurança/erro.
+        if self._clean_product_title(text) == "":
+            return ""
+
+        return text
+
     def _identity_from_title(self, title: str) -> dict:
         text = self._clean_product_title(title)
         if not text:
@@ -850,6 +897,17 @@ class ProductResearchEngine:
         low = text.casefold()
         if "smartwatch" in low or "relógio" in low or "relogio" in low:
             category = "Smartwatch"
+        elif (
+            "fitness" in low
+            and any(x in low for x in ("calça", "calca", "top", "legging"))
+        ):
+            category = "Moda Fitness"
+        elif any(x in low for x in ("calça", "calca", "legging")):
+            category = "Calça"
+        elif any(x in low for x in ("fone", "earbud", "headphone")):
+            category = "Áudio"
+        elif any(x in low for x in ("mop", "rodo", "limpeza")):
+            category = "Casa e Limpeza"
 
         parts = [x for x in (brand, model, category) if x]
         search_name = " ".join(parts[:3]).strip()
@@ -1072,15 +1130,49 @@ class ProductResearchEngine:
             add("brand", product.get("brand"), min(0.94, base + 0.08), source)
             add("model", product.get("model"), min(0.92, base + 0.06), source)
             add("category", product.get("category"), base, source)
-            add(
-                "description",
-                _first(
-                    product.get("description"),
-                    source.get("description"),
-                ),
-                base,
-                source,
+            source_description = _first(
+                product.get("description"),
+                source.get("description"),
             )
+
+            if source_description:
+                identity_anchor = " ".join(
+                    x for x in (
+                        seed.get("brand"),
+                        seed.get("model"),
+                        seed.get("name"),
+                    )
+                    if x
+                )
+                description_match = _similarity(
+                    identity_anchor,
+                    source_description,
+                )
+                brand_in_description = bool(
+                    seed.get("brand")
+                    and str(seed.get("brand")).casefold()
+                    in str(source_description).casefold()
+                )
+                model_in_description = bool(
+                    seed.get("model")
+                    and str(seed.get("model")).casefold()
+                    in str(source_description).casefold()
+                )
+
+                # Não deixa uma meta description não relacionada da página
+                # substituir os dados do produto identificado pelo link.
+                if (
+                    source.get("source_type") != "submitted_link"
+                    or description_match >= 0.20
+                    or brand_in_description
+                    or model_in_description
+                ):
+                    add(
+                        "description",
+                        source_description,
+                        base,
+                        source,
+                    )
             add(
                 "image_url",
                 _first(
@@ -1128,51 +1220,279 @@ class ProductResearchEngine:
 
             field_sources[field] = deduped
 
-        # Esses campos são inferências de venda e não são fabricados a partir
-        # de uma única descrição. Só montamos rascunhos quando há texto útil.
-        descriptions = [
-            _clean(
-                _first(
-                    (s.get("product") or {}).get("description"),
-                    s.get("description"),
-                )
-            )
-            for s in sources
-            if s.get("ok")
-        ]
-        combined = " ".join(x for x in descriptions if x)
+        derived = self._derive_structured_fields(
+            sources,
+            seed,
+        )
 
-        if combined:
-            sentences = [
-                _clean(x)
-                for x in re.split(r"(?<=[.!?])\s+", combined)
-                if 25 <= len(_clean(x)) <= 240
-            ]
-
-            benefit_candidates = [
-                s for s in sentences
-                if any(
-                    key in s.casefold()
-                    for key in (
-                        "ideal", "permite", "facil", "fácil", "prático",
-                        "pratico", "confort", "econom", "resistente",
-                        "rápid", "rapido", "benef", "ajuda", "melhor",
-                    )
-                )
-            ]
-
-            if benefit_candidates:
-                values["key_benefits"] = "; ".join(
-                    benefit_candidates[:4]
-                )
-                confidence["key_benefits"] = 0.58
-                field_sources["key_benefits"] = [
-                    self._public_source_record(s)
-                    for s in sources
-                    if s.get("ok") and s.get("description")
-                ][:4]
+        for field, payload in derived.items():
+            if field in values:
+                continue
+            values[field] = payload["value"]
+            confidence[field] = payload["confidence"]
+            field_sources[field] = payload["sources"]
 
         return values, confidence, field_sources, reviews[:250]
+
+    def _source_text_for_identity(
+        self,
+        source: dict,
+        seed: dict,
+    ) -> str:
+        if not source.get("ok"):
+            return ""
+
+        product = source.get("product") or {}
+        title = _clean(
+            _first(
+                product.get("name"),
+                source.get("title"),
+            )
+        )
+        description = _clean(
+            _first(
+                product.get("description"),
+                source.get("description"),
+            )
+        )
+
+        if source.get("source_type") == "submitted_link":
+            # O título vindo de og_info é confiável para identidade.
+            safe_parts = [title]
+            anchor = " ".join(
+                x for x in (
+                    seed.get("brand"),
+                    seed.get("model"),
+                    seed.get("name"),
+                )
+                if x
+            )
+            if (
+                description
+                and (
+                    _similarity(anchor, description) >= 0.20
+                    or (
+                        seed.get("brand")
+                        and str(seed["brand"]).casefold()
+                        in description.casefold()
+                    )
+                    or (
+                        seed.get("model")
+                        and str(seed["model"]).casefold()
+                        in description.casefold()
+                    )
+                )
+            ):
+                safe_parts.append(description)
+            return _clean(" ".join(x for x in safe_parts if x))
+
+        return _clean(" ".join(x for x in (title, description) if x))
+
+    def _derive_structured_fields(
+        self,
+        sources: list[dict],
+        seed: dict,
+    ) -> dict:
+        evidence = []
+        source_records = []
+
+        for source in sources:
+            text = self._source_text_for_identity(source, seed)
+            if not text:
+                continue
+            evidence.append(text)
+            source_records.append(self._public_source_record(source))
+
+        # O próprio título identificado pelo link sempre entra como evidência.
+        if seed.get("name"):
+            evidence.insert(0, _clean(seed["name"]))
+
+        combined = " ".join(evidence)
+        if not combined:
+            return {}
+
+        low = combined.casefold()
+        sentences = [
+            _clean(x)
+            for x in re.split(r"(?<=[.!?;])\s+|\s+[|•]\s+", combined)
+            if 12 <= len(_clean(x)) <= 300
+        ]
+
+        def unique_sentences(keys, limit=4):
+            out = []
+            seen = set()
+            for sentence in sentences:
+                sl = sentence.casefold()
+                if not any(k in sl for k in keys):
+                    continue
+                norm = re.sub(r"\W+", " ", sl).strip()
+                if norm in seen:
+                    continue
+                seen.add(norm)
+                out.append(sentence)
+                if len(out) >= limit:
+                    break
+            return out
+
+        derived = {}
+        sources_out = source_records[:5]
+
+        benefit_sentences = unique_sentences(
+            (
+                "ideal", "permite", "fácil", "facil", "prático", "pratico",
+                "confort", "resistente", "rápid", "rapido", "performance",
+                "cintura alta", "compress", "flex", "respir", "leve",
+            ),
+            limit=4,
+        )
+        if benefit_sentences:
+            derived["key_benefits"] = {
+                "value": "; ".join(benefit_sentences),
+                "confidence": 0.62,
+                "sources": sources_out,
+            }
+
+        included = unique_sentences(
+            (
+                "acompanha", "inclui", "vem com", "itens inclus",
+                "conteúdo da embalagem", "conteudo da embalagem",
+                "brinde", "kit contém", "kit contem",
+            ),
+            limit=4,
+        )
+        if included:
+            derived["included_items"] = {
+                "value": "; ".join(included),
+                "confidence": 0.68,
+                "sources": sources_out,
+            }
+
+        compatibility = unique_sentences(
+            (
+                "compatível", "compativel", "android", "iphone", "ios",
+                "strava", "whatsapp", "bluetooth", "indução", "inducao",
+            ),
+            limit=4,
+        )
+        if compatibility:
+            derived["compatibility"] = {
+                "value": "; ".join(compatibility),
+                "confidence": 0.66,
+                "sources": sources_out,
+            }
+
+        battery = unique_sentences(
+            (
+                "bateria", "autonomia", "mah", "carregamento", "carga",
+            ),
+            limit=4,
+        )
+        if battery:
+            derived["battery_info"] = {
+                "value": "; ".join(battery),
+                "confidence": 0.70,
+                "sources": sources_out,
+            }
+
+        warranty = unique_sentences(
+            ("garantia", "warranty"),
+            limit=3,
+        )
+        if warranty:
+            derived["warranty"] = {
+                "value": "; ".join(warranty),
+                "confidence": 0.72,
+                "sources": sources_out,
+            }
+
+        usage = unique_sentences(
+            (
+                "como usar", "modo de uso", "ideal para", "indicado para",
+                "treino", "esporte", "corrida", "academia", "monitoramento",
+            ),
+            limit=4,
+        )
+        if usage:
+            derived["usage_info"] = {
+                "value": "; ".join(usage),
+                "confidence": 0.60,
+                "sources": sources_out,
+            }
+
+        limitations = unique_sentences(
+            (
+                "não possui", "nao possui", "não compatível", "nao compativel",
+                "não suporta", "nao suporta", "não acompanha", "nao acompanha",
+            ),
+            limit=3,
+        )
+        if limitations:
+            derived["limitations"] = {
+                "value": "; ".join(limitations),
+                "confidence": 0.72,
+                "sources": sources_out,
+            }
+
+        measurement_patterns = (
+            r"\b\d+(?:[.,]\d+)?\s?(?:mah|atm|hz|cm|mm|ml|kg|g|w|v)\b",
+            r"\b\d+(?:[.,]\d+)?\s?(?:polegadas|litros|l)\b",
+        )
+        measurement_sentences = []
+        for sentence in sentences:
+            sl = sentence.casefold()
+            if any(re.search(p, sl, re.I) for p in measurement_patterns):
+                measurement_sentences.append(sentence)
+            if len(measurement_sentences) >= 5:
+                break
+
+        if measurement_sentences:
+            derived["size_info"] = {
+                "value": "; ".join(measurement_sentences),
+                "confidence": 0.64,
+                "sources": sources_out,
+            }
+
+        # Diferenciais: extrai apenas atributos explicitamente mencionados.
+        feature_patterns = [
+            (r"\bgps\s+interno\b", "GPS interno"),
+            (r"\bstrava\b", "Integração com Strava"),
+            (r"\bwhatsapp\b", "Recurso com WhatsApp"),
+            (r"\b5\s?atm\b", "Resistência à água 5ATM"),
+            (r"\bamoled\b", "Tela AMOLED"),
+            (r"\b60\s?hz\b", "Tela 60 Hz"),
+            (r"\b150\s+modos\b", "150 modos esportivos"),
+            (r"\bchatgpt\b", "Recurso ChatGPT anunciado"),
+            (r"\bcintura\s+alta\b", "Cintura alta"),
+        ]
+        features = []
+        for pattern, label in feature_patterns:
+            if re.search(pattern, low, re.I):
+                features.append(label)
+
+        if features:
+            derived["differentials"] = {
+                "value": "; ".join(dict.fromkeys(features)),
+                "confidence": 0.74,
+                "sources": sources_out,
+            }
+
+        # Só gera "problemas que resolve" quando a própria fonte usa linguagem
+        # explícita de solução/dor; não inventa benefícios.
+        problem_sentences = unique_sentences(
+            (
+                "ajuda a", "resolve", "evita", "reduz", "melhora",
+                "para quem sofre", "para quem precisa",
+            ),
+            limit=3,
+        )
+        if problem_sentences:
+            derived["problems_solved"] = {
+                "value": "; ".join(problem_sentences),
+                "confidence": 0.58,
+                "sources": sources_out,
+            }
+
+        return derived
 
     def _analyze_reviews(
         self,
