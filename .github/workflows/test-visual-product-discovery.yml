@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - v0.5.2-product-research
+    paths-ignore:
+      - .ci/visual-product-test.txt
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -16,4 +21,20 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall core backend
-      - run: pytest -q tests/test_visual_product_discovery.py
+      - name: Run focused tests
+        id: focused
+        continue-on-error: true
+        run: |
+          mkdir -p .ci
+          pytest -q tests/test_visual_product_discovery.py > .ci/visual-product-test.txt 2>&1
+      - name: Persist diagnostics
+        if: steps.focused.outcome == 'failure'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .ci/visual-product-test.txt
+          git commit -m "[skip ci] Salva diagnóstico do teste visual" || true
+          git push
+      - name: Fail when focused tests fail
+        if: steps.focused.outcome == 'failure'
+        run: exit 1
