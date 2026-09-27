@@ -165,6 +165,12 @@ details{margin-top:10px}summary{cursor:pointer;font-weight:850;color:#1e64b7;fon
 .product-chip{min-width:210px}
 .product-chip-meta{font-size:8px;color:var(--muted);margin-top:4px}
 .product-chip .row{display:grid;grid-template-columns:repeat(3,1fr)}
+.research-list{display:grid;gap:6px}
+.research-row{background:#fff;border:1px solid #e3ebf5;border-radius:9px;padding:8px;font-size:9px;color:#506078;line-height:1.35}
+.research-row b{color:#21364f}
+.research-loading{display:inline-flex;align-items:center;gap:7px;color:#246cc3;font-weight:800}
+.research-spinner{width:13px;height:13px;border:2px solid #cdddf1;border-top-color:#246cc3;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .debug-card{margin-top:12px}
 pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:10px;max-height:280px;overflow:auto;margin:8px 0 0}
 .hidden{display:none!important}
@@ -201,7 +207,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5.1</span><span class="dot"></span><span>Product Intelligence</span>
+      <span>v0.5.2</span><span class="dot"></span><span>Product Research</span>
     </div>
   </aside>
 
@@ -302,18 +308,28 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
           <div class="field-label">Link do produto TikTok</div>
           <input id="pUrl" placeholder="https://vt.tiktok.com/...">
         </div>
-        <button class="btn" id="analyzeLink" disabled title="Será ativado na V0.5.2">🔎 Analisar link — próxima etapa</button>
+        <button class="btn primary" id="analyzeLink">🔎 Analisar produto</button>
       </div>
 
       <div id="researchBox" class="research-box">
         <b style="font-size:11px">Pesquisa do produto</b>
-        <div id="researchStatusText" class="intel-sub">Ainda não analisado automaticamente. Nesta versão, a ficha e a edição manual já ficam prontas.</div>
+        <div id="researchStatusText" class="intel-sub">Cole o link do produto e toque em Analisar produto. O sistema pesquisará somente fontes públicas acessíveis.</div>
         <div class="research-grid">
           <div class="research-stat"><b id="researchSources">0</b><span>FONTES</span></div>
           <div class="research-stat"><b id="researchReviews">0</b><span>AVALIAÇÕES</span></div>
           <div class="research-stat"><b id="researchFaq">0</b><span>FAQ</span></div>
           <div class="research-stat"><b id="researchLocked">0</b><span>CAMPOS MANUAIS</span></div>
         </div>
+        <details id="researchDetails" class="hidden" style="margin-top:10px">
+          <summary>Ver o que foi encontrado</summary>
+          <div id="researchNotes" class="intel-sub" style="margin-top:8px"></div>
+          <div class="section-label" style="margin-top:10px">FONTES ENCONTRADAS</div>
+          <div id="researchSourceList" class="research-list"></div>
+          <div class="section-label" style="margin-top:10px">AVALIAÇÕES / PERCEPÇÕES</div>
+          <div id="researchReviewList" class="research-list"></div>
+          <div class="section-label" style="margin-top:10px">PERGUNTAS FREQUENTES</div>
+          <div id="researchFaqList" class="research-list"></div>
+        </details>
       </div>
 
       <div class="section-label">DADOS PERMANENTES DO PRODUTO</div>
@@ -446,6 +462,11 @@ let lastStatus = "parado";
 let wsConnected = false;
 let editingProductId = null;
 let editorOriginal = {};
+let editorLockedFields = new Set();
+let researchDraftMeta = {};
+let researchDraftSummary = {};
+let researchBaseline = null;
+let preResearchManualFields = new Set();
 
 async function api(url,options={}){
   const r = await fetch(url,{headers:{"Content-Type":"application/json"},...options});
@@ -545,8 +566,8 @@ function renderEditorMeta(product){
 
   const status=research.status||"not_analyzed";
   $("#researchStatusText").textContent=status==="completed"
-    ? "Pesquisa concluída. Revise as informações antes de usar na LIVE."
-    : "Ainda não analisado automaticamente. Nesta versão, a ficha e a edição manual já ficam prontas.";
+    ? "Pesquisa concluída. Revise e edite o rascunho antes de salvar."
+    : "Cole o link do produto e toque em Analisar produto. O sistema pesquisará somente fontes públicas acessíveis.";
 }
 
 function renderProduct(data){
@@ -704,11 +725,21 @@ function editorValues(){
 function resetEditor(){
   editingProductId=null;
   editorOriginal={};
+  editorLockedFields=new Set();
+  researchDraftMeta={};
+  researchDraftSummary={};
+  researchBaseline=null;
+  preResearchManualFields=new Set();
   Object.values(editorMap).forEach(selector=>{$(selector).value=""});
   $("#pLiveOffer").checked=false;
   $("#editingPill").classList.add("hidden");
   $("#cancelEdit").classList.add("hidden");
   $("#saveProduct").textContent="Salvar produto";
+  $("#researchDetails").classList.add("hidden");
+  $("#researchSourceList").innerHTML="";
+  $("#researchReviewList").innerHTML="";
+  $("#researchFaqList").innerHTML="";
+  $("#researchNotes").textContent="";
   renderEditorMeta(null);
 }
 
@@ -736,6 +767,14 @@ function loadEditor(product){
   }
   $("#pLiveOffer").checked=values.live_offer;
   editorOriginal=values;
+  researchDraftMeta={};
+  researchDraftSummary={};
+  researchBaseline=null;
+  preResearchManualFields=new Set();
+  editorLockedFields=new Set([
+    ...Object.entries(product.field_meta||{}).filter(([_,m])=>m&&m.locked_by_user).map(([k])=>k),
+    ...Object.entries(product.live_meta||{}).filter(([_,m])=>m&&m.locked_by_user).map(([k])=>k)
+  ]);
   $("#editingPill").classList.remove("hidden");
   $("#cancelEdit").classList.remove("hidden");
   $("#saveProduct").textContent="Salvar alterações";
@@ -743,21 +782,127 @@ function loadEditor(product){
   $("#productPanel").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+function baseChangedFields(values,baseline){
+  return Object.keys(values).filter(
+    k=>String(values[k]??"")!==String((baseline||{})[k]??"")
+  );
+}
+
 function changedFields(values){
+  if(researchBaseline){
+    return Array.from(new Set([
+      ...preResearchManualFields,
+      ...baseChangedFields(values,researchBaseline)
+    ]));
+  }
+
   if(!editingProductId){
     return Object.entries(values)
       .filter(([k,v])=>v!=="" && v!==null && v!==false)
       .map(([k])=>k);
   }
-  return Object.keys(values).filter(k=>String(values[k]??"")!==String(editorOriginal[k]??""));
+
+  return baseChangedFields(values,editorOriginal);
 }
 
+function renderResearchResult(result){
+  const summary=result.research_summary||{};
+  const sources=summary.sources||[];
+  const reviews=summary.review_summary||{};
+  const faq=summary.faq||[];
+  const notes=summary.notes||[];
+
+  $("#researchSources").textContent=summary.source_count||0;
+  $("#researchReviews").textContent=summary.review_count||0;
+  $("#researchFaq").textContent=faq.length||0;
+  $("#researchStatusText").textContent=result.ok
+    ? "Pesquisa concluída. As informações abaixo são um rascunho: revise antes de salvar."
+    : "A pesquisa foi parcial. Complete o nome/modelo manualmente e tente novamente.";
+
+  $("#researchNotes").textContent=notes.join(" ");
+  $("#researchSourceList").innerHTML=sources.length
+    ? sources.map(s=>'<div class="research-row"><b>'+esc(s.host||"Fonte")+'</b><br>'+esc(s.title||s.url||"")+'</div>').join("")
+    : '<div class="research-row">Nenhuma fonte pública adicional foi acessível.</div>';
+
+  const positives=reviews.positives||[];
+  const negatives=reviews.negatives||[];
+  const contexts=reviews.context_snippets||[];
+  const rows=[];
+  positives.slice(0,4).forEach(x=>rows.push('<div class="research-row"><b>👍 Positivo encontrado</b><br>'+esc(x)+'</div>'));
+  negatives.slice(0,4).forEach(x=>rows.push('<div class="research-row"><b>⚠ Ponto negativo encontrado</b><br>'+esc(x)+'</div>'));
+  contexts.slice(0,4).forEach(x=>rows.push('<div class="research-row"><b>Contexto público</b><br>'+esc(x)+'</div>'));
+  $("#researchReviewList").innerHTML=rows.join("")||'<div class="research-row">Nenhuma avaliação textual pública foi extraída nesta tentativa.</div>';
+
+  $("#researchFaqList").innerHTML=faq.length
+    ? faq.slice(0,10).map(x=>'<div class="research-row"><b>❓ '+esc(x.question||"")+'</b></div>').join("")
+    : '<div class="research-row">Nenhuma pergunta recorrente foi identificada.</div>';
+
+  $("#researchDetails").classList.remove("hidden");
+}
+
+function applyResearchResult(result,manualBefore){
+  const values=result.values||{};
+  const confidence=result.confidence||{};
+  const fieldSources=result.field_sources||{};
+
+  // O link digitado pelo usuário é preservado como entrada original.
+  delete values.product_url;
+
+  for(const [key,value] of Object.entries(values)){
+    const selector=editorMap[key];
+    if(!selector) continue;
+    if(editorLockedFields.has(key) || manualBefore.has(key)) continue;
+    if(value===null || value===undefined || value==="") continue;
+
+    $(selector).value=value;
+    researchDraftMeta[key]={
+      origin:"research",
+      confidence:confidence[key]??null,
+      sources:fieldSources[key]||[],
+      locked_by_user:false
+    };
+  }
+
+  researchDraftSummary=result.research_summary||{};
+  preResearchManualFields=new Set([
+    ...preResearchManualFields,
+    ...manualBefore
+  ]);
+  researchBaseline=editorValues();
+
+  const fakeProduct={
+    field_meta:{},
+    live_meta:{},
+    research:researchDraftSummary
+  };
+  const liveFields=new Set([
+    "regular_price","current_price","discount","stock","shipping_info",
+    "coupon","promotion_note","live_offer_text"
+  ]);
+  for(const [key,meta] of Object.entries(researchDraftMeta)){
+    if(liveFields.has(key)) fakeProduct.live_meta[key]=meta;
+    else fakeProduct.field_meta[key]=meta;
+  }
+
+  // Mantém visualmente os campos já travados manualmente quando editando.
+  if(editingProductId){
+    for(const key of editorLockedFields){
+      if(liveFields.has(key)) fakeProduct.live_meta[key]={origin:"user",locked_by_user:true};
+      else fakeProduct.field_meta[key]={origin:"user",locked_by_user:true};
+    }
+  }
+
+  renderEditorMeta(fakeProduct);
+  renderResearchResult(result);
+}
 async function saveEditor(activateAfter=false){
   try{
     const values=editorValues();
     if(!String(values.name||"").trim()) throw new Error("Informe o nome do produto.");
 
     values.manual_fields=changedFields(values);
+    values.research_meta=researchDraftMeta;
+    values.research_summary=researchDraftSummary;
     const url=editingProductId?("/api/products/"+editingProductId):"/api/products";
     const method=editingProductId?"PUT":"POST";
     const result=await api(url,{method,body:JSON.stringify(values)});
@@ -773,6 +918,51 @@ async function saveEditor(activateAfter=false){
     $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
   }
 }
+
+$("#analyzeLink").onclick=async()=>{
+  const button=$("#analyzeLink");
+  const url=$("#pUrl").value.trim();
+
+  if(!url){
+    $("#productMessage").innerHTML='<span class="bad">Cole o link do produto primeiro.</span>';
+    return;
+  }
+
+  const before=editorValues();
+  const comparison=researchBaseline||editorOriginal||{};
+  const manualBefore=new Set(
+    !editingProductId && !researchBaseline
+      ? Object.entries(before).filter(([k,v])=>k!=="product_url"&&v!==""&&v!==null&&v!==false).map(([k])=>k)
+      : baseChangedFields(before,comparison).filter(k=>k!=="product_url")
+  );
+
+  button.disabled=true;
+  button.innerHTML='<span class="research-loading"><span class="research-spinner"></span>Pesquisando...</span>';
+  $("#researchStatusText").textContent="Resolvendo o link, identificando o produto e procurando fontes públicas...";
+
+  try{
+    const result=await api("/api/product-research/analyze",{
+      method:"POST",
+      body:JSON.stringify({
+        url,
+        hint:$("#pName").value.trim()
+      })
+    });
+    applyResearchResult(result,manualBefore);
+
+    if(!$("#pName").value.trim()){
+      $("#productMessage").innerHTML='<span class="bad">O TikTok não expôs o nome do produto nesta tentativa. Preencha Nome/Modelo e toque em Analisar produto novamente.</span>';
+    }else{
+      $("#productMessage").innerHTML='<span class="ok">Pesquisa concluída. Revise tudo antes de salvar.</span>';
+    }
+  }catch(e){
+    $("#researchStatusText").textContent="Não foi possível concluir esta pesquisa.";
+    $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
+  }finally{
+    button.disabled=false;
+    button.textContent="🔎 Analisar produto";
+  }
+};
 
 $("#saveProduct").onclick=()=>saveEditor(false);
 $("#saveActivateProduct").onclick=()=>saveEditor(true);
