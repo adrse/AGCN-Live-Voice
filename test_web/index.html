@@ -467,6 +467,7 @@ let researchDraftMeta = {};
 let researchDraftSummary = {};
 let researchBaseline = null;
 let preResearchManualFields = new Set();
+let lastResearchInputUrl = "";
 
 async function api(url,options={}){
   const r = await fetch(url,{headers:{"Content-Type":"application/json"},...options});
@@ -730,6 +731,7 @@ function resetEditor(){
   researchDraftSummary={};
   researchBaseline=null;
   preResearchManualFields=new Set();
+  lastResearchInputUrl="";
   Object.values(editorMap).forEach(selector=>{$(selector).value=""});
   $("#pLiveOffer").checked=false;
   $("#editingPill").classList.add("hidden");
@@ -771,6 +773,7 @@ function loadEditor(product){
   researchDraftSummary={};
   researchBaseline=null;
   preResearchManualFields=new Set();
+  lastResearchInputUrl=values.product_url||"";
   editorLockedFields=new Set([
     ...Object.entries(product.field_meta||{}).filter(([_,m])=>m&&m.locked_by_user).map(([k])=>k),
     ...Object.entries(product.live_meta||{}).filter(([_,m])=>m&&m.locked_by_user).map(([k])=>k)
@@ -919,6 +922,24 @@ async function saveEditor(activateAfter=false){
   }
 }
 
+function clearPreviousResearchFields(preserveFields=new Set()){
+  for(const key of Object.keys(researchDraftMeta||{})){
+    if(preserveFields.has(key) || editorLockedFields.has(key)) continue;
+    const selector=editorMap[key];
+    if(selector) $(selector).value="";
+  }
+
+  researchDraftMeta={};
+  researchDraftSummary={};
+  researchBaseline=null;
+
+  $("#researchDetails").classList.add("hidden");
+  $("#researchSourceList").innerHTML="";
+  $("#researchReviewList").innerHTML="";
+  $("#researchFaqList").innerHTML="";
+  $("#researchNotes").textContent="";
+}
+
 $("#analyzeLink").onclick=async()=>{
   const button=$("#analyzeLink");
   const url=$("#pUrl").value.trim();
@@ -928,13 +949,31 @@ $("#analyzeLink").onclick=async()=>{
     return;
   }
 
-  const before=editorValues();
-  const comparison=researchBaseline||editorOriginal||{};
-  const manualBefore=new Set(
+  let before=editorValues();
+  let comparison=researchBaseline||editorOriginal||{};
+  let manualBefore=new Set(
     !editingProductId && !researchBaseline
       ? Object.entries(before).filter(([k,v])=>k!=="product_url"&&v!==""&&v!==null&&v!==false).map(([k])=>k)
       : baseChangedFields(before,comparison).filter(k=>k!=="product_url")
   );
+
+  const isDifferentProductLink = Boolean(
+    lastResearchInputUrl
+    && url !== lastResearchInputUrl
+  );
+
+  if(isDifferentProductLink){
+    // Novo link = nova pesquisa. Remove somente o que veio da pesquisa
+    // anterior, preservando o que o usuário digitou/corrigiu manualmente.
+    clearPreviousResearchFields(manualBefore);
+    before=editorValues();
+    comparison=editorOriginal||{};
+    manualBefore=new Set([
+      ...manualBefore,
+      ...baseChangedFields(before,comparison).filter(k=>k!=="product_url")
+    ]);
+    $("#productMessage").innerHTML='<span class="ok">Novo link detectado. Dados da pesquisa anterior foram limpos.</span>';
+  }
 
   button.disabled=true;
   button.innerHTML='<span class="research-loading"><span class="research-spinner"></span>Pesquisando...</span>';
@@ -949,6 +988,7 @@ $("#analyzeLink").onclick=async()=>{
       })
     });
     applyResearchResult(result,manualBefore);
+    lastResearchInputUrl=url;
 
     if(!$("#pName").value.trim()){
       $("#productMessage").innerHTML='<span class="bad">O TikTok não expôs o nome do produto nesta tentativa. Preencha Nome/Modelo e toque em Analisar produto novamente.</span>';
