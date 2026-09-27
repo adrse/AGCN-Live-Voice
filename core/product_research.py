@@ -8,6 +8,8 @@ from urllib.parse import parse_qs, quote_plus, unquote, unquote_plus, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from core.tiktok_native_product import TikTokNativeProductExtractor
+
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -246,11 +248,25 @@ class ProductResearchEngine:
                 "Accept": "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.5",
             },
         )
+        self.tiktok_native = TikTokNativeProductExtractor()
 
     def analyze(self, url: str, hint: str = "") -> dict:
         url = _clean(url)
         if not url.startswith(("http://", "https://")):
             raise ValueError("Informe um link válido do produto.")
+
+        native = {}
+        if "tiktok.com" in urlparse(url).netloc.casefold():
+            try:
+                native = self.tiktok_native.extract(url)
+            except Exception as exc:
+                native = {
+                    "ok": False,
+                    "notes": [
+                        "Extrator nativo TikTok falhou nesta tentativa: "
+                        + _clean(str(exc))[:180]
+                    ],
+                }
 
         direct = self._fetch_source(url, source_type="submitted_link")
         resolved_url = direct.get("final_url") or url
@@ -279,6 +295,34 @@ class ProductResearchEngine:
                 direct["image_url"] = metadata["image_url"]
             direct["url_metadata"] = metadata
 
+        # O TikTok nativo tem prioridade sobre pesquisa externa quando expõe
+        # dados do próprio PDP.
+        if native.get("ok"):
+            product = direct.setdefault("product", {})
+            native_map = {
+                "name": "title",
+                "description": "description",
+                "brand": "brand",
+                "model": "model",
+                "category": "category",
+                "image_url": "image_url",
+            }
+            for target, source_key in native_map.items():
+                value = native.get(source_key)
+                if value not in (None, "", [], {}):
+                    product[target] = value
+
+            if native.get("title"):
+                direct["title"] = native["title"]
+            if native.get("description"):
+                direct["description"] = native["description"]
+            if native.get("image_url"):
+                direct["image_url"] = native["image_url"]
+
+            # Dados nativos do TikTok, especialmente preço e SKU, não são
+            # tratados como simples "pesquisa externa".
+            direct["tiktok_native"] = native
+
         seed = self._seed_from_source(direct)
 
         if not seed.get("name"):
@@ -297,6 +341,89 @@ class ProductResearchEngine:
 
         if hint:
             seed["name"] = _clean(hint)
+
+        native_values = {}
+        native_confidence = {}
+        native_field_sources = {}
+
+        if native.get("ok"):
+            native_source = [{
+                "url": native.get("resolved_url") or url,
+                "host": "shop.tiktok.com",
+                "marketplace": "TikTok Shop",
+                "title": native.get("title") or "",
+                "description": native.get("description") or "",
+                "source_type": "tiktok_native",
+                "status_code": 200,
+            }]
+
+            mapping = {
+                "name": native.get("title"),
+                "brand": native.get("brand"),
+                "model": native.get("model"),
+                "category": native.get("category"),
+                "description": native.get("description"),
+                "image_url": native.get("image_url"),
+            }
+
+            for field, value in mapping.items():
+                if value not in (None, "", [], {}):
+                    native_values[field] = value
+                    native_confidence[field] = 0.98
+                    native_field_sources[field] = native_source
+
+            if native.get("current_price") is not None:
+                native_values["current_price"] = native["current_price"]
+                native_confidence["current_price"] = 0.99
+                native_field_sources["current_price"] = native_source
+
+            if native.get("regular_price") is not None:
+                native_values["regular_price"] = native["regular_price"]
+                native_confidence["regular_price"] = 0.99
+                native_field_sources["regular_price"] = native_source
+
+            if native.get("discount") not in (None, ""):
+                native_values["discount"] = native["discount"]
+                native_confidence["discount"] = 0.99
+                native_field_sources["discount"] = native_source
+
+            if native.get("stock") is not None:
+                native_values["stock"] = native["stock"]
+                native_confidence["stock"] = 0.98
+                native_field_sources["stock"] = native_source
+
+            attribute_text = "; ".join(
+                f"{item.get('name')}: {item.get('value')}"
+                for item in (native.get("attributes") or [])
+                if item.get("name") and item.get("value")
+            )
+
+            sku_text = "; ".join(
+                " / ".join(
+                    x for x in (
+                        item.get("variation") or "",
+                        (
+                            f"R$ {item['price']:.2f}"
+                            if isinstance(item.get("price"), (int, float))
+                            else ""
+                        ),
+                    )
+                    if x
+                )
+                for item in (native.get("skus") or [])[:12]
+                if item.get("variation") or item.get("price") is not None
+            )
+
+            extra_parts = []
+            if attribute_text:
+                extra_parts.append("Especificações TikTok: " + attribute_text)
+            if sku_text:
+                extra_parts.append("Variações TikTok: " + sku_text)
+
+            if extra_parts:
+                native_values["additional_info"] = " | ".join(extra_parts)
+                native_confidence["additional_info"] = 0.96
+                native_field_sources["additional_info"] = native_source
 
         identity = self._identity_from_title(seed.get("name") or "")
 
@@ -345,6 +472,13 @@ class ProductResearchEngine:
             seed,
         )
 
+        # Dados extraídos do PDP do próprio TikTok vencem qualquer inferência
+        # de marketplace externo.
+        for field, value in native_values.items():
+            values[field] = value
+            confidence[field] = native_confidence.get(field, 0.98)
+            field_sources[field] = native_field_sources.get(field, [])
+
         review_summary = self._analyze_reviews(
             reviews,
             search_results,
@@ -359,6 +493,11 @@ class ProductResearchEngine:
         ]
 
         notes = []
+        notes.extend(native.get("notes") or [])
+        if native.get("raw_sources"):
+            notes.append(
+                "TikTok nativo: " + ", ".join(native.get("raw_sources") or [])
+            )
         if not direct.get("ok"):
             notes.append(
                 "O link original não pôde ser lido publicamente; "
@@ -391,8 +530,29 @@ class ProductResearchEngine:
                 "notes": notes,
                 "search_query": search_name or "",
                 "identifiers": {
-                    "tiktok_product_id": metadata.get("product_id"),
-                    "group_id": metadata.get("group_id"),
+                    "tiktok_product_id": _first(
+                        native.get("product_id"),
+                        metadata.get("product_id"),
+                    ),
+                    "group_id": _first(
+                        native.get("group_id"),
+                        metadata.get("group_id"),
+                    ),
+                },
+                "tiktok_native": {
+                    "used": bool(native.get("ok")),
+                    "browser_used": "tiktok_browser" in (native.get("raw_sources") or []),
+                    "attribute_count": len(native.get("attributes") or []),
+                    "sku_count": len(native.get("skus") or []),
+                    "sale_property_count": len(native.get("sale_properties") or []),
+                    "rating": native.get("rating"),
+                    "review_count": native.get("review_count"),
+                    "sold_count": native.get("sold_count"),
+                    "seller": native.get("seller") or {},
+                    "attributes": native.get("attributes") or [],
+                    "skus": native.get("skus") or [],
+                    "sale_properties": native.get("sale_properties") or [],
+                    "images": native.get("images") or [],
                 },
             },
         }
