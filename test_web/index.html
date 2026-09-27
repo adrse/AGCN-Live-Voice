@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AGCN Live Voice — Teste</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#0a0a0b;background:#f3f5f9}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:980px;margin:auto;padding:18px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 5px 18px #0000000a}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;background:#0a0a0b;color:white;border-radius:13px;display:grid;place-items:center;font-weight:900;font-size:22px}.blue{color:#0061ff}
+h1{font-size:23px;margin:0}.sub{font-size:12px;color:#6b7280}.row{display:flex;gap:8px}.row>*{flex:1}
+input,textarea,button{width:100%;padding:11px 12px;border-radius:11px;border:1px solid #d1d5db;font-size:14px}textarea{min-height:70px}
+button{cursor:pointer;font-weight:750;background:white}.primary{background:#0061ff;border-color:#0061ff;color:white}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px}.label{font-size:10px;color:#6b7280}.value{font-size:22px;font-weight:850;margin-top:3px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.muted{color:#6b7280;font-size:12px}.comment{padding:7px 0;border-bottom:1px solid #f0f1f3;font-size:13px}
+.speech{border-left:4px solid #0061ff;background:#f8fafc;border-radius:12px;padding:14px;min-height:72px}.product{padding:10px;border:1px solid #e5e7eb;border-radius:12px;margin-top:7px}.active{border-color:#0061ff;background:#f5f8ff}
+details summary{cursor:pointer;font-weight:800;color:#0061ff}.status{margin-top:8px;font-size:12px}.ok{color:#167245}.bad{color:#b42318}
+pre{white-space:pre-wrap;background:#fafafa;border:1px solid #eee;border-radius:12px;padding:12px;font-size:11px;max-height:330px;overflow:auto}
+@media(max-width:700px){.row,.two{display:grid;grid-template-columns:1fr}.grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="brand"><div class="logo">A<span class="blue">●</span></div><div><h1>AGCN Live Voice</h1><div class="sub">Interface temporária de teste — baseline V0.4.1</div></div></div>
+    <div class="row" style="margin-top:14px">
+      <input id="username" placeholder="@username da LIVE">
+      <button class="primary" id="start">Iniciar</button>
+      <button id="stop">Encerrar</button>
+    </div>
+    <div id="liveStatus" class="status">Aguardando.</div>
+  </div>
+
+  <div class="card">
+    <b>Produto ativo</b>
+    <div id="activeProduct" class="muted" style="margin-top:6px">Nenhum.</div>
+    <details style="margin-top:12px">
+      <summary>+ Cadastrar produto</summary>
+      <div style="display:grid;gap:8px;margin-top:10px">
+        <input id="pName" placeholder="Nome">
+        <textarea id="pDescription" placeholder="Descrição"></textarea>
+        <div class="row"><input id="pRegular" placeholder="Preço normal"><input id="pCurrent" placeholder="Preço atual"></div>
+        <div class="row"><input id="pDiscount" placeholder="Desconto %"><input id="pCategory" placeholder="Categoria"></div>
+        <textarea id="pInfo" placeholder="Informações adicionais"></textarea>
+        <input id="pImage" placeholder="URL da imagem (opcional)">
+        <button class="primary" id="saveProduct">Salvar produto</button>
+        <div id="productMessage" class="status"></div>
+      </div>
+    </details>
+    <div id="products"></div>
+  </div>
+
+  <div class="grid">
+    <div class="metric"><div class="label">VIEWERS</div><div id="viewers" class="value">—</div></div>
+    <div class="metric"><div class="label">CURTIDAS</div><div id="likes" class="value">—</div></div>
+    <div class="metric"><div class="label">COMENTÁRIOS</div><div id="commentsCount" class="value">0</div></div>
+    <div class="metric"><div class="label">SHARES</div><div id="shares" class="value">0</div></div>
+  </div>
+
+  <div class="two">
+    <div class="card"><b>Comentários</b><div id="comments" class="muted" style="margin-top:8px">Aguardando...</div></div>
+    <div class="card"><b>Última decisão</b><div id="decision" class="muted" style="margin-top:8px">Aguardando...</div></div>
+  </div>
+
+  <div class="card"><b>Falando agora</b><div id="speech" class="speech" style="margin-top:8px">Aguardando próxima decisão...</div></div>
+  <div class="card"><b>Fila</b><div id="queue" class="muted" style="margin-top:8px">Fila vazia.</div></div>
+  <div class="card"><b>Resumo do teste</b><pre id="summary">Aguardando...</pre></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+async function api(url,options={}){const r=await fetch(url,{headers:{"Content-Type":"application/json"},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.detail||"Erro");return data}
+function render(data){
+  $("#viewers").textContent=data.viewers??"—"; $("#likes").textContent=data.likes??"—"; $("#commentsCount").textContent=data.comments_received??0; $("#shares").textContent=data.shares??0;
+  $("#liveStatus").innerHTML=data.error?'<span class="bad">'+esc(data.error)+'</span>':(data.status==="ativo"?'<span class="ok">Ativo</span> • '+esc(data.username||""):'Status: '+esc(data.status||"—")+' • '+esc(data.diagnostic||""));
+  const p=data.active_product||{}; $("#activeProduct").textContent=p.name?p.name+(p.current_price!=null?" • R$ "+Number(p.current_price).toLocaleString("pt-BR",{minimumFractionDigits:2}):""):"Nenhum produto ativo.";
+  const products=Array.isArray(data.products)?data.products:[];
+  $("#products").innerHTML=products.map(x=>'<div class="product '+(x.active?"active":"")+'"><b>'+esc(x.name)+'</b><div class="row" style="margin-top:7px"><button onclick="activateProduct(\''+x.id+'\')" '+(x.active?"disabled":"")+'>'+(x.active?"Ativo":"Ativar")+'</button><button onclick="deleteProduct(\''+x.id+'\')">Excluir</button></div></div>').join("");
+  const comments=(data.comments||[]).slice().reverse(); $("#comments").innerHTML=comments.length?comments.map(c=>'<div class="comment"><b>'+esc(c.user)+'</b>: '+esc(c.text)+'</div>').join(""):"Aguardando...";
+  const d=data.last_decision; $("#decision").innerHTML=d?'<b>'+esc(d.label)+'</b> • Prioridade '+esc(d.priority)+'<br>'+esc(d.user)+': '+esc(d.comment):"Aguardando...";
+  const s=data.current_speech; $("#speech").textContent=s?s.speech:"Aguardando próxima decisão...";
+  const q=data.queue||[]; $("#queue").innerHTML=q.length?q.slice(0,6).map(i=>'<div class="comment"><b>P'+esc(i.priority)+' • '+esc(i.label)+'</b><br>'+esc(i.speech)+'</div>').join(""):"Fila vazia.";
+  $("#summary").textContent=data.summary||"Aguardando...";
+}
+$("#start").onclick=async()=>{try{await api("/api/live/start",{method:"POST",body:JSON.stringify({username:$("#username").value})})}catch(e){$("#liveStatus").innerHTML='<span class="bad">'+esc(e.message)+'</span>'}}
+$("#stop").onclick=()=>api("/api/live/stop",{method:"POST"}).catch(()=>{});
+$("#saveProduct").onclick=async()=>{try{await api("/api/products",{method:"POST",body:JSON.stringify({name:$("#pName").value,description:$("#pDescription").value,regular_price:$("#pRegular").value,current_price:$("#pCurrent").value,discount:$("#pDiscount").value,category:$("#pCategory").value,additional_info:$("#pInfo").value,image_url:$("#pImage").value})});$("#productMessage").innerHTML='<span class="ok">Produto salvo.</span>'}catch(e){$("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>'}}
+window.activateProduct=id=>api("/api/products/"+id+"/activate",{method:"POST"}).catch(()=>{});
+window.deleteProduct=id=>api("/api/products/"+id,{method:"DELETE"}).catch(()=>{});
+function connect(){const proto=location.protocol==="https:"?"wss":"ws";const ws=new WebSocket(proto+"://"+location.host+"/ws");ws.onmessage=e=>render(JSON.parse(e.data));ws.onclose=()=>setTimeout(connect,1500)}
+connect();
+</script>
+</body>
+</html>
