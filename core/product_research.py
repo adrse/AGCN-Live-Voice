@@ -353,7 +353,7 @@ class ProductResearchEngine:
 
         for script in soup.find_all(
             "script",
-            attrs={"type": re.compile("ld\+json", re.I)},
+            attrs={"type": re.compile(r"ld\+json", re.I)},
         ):
             try:
                 raw = json.loads(script.string or script.get_text() or "{}")
