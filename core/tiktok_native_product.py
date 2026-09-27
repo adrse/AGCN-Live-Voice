@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections import defaultdict
 from copy import deepcopy
@@ -155,7 +156,15 @@ class TikTokNativeProductExtractor:
             self._merge(result, html_result)
             result["raw_sources"].append("tiktok_html")
 
-        needs_browser = self._needs_browser(result, response.text)
+        browser_enabled = os.getenv(
+            "AGCN_TIKTOK_BROWSER_ENABLED",
+            "1",
+        ).strip().casefold() in {"1", "true", "yes", "sim", "on"}
+
+        needs_browser = (
+            browser_enabled
+            and self._needs_browser(result, response.text)
+        )
 
         if needs_browser:
             browser_result = self._extract_with_browser(final_url)
@@ -351,12 +360,11 @@ class TikTokNativeProductExtractor:
                 context.close()
                 browser.close()
 
-        except Exception as exc:
+        except Exception:
             return {
                 "browser_used": False,
                 "notes": [
-                    "Navegador TikTok indisponível: "
-                    + clean(str(exc))[:200]
+                    "Navegador renderizado do TikTok não ficou disponível nesta tentativa."
                 ],
             }
 
