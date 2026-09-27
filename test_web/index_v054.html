@@ -207,7 +207,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5.4</span><span class="dot"></span><span>Product Enrichment V1</span>
+      <span>v0.5.5</span><span class="dot"></span><span>Web Lens Test</span>
     </div>
   </aside>
 
@@ -838,7 +838,7 @@ function renderResearchResult(result){
     ? (discovery.lens_used
         ? "Google Lens local: "+String(discovery.lens_marketplace_count||0)+" resultados de marketplace."
         : "Google Lens local: não encontrou resultado utilizável"+(discovery.lens_reason?(" ("+discovery.lens_reason+")"):"")+".")
-    : "Google Lens local: desativado neste ambiente.";
+    : "Google Lens: indisponível nesta tentativa.";
   const enrichmentLine=enrichment.used
     ? "Enriquecimento: "+String(enrichment.confirmed_match_count||0)+" correspondências confirmadas • "+String(enrichment.technical_spec_count||0)+" especificações."
     : "Enriquecimento externo não utilizado.";
