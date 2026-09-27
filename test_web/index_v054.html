@@ -207,7 +207,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5.5</span><span class="dot"></span><span>Web Lens Test</span>
+      <span>v0.6</span><span class="dot"></span><span>Manual Product + Presenter Focus</span>
     </div>
   </aside>
 
@@ -298,41 +298,35 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
       <div class="intel-head">
         <div>
           <div class="intel-title">Product Intelligence</div>
-          <div class="intel-sub">Ficha inteligente, editável e preparada para pesquisa automática. Dados permanentes do produto ficam separados das condições temporárias da LIVE.</div>
+          <div class="intel-sub">Cadastre as informações do produto que o apresentador deve conhecer. Quanto melhor a ficha, melhor a fala durante a LIVE.</div>
         </div>
         <span id="editingPill" class="editing-pill hidden">✎ Editando produto</span>
       </div>
 
-      <div class="link-analyzer">
-        <div>
-          <div class="field-label">Link do produto TikTok</div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Link do produto (opcional)</span></div>
           <input id="pUrl" placeholder="https://vt.tiktok.com/...">
+          <div class="helper" style="margin-top:6px">Use apenas como referência. O cadastro do produto é manual.</div>
         </div>
-        <button class="btn primary" id="analyzeLink">🔎 Analisar produto</button>
       </div>
 
-      <div id="researchBox" class="research-box">
-        <b style="font-size:11px">Pesquisa do produto</b>
-        <div id="researchStatusText" class="intel-sub">Cole o link do TikTok. O sistema identifica o produto e depois completa a ficha usando marketplaces públicos compatíveis.</div>
-        <div class="research-grid">
-          <div class="research-stat"><b id="researchSources">0</b><span>FONTES</span></div>
-          <div class="research-stat"><b id="researchReviews">0</b><span>AVALIAÇÕES</span></div>
-          <div class="research-stat"><b id="researchFaq">0</b><span>FAQ</span></div>
-          <div class="research-stat"><b id="researchLocked">0</b><span>CAMPOS MANUAIS</span></div>
-        </div>
-        <details id="researchDetails" class="hidden" style="margin-top:10px">
-          <summary>Ver o que foi encontrado</summary>
-          <div id="researchNotes" class="intel-sub" style="margin-top:8px"></div>
-          <div class="section-label" style="margin-top:10px">FONTES ENCONTRADAS</div>
-          <div id="researchSourceList" class="research-list"></div>
-          <div class="section-label" style="margin-top:10px">CANDIDATOS VISUAIS</div>
-          <div id="researchCandidateList" class="research-list"></div>
-          <div class="section-label" style="margin-top:10px">ESPECIFICAÇÕES TÉCNICAS ENCONTRADAS</div>
-          <div id="researchSpecsList" class="research-list"></div>
-          <div class="section-label" style="margin-top:10px">AVALIAÇÕES / PERCEPÇÕES</div>
-          <div id="researchReviewList" class="research-list"></div>
-          <div class="section-label" style="margin-top:10px">PERGUNTAS FREQUENTES</div>
-          <div id="researchFaqList" class="research-list"></div>
+      <!-- Pesquisa automática desativada no fluxo principal. Mantida oculta apenas
+           para não quebrar dados antigos durante esta fase de desenvolvimento. -->
+      <button id="analyzeLink" class="hidden" type="button"></button>
+      <div id="researchBox" class="hidden">
+        <div id="researchStatusText"></div>
+        <span id="researchSources">0</span>
+        <span id="researchReviews">0</span>
+        <span id="researchFaq">0</span>
+        <span id="researchLocked">0</span>
+        <details id="researchDetails" class="hidden">
+          <div id="researchNotes"></div>
+          <div id="researchSourceList"></div>
+          <div id="researchCandidateList"></div>
+          <div id="researchSpecsList"></div>
+          <div id="researchReviewList"></div>
+          <div id="researchFaqList"></div>
         </details>
       </div>
 
@@ -342,7 +336,19 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <div class="field"><div class="field-head"><span class="field-label">Marca</span><span id="meta-brand" class="meta-badge">Não informado</span></div><input id="pBrand" placeholder="Marca"></div>
         <div class="field"><div class="field-head"><span class="field-label">Modelo</span><span id="meta-model" class="meta-badge">Não informado</span></div><input id="pModel" placeholder="Modelo"></div>
         <div class="field"><div class="field-head"><span class="field-label">Categoria</span><span id="meta-category" class="meta-badge">Não informado</span></div><input id="pCategory" placeholder="Categoria"></div>
-        <div class="field"><div class="field-head"><span class="field-label">Imagem</span><span id="meta-image_url" class="meta-badge">Não informado</span></div><input id="pImage" placeholder="URL da imagem"></div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Imagem do produto</span><span id="meta-image_url" class="meta-badge">Não informado</span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+            <input id="pImage" placeholder="Cole um link da imagem ou escolha da galeria">
+            <label class="btn secondary" for="pImageFile" style="cursor:pointer;white-space:nowrap">📷 Galeria</label>
+          </div>
+          <input id="pImageFile" type="file" accept="image/*" style="display:none">
+          <div id="pImagePreviewWrap" class="hidden" style="margin-top:10px">
+            <img id="pImagePreview" alt="Prévia do produto" style="width:120px;height:120px;object-fit:cover;border-radius:14px;border:1px solid #dbe4f0;background:#fff">
+            <button id="clearImageUpload" class="btn ghost" type="button" style="margin-left:8px">Remover imagem</button>
+          </div>
+          <div class="helper" style="margin-top:6px">Você pode escolher uma foto da galeria do celular/computador ou colar um link.</div>
+        </div>
 
         <div class="field full"><div class="field-head"><span class="field-label">Descrição geral</span><span id="meta-description" class="meta-badge">Não informado</span></div><textarea id="pDescription" placeholder="O que é o produto e para que serve"></textarea></div>
         <div class="field full"><div class="field-head"><span class="field-label">Principais benefícios</span><span id="meta-key_benefits" class="meta-badge">Não informado</span></div><textarea id="pBenefits" placeholder="Benefícios reais para o cliente"></textarea></div>
@@ -707,6 +713,53 @@ $("#username").addEventListener("keydown",e=>{
 
 $("#stop").onclick=()=>api("/api/live/stop",{method:"POST"}).catch(()=>{});
 
+function setProductImagePreview(value){
+  const preview=$("#pImagePreview");
+  const wrap=$("#pImagePreviewWrap");
+  const src=String(value||"").trim();
+
+  if(!src){
+    preview.removeAttribute("src");
+    wrap.classList.add("hidden");
+    return;
+  }
+
+  preview.src=src;
+  wrap.classList.remove("hidden");
+}
+
+async function compressProductImage(file){
+  if(!file) return "";
+  if(!String(file.type||"").startsWith("image/")) throw new Error("Escolha um arquivo de imagem.");
+
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error("Não foi possível ler a imagem."));
+    reader.readAsDataURL(file);
+  });
+
+  const img=await new Promise((resolve,reject)=>{
+    const image=new Image();
+    image.onload=()=>resolve(image);
+    image.onerror=()=>reject(new Error("Não foi possível abrir a imagem."));
+    image.src=dataUrl;
+  });
+
+  const maxSide=1280;
+  const scale=Math.min(1,maxSide/Math.max(img.width,img.height));
+  const width=Math.max(1,Math.round(img.width*scale));
+  const height=Math.max(1,Math.round(img.height*scale));
+  const canvas=document.createElement("canvas");
+  canvas.width=width;
+  canvas.height=height;
+  const ctx=canvas.getContext("2d");
+  ctx.drawImage(img,0,0,width,height);
+
+  // JPEG reduz bastante o tamanho e fica suficiente para a ficha do produto.
+  return canvas.toDataURL("image/jpeg",0.82);
+}
+
 const editorMap={
   product_url:"#pUrl",name:"#pName",brand:"#pBrand",model:"#pModel",category:"#pCategory",
   image_url:"#pImage",description:"#pDescription",key_benefits:"#pBenefits",
@@ -737,6 +790,8 @@ function resetEditor(){
   preResearchManualFields=new Set();
   lastResearchInputUrl="";
   Object.values(editorMap).forEach(selector=>{$(selector).value=""});
+  if($("#pImageFile")) $("#pImageFile").value="";
+  setProductImagePreview("");
   $("#pLiveOffer").checked=false;
   $("#editingPill").classList.add("hidden");
   $("#cancelEdit").classList.add("hidden");
@@ -772,6 +827,8 @@ function loadEditor(product){
     $(selector).value=values[key]??"";
   }
   $("#pLiveOffer").checked=values.live_offer;
+  setProductImagePreview(values.image_url);
+  if($("#pImageFile")) $("#pImageFile").value="";
   editorOriginal=values;
   researchDraftMeta={};
   researchDraftSummary={};
@@ -1057,6 +1114,32 @@ $("#analyzeLink").onclick=async()=>{
     button.disabled=false;
     button.textContent="🔎 Analisar produto";
   }
+};
+
+$("#pImage").addEventListener("input",()=>{
+  setProductImagePreview($("#pImage").value);
+});
+
+$("#pImageFile").addEventListener("change",async event=>{
+  const file=event.target.files&&event.target.files[0];
+  if(!file) return;
+
+  try{
+    $("#productMessage").innerHTML='<span class="ok">Preparando imagem...</span>';
+    const dataUrl=await compressProductImage(file);
+    $("#pImage").value=dataUrl;
+    setProductImagePreview(dataUrl);
+    $("#productMessage").innerHTML='<span class="ok">Imagem adicionada da galeria.</span>';
+  }catch(e){
+    $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
+    event.target.value="";
+  }
+});
+
+$("#clearImageUpload").onclick=()=>{
+  $("#pImage").value="";
+  $("#pImageFile").value="";
+  setProductImagePreview("");
 };
 
 $("#saveProduct").onclick=()=>saveEditor(false);
