@@ -983,6 +983,14 @@ class ProductResearchEngine:
             category = "Áudio"
         elif any(x in low for x in ("mop", "rodo", "limpeza")):
             category = "Casa e Limpeza"
+        elif (
+            "pote" in low
+            and "vidro" in low
+            and any(x in low for x in ("hermético", "hermetico", "marmita"))
+        ):
+            category = "Potes e Marmitas"
+        elif any(x in low for x in ("pote", "marmita", "mantimento")):
+            category = "Cozinha e Armazenamento"
 
         parts = [x for x in (brand, model, category) if x]
         search_name = " ".join(parts[:3]).strip()
@@ -1278,8 +1286,50 @@ class ProductResearchEngine:
                 base = max(base, 0.88)
 
             add("name", self._clean_product_title(source_name), base, source)
-            add("brand", product.get("brand"), min(0.94, base + 0.08), source)
-            add("model", product.get("model"), min(0.92, base + 0.06), source)
+
+            external_brand = _clean(product.get("brand"))
+            external_model = _clean(product.get("model"))
+
+            if source.get("source_type") == "submitted_link":
+                add(
+                    "brand",
+                    external_brand,
+                    min(0.96, base + 0.08),
+                    source,
+                )
+                add(
+                    "model",
+                    external_model,
+                    min(0.96, base + 0.08),
+                    source,
+                )
+            else:
+                # Marketplace externo serve para CONFIRMAR marca/modelo já
+                # identificados. Uma única loja parecida não pode batizar o produto.
+                if (
+                    seed.get("brand")
+                    and external_brand
+                    and external_brand.casefold() == str(seed["brand"]).casefold()
+                ):
+                    add(
+                        "brand",
+                        external_brand,
+                        min(0.94, base + 0.08),
+                        source,
+                    )
+
+                if (
+                    seed.get("model")
+                    and external_model
+                    and external_model.casefold() == str(seed["model"]).casefold()
+                ):
+                    add(
+                        "model",
+                        external_model,
+                        min(0.94, base + 0.08),
+                        source,
+                    )
+
             add("category", product.get("category"), base, source)
             source_description = _first(
                 product.get("description"),
@@ -1634,6 +1684,83 @@ class ProductResearchEngine:
                 "confidence": 0.58,
                 "sources": sources_out,
             }
+
+        # Regras factuais para categorias comuns. Só usam termos que aparecem
+        # explicitamente no título/fontes correspondentes.
+        if "pote" in low and "vidro" in low:
+            capacities = []
+            for value, unit in re.findall(
+                r"\b(\d+(?:[.,]\d+)?)\s*(ml|l)\b",
+                low,
+                flags=re.I,
+            ):
+                normalized = f"{value} {unit}".replace(".", ",")
+                if normalized not in capacities:
+                    capacities.append(normalized)
+
+            qty_match = re.search(
+                r"\b(?:kit\s+)?(?:até\s+)?(\d+)\s+potes?\b",
+                low,
+                flags=re.I,
+            )
+
+            included_bits = []
+            if qty_match:
+                included_bits.append(
+                    f"kit anunciado com até {qty_match.group(1)} potes"
+                )
+            if "tampa" in low:
+                included_bits.append("potes com tampa")
+            if "trava" in low:
+                included_bits.append("tampa com trava")
+
+            if included_bits and "included_items" not in derived:
+                derived["included_items"] = {
+                    "value": "; ".join(included_bits),
+                    "confidence": 0.76,
+                    "sources": sources_out,
+                }
+
+            if capacities and "size_info" not in derived:
+                derived["size_info"] = {
+                    "value": "Capacidades anunciadas: " + ", ".join(capacities),
+                    "confidence": 0.80,
+                    "sources": sources_out,
+                }
+
+            explicit_benefits = []
+            if "hermético" in low or "hermetico" in low:
+                explicit_benefits.append("fechamento hermético anunciado")
+            if "antivazamento" in low or "anti-vazamento" in low:
+                explicit_benefits.append("característica antivazamento anunciada")
+            if "trava" in low:
+                explicit_benefits.append("tampa com trava")
+
+            if explicit_benefits and "key_benefits" not in derived:
+                derived["key_benefits"] = {
+                    "value": "; ".join(explicit_benefits),
+                    "confidence": 0.74,
+                    "sources": sources_out,
+                }
+
+            use_cases = []
+            for keyword, label in (
+                ("marmita", "uso como marmita"),
+                ("freezer", "armazenamento no freezer"),
+                ("microondas", "uso em micro-ondas quando confirmado pela fonte"),
+                ("micro-ondas", "uso em micro-ondas quando confirmado pela fonte"),
+                ("airfryer", "uso em air fryer quando confirmado pela fonte"),
+                ("mantimento", "armazenamento de alimentos"),
+            ):
+                if keyword in low and label not in use_cases:
+                    use_cases.append(label)
+
+            if use_cases and "usage_info" not in derived:
+                derived["usage_info"] = {
+                    "value": "; ".join(use_cases),
+                    "confidence": 0.66,
+                    "sources": sources_out,
+                }
 
         return derived
 
