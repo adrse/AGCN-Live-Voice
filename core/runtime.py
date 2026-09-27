@@ -4,47 +4,62 @@ import threading
 import time
 from collections import deque
 
-from core.presenter_engine import PresenterEngine
+from core.presenter_v2 import PresenterV2
 from core.product_store import ProductStore
 from core.tiktok_monitor import TikTokMonitor
 
 
 class AGCNVoiceRuntime:
-    """Runtime integrado da baseline V0.4.1."""
+    """V0.5 Presenter Behavior Runtime."""
 
     def __init__(self, store: ProductStore | None = None):
         self.store = store or ProductStore()
         self.lock = threading.RLock()
 
-        self.comments = deque(maxlen=20)
+        self.comments = deque(maxlen=30)
         self.comments_analyzed = 0
         self.items_queued = 0
         self.speeches_generated = 0
         self.proactive_generated = 0
+        self.interruptions = 0
 
         self.last_comment = None
         self.last_decision = None
         self.current_speech = None
         self.current_speech_until = 0.0
 
-        self.presenter = PresenterEngine(
-            self.store.active() or {}
-        )
+        active = self.store.active() or {}
+        self.presenter = PresenterV2(active)
+        self.product_signature = self._product_signature(active)
 
         self.monitor = TikTokMonitor(
             event_callback=self._on_monitor_event
         )
 
+    @staticmethod
+    def _product_signature(product: dict) -> tuple:
+        return (
+            product.get("id"),
+            product.get("updated_at"),
+        )
+
     def _sync_active_product_locked(self):
         active = self.store.active() or {}
-        current_id = self.presenter.product.get("id")
-        active_id = active.get("id")
+        signature = self._product_signature(active)
 
-        if current_id != active_id:
-            self.presenter = PresenterEngine(active)
-            self.current_speech = None
-            self.current_speech_until = 0.0
-            self.last_decision = None
+        if signature != self.product_signature:
+            previous_id = self.presenter.product.get("id")
+            active_id = active.get("id")
+
+            if previous_id == active_id:
+                self.presenter.set_product(active)
+            else:
+                self.presenter = PresenterV2(active)
+                self.current_speech = None
+                self.current_speech_until = 0.0
+                self.last_decision = None
+
+            self.product_signature = signature
 
     def _on_monitor_event(self, event_type: str, payload: dict):
         if event_type != "comment":
@@ -62,29 +77,16 @@ class AGCNVoiceRuntime:
             self.comments.append(item)
             self.last_comment = item
 
-            decision = self.presenter.enqueue_comment(
+            analyzed = self.presenter.ingest_comment(
                 item["user"],
                 item["text"],
             )
 
-            if decision:
+            if analyzed:
                 self.comments_analyzed += 1
-                self.items_queued += 1
-                self.last_decision = decision
 
     def add_product(self, payload: dict) -> dict:
-        payload = payload or {}
-
-        product = self.store.add(
-            name=payload.get("name"),
-            description=payload.get("description", ""),
-            regular_price=payload.get("regular_price"),
-            current_price=payload.get("current_price"),
-            discount=payload.get("discount"),
-            additional_info=payload.get("additional_info", ""),
-            category=payload.get("category", ""),
-            image_url=payload.get("image_url", ""),
-        )
+        product = self.store.add(**(payload or {}))
 
         with self.lock:
             self._sync_active_product_locked()
@@ -153,32 +155,46 @@ class AGCNVoiceRuntime:
         ):
             return
 
+        created = self.presenter.process_pending_comments()
+        if created:
+            self.items_queued += len(created)
+
+        queue = self.presenter.queue_snapshot()
         now = time.time()
 
         if self.current_speech and now < self.current_speech_until:
-            return
+            if (
+                queue
+                and queue[0].get("priority", 0) >= 90
+                and queue[0].get("priority", 0)
+                > self.current_speech.get("priority", 0)
+            ):
+                self.current_speech_until = 0.0
+                self.interruptions += 1
+            else:
+                return
 
         self.current_speech = None
 
-        proactive = self.presenter.maybe_enqueue_proactive(
-            interval=25
-        )
-
+        proactive = self.presenter.maybe_proactive()
         if proactive:
             self.proactive_generated += 1
             self.items_queued += 1
 
         item = self.presenter.next_speech()
-
         if not item:
             return
 
         self.current_speech = item
         self.speeches_generated += 1
 
+        if item.get("type") == "reactive":
+            self.last_decision = item
+
+        # Simulação textual da duração. O TTS real virá depois.
         duration = min(
-            14,
-            max(4, len(item["speech"]) / 14),
+            12.0,
+            max(2.5, len(item["speech"]) / 16.0),
         )
         self.current_speech_until = now + duration
 
@@ -188,15 +204,18 @@ class AGCNVoiceRuntime:
 
             live = self.monitor.snapshot()
             active = self.store.active() or {}
+            presenter_state = self.presenter.snapshot()
 
             data = {
                 **live,
+                "version": "0.5-presenter-behavior",
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
                 "items_queued": self.items_queued,
                 "speeches_generated": self.speeches_generated,
                 "proactive_generated": self.proactive_generated,
+                "interruptions": self.interruptions,
                 "last_comment": (
                     dict(self.last_comment)
                     if self.last_comment
@@ -218,8 +237,9 @@ class AGCNVoiceRuntime:
                 ),
                 "comments": [
                     dict(item)
-                    for item in list(self.comments)[-8:]
+                    for item in list(self.comments)[-12:]
                 ],
+                "presenter": presenter_state,
             }
 
             data["summary"] = self._summary(data)
@@ -228,6 +248,9 @@ class AGCNVoiceRuntime:
     @staticmethod
     def _summary(data: dict) -> str:
         product = data.get("active_product") or {}
+        presenter = data.get("presenter") or {}
+        memory = presenter.get("memory") or {}
+        watchdog = presenter.get("watchdog") or {}
 
         checks = {
             "LIVE conectou": bool(
@@ -252,7 +275,7 @@ class AGCNVoiceRuntime:
         passed = sum(1 for ok in checks.values() if ok)
 
         lines = [
-            "AGCN LIVE VOICE — RESULTADO DO TESTE BASELINE",
+            "AGCN LIVE VOICE — TESTE V0.5 PRESENTER BEHAVIOR",
             "",
             f"LIVE: {data.get('username') or 'NÃO INICIADA'}",
             f"Status: {data.get('status', '—')}",
@@ -270,25 +293,30 @@ class AGCNVoiceRuntime:
             f"Viewers atuais: {data.get('viewers') if data.get('viewers') is not None else '—'}",
             f"Curtidas: {data.get('likes') if data.get('likes') is not None else '—'}",
             f"Comentários recebidos: {data.get('comments_received', 0)}",
-            f"Comentários relevantes analisados: {data.get('comments_analyzed', 0)}",
-            f"Itens colocados na fila: {data.get('items_queued', 0)}",
-            f"Falas sugeridas geradas: {data.get('speeches_generated', 0)}",
-            f"Falas proativas geradas: {data.get('proactive_generated', 0)}",
+            f"Comentários analisados: {data.get('comments_analyzed', 0)}",
+            f"Itens enfileirados: {data.get('items_queued', 0)}",
+            f"Falas geradas: {data.get('speeches_generated', 0)}",
+            f"Falas proativas: {data.get('proactive_generated', 0)}",
+            f"Interrupções prioritárias: {data.get('interruptions', 0)}",
+            f"Silêncio atual: {memory.get('seconds_since_speech', '—')}s",
+            f"Watchdog: {watchdog.get('status', '—')}",
+            f"Tópico atual: {memory.get('current_topic') or '—'}",
         ]
 
         decision = data.get("last_decision")
         if decision:
             lines += [
                 "",
-                f"Comentário que gerou a última decisão: {decision.get('user', '')}: {decision.get('comment', '')}",
-                f"Última classificação: {decision.get('label', '—')}",
-                f"Última prioridade: {decision.get('priority', '—')}",
+                f"Comentário da última decisão: {decision.get('user', '')}: {decision.get('comment', '')}",
+                f"Intenção: {decision.get('label', '—')}",
+                f"Prioridade: {decision.get('priority', '—')}",
+                f"Plano: {' → '.join(decision.get('plan') or [])}",
             ]
 
         lines += [
             "",
             f"Resultado automático: {passed}/{len(checks)} verificações confirmadas.",
-            f"Diagnóstico: {data.get('diagnostic', '—')}",
+            f"Diagnóstico TikTok: {data.get('diagnostic', '—')}",
         ]
 
         if data.get("error"):
