@@ -20,6 +20,38 @@ BLOCKED_HOST_FRAGMENTS = {
     "instagram.com",
     "pinterest.com",
     "youtube.com",
+    "wikipedia.org",
+    "simple.wikipedia.org",
+}
+
+COMMERCE_HOSTS = {
+    "shopee.com.br",
+    "mercadolivre.com.br",
+    "mercadolivre.com",
+    "amazon.com.br",
+    "magazineluiza.com.br",
+    "casasbahia.com.br",
+    "carrefour.com.br",
+    "ponto.com.br",
+    "extra.com.br",
+    "kabum.com.br",
+    "americanas.com.br",
+    "aliexpress.com",
+}
+
+COMMERCE_LABELS = {
+    "shopee.com.br": "Shopee",
+    "mercadolivre.com.br": "Mercado Livre",
+    "mercadolivre.com": "Mercado Livre",
+    "amazon.com.br": "Amazon",
+    "magazineluiza.com.br": "Magazine Luiza",
+    "casasbahia.com.br": "Casas Bahia",
+    "carrefour.com.br": "Carrefour",
+    "ponto.com.br": "Ponto",
+    "extra.com.br": "Extra",
+    "kabum.com.br": "KaBuM!",
+    "americanas.com.br": "Americanas",
+    "aliexpress.com": "AliExpress",
 }
 
 STOPWORDS = {
@@ -51,6 +83,46 @@ def _host(url: str) -> str:
         return urlparse(url).netloc.casefold().removeprefix("www.")
     except Exception:
         return ""
+
+
+def _commerce_root(host: str) -> str | None:
+    host = (host or "").casefold().removeprefix("www.")
+    for root in COMMERCE_HOSTS:
+        if host == root or host.endswith("." + root):
+            return root
+    return None
+
+
+def _is_commerce_host(host: str) -> bool:
+    return _commerce_root(host) is not None
+
+
+def _specific_tokens(text: str) -> set[str]:
+    """Tokens que ajudam a distinguir produtos parecidos."""
+    low = _clean(text).casefold()
+    out = set()
+
+    for value, unit in re.findall(
+        r"\b(\d+(?:[.,]\d+)?)\s*(ml|l|cm|mm|kg|g|mah|atm|hz|w|v)\b",
+        low,
+        flags=re.I,
+    ):
+        out.add((value.replace(",", ".") + unit).casefold())
+
+    for token in re.findall(r"\b[a-z]{1,5}\d+[a-z0-9-]*\b", low, flags=re.I):
+        out.add(token.casefold())
+
+    return out
+
+
+def _meaningful_product_tokens(text: str) -> set[str]:
+    tokens = _tokens(text)
+    generic = {
+        "compre", "comprar", "oferta", "promoção", "promocao", "preço",
+        "preco", "frete", "grátis", "gratis", "original", "premium",
+        "unidade", "unidades", "até", "ate", "kit", "conjunto",
+    }
+    return {x for x in tokens if x not in generic}
 
 
 def _tokens(text: str) -> set[str]:
@@ -232,11 +304,14 @@ class ProductResearchEngine:
             if not seed.get(key) and identity.get(key):
                 seed[key] = identity[key]
 
-        search_name = _first(
-            identity.get("search_name"),
-            seed.get("name"),
-            self._title_hint_from_url(resolved_url),
-        )
+        if identity.get("brand") and identity.get("model"):
+            search_name = identity.get("search_name")
+        else:
+            search_name = _first(
+                self._canonical_search_name(seed.get("name") or ""),
+                seed.get("name"),
+                self._title_hint_from_url(resolved_url),
+            )
 
         sources = [direct]
         search_results = []
@@ -778,7 +853,7 @@ class ProductResearchEngine:
                     source.get("image_url"),
                 )
             ),
-            "current_price": product.get("price"),
+            "observed_price": product.get("price"),
         }
 
     def _clean_product_title(self, title: str) -> str:
@@ -890,7 +965,7 @@ class ProductResearchEngine:
             brand = first
 
         for token in words[1:8]:
-            if re.fullmatch(r"[A-Za-z]{0,5}\d+[A-Za-z0-9-]*", token):
+            if re.fullmatch(r"[A-Za-z]{1,5}\d+[A-Za-z0-9-]*", token):
                 model = token
                 break
 
@@ -922,6 +997,26 @@ class ProductResearchEngine:
             "search_name": search_name,
         }
 
+    def _canonical_search_name(self, title: str) -> str:
+        text = self._clean_product_title(title)
+        if not text:
+            return ""
+
+        # Mantém substantivos e medidas que identificam o produto e remove
+        # linguagem puramente promocional.
+        text = re.sub(
+            r"\b(compre|comprar|oferta|promoção|promocao|frete grátis|frete gratis|"
+            r"leve o|na sua aventura|monitor de performance completo)\b.*$",
+            "",
+            text,
+            flags=re.I,
+        )
+        text = re.sub(r"\s+", " ", text).strip(" -|:;,.")
+        words = text.split()
+
+        # Para títulos longos, 14 termos costumam preservar produto + variantes.
+        return " ".join(words[:14])
+
     def _title_hint_from_url(self, url: str) -> str:
         path = urlparse(url).path
         chunks = [
@@ -942,15 +1037,26 @@ class ProductResearchEngine:
             x for x in (brand, model, category) if x
         ).strip() or query
 
+        canonical = self._canonical_search_name(query) or compact
+        commerce_domains = [
+            "shopee.com.br",
+            "mercadolivre.com.br",
+            "magazineluiza.com.br",
+            "amazon.com.br",
+            "casasbahia.com.br",
+            "carrefour.com.br",
+        ]
+
         searches = [
-            f'"{compact}"',
-            f'"{compact}" especificações',
-            f'"{compact}" avaliações review',
-            f'"{compact}" manual fabricante',
+            f'site:{domain} "{canonical}"'
+            for domain in commerce_domains
         ]
 
         if brand and model:
-            searches.insert(0, f'"{brand}" "{model}"')
+            searches.insert(
+                0,
+                f'"{brand}" "{model}" produto',
+            )
 
         seen = set()
         results = []
@@ -999,9 +1105,13 @@ class ProductResearchEngine:
                         continue
 
                     host = _host(href)
-                    if not host or any(
-                        blocked in host
-                        for blocked in BLOCKED_HOST_FRAGMENTS
+                    if (
+                        not host
+                        or any(
+                            blocked in host
+                            for blocked in BLOCKED_HOST_FRAGMENTS
+                        )
+                        or not _is_commerce_host(host)
                     ):
                         continue
 
@@ -1034,13 +1144,23 @@ class ProductResearchEngine:
         limit: int,
     ) -> list[dict]:
         scored = []
+        identity_tokens = _meaningful_product_tokens(name)
+        identity_specific = _specific_tokens(name)
+
         for result in results:
+            host = result.get("host", "")
+            if not _is_commerce_host(host):
+                continue
+
             haystack = (
                 result.get("title", "")
                 + " "
                 + result.get("snippet", "")
             )
             low_haystack = haystack.casefold()
+            result_tokens = _meaningful_product_tokens(haystack)
+            result_specific = _specific_tokens(haystack)
+
             brand_match = bool(
                 brand and brand.casefold() in low_haystack
             )
@@ -1048,33 +1168,56 @@ class ProductResearchEngine:
                 model and model.casefold() in low_haystack
             )
 
-            # Quando temos marca + modelo vindos do link do TikTok,
-            # um resultado externo precisa conter os dois para ser aceito.
+            # Produto com marca/modelo claros: ambos precisam aparecer.
             if brand and model and not (brand_match and model_match):
                 continue
 
-            score = _similarity(name, haystack)
+            overlap = (
+                len(identity_tokens & result_tokens)
+                / max(1, min(len(identity_tokens), len(result_tokens)))
+            )
+
+            # Produtos genéricos (potes, roupas etc.) precisam bater em vários
+            # termos do título. Uma coincidência numérica isolada não basta.
+            common_terms = identity_tokens & result_tokens
+            if not (brand and model):
+                if len(common_terms) < 3:
+                    continue
+                if overlap < 0.34:
+                    continue
+
+                # Quando o título tem capacidades/medidas, pelo menos uma deve
+                # coincidir. Isso evita misturar potes 640 ml com produtos sem relação.
+                if identity_specific and not (identity_specific & result_specific):
+                    continue
+
+            score = overlap
 
             if brand_match:
                 score += 0.30
             if model_match:
                 score += 0.35
 
-            host = result.get("host", "")
-            if brand and brand.casefold() in host.casefold():
-                score += 0.18
+            specific_matches = len(identity_specific & result_specific)
+            score += min(0.24, specific_matches * 0.08)
 
-            if any(k in host for k in (
-                "amazon.", "mercadolivre.", "magazineluiza.",
-                "shopee.", "kabum.", "carrefour.", "casasbahia.",
-            )):
-                score += 0.05
-
-            if score >= 0.18:
-                scored.append((score, result))
+            scored.append((score, result))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [item for _, item in scored[:limit]]
+
+        # Diversifica por marketplace: evita 8 resultados quase iguais da mesma loja.
+        selected = []
+        per_root = Counter()
+        for score, result in scored:
+            root = _commerce_root(result.get("host", "")) or result.get("host", "")
+            if per_root[root] >= 2:
+                continue
+            selected.append(result)
+            per_root[root] += 1
+            if len(selected) >= limit:
+                break
+
+        return selected
 
     def _aggregate(
         self,
@@ -1099,6 +1242,8 @@ class ProductResearchEngine:
         direct_score = 0.88 if direct.get("ok") else 0.45
 
         for field, value in seed.items():
+            if field == "observed_price":
+                continue
             score = direct_score
             if field == "brand" and value:
                 score = max(score, 0.93)
@@ -1110,6 +1255,12 @@ class ProductResearchEngine:
 
         for source in sources:
             if not source.get("ok"):
+                continue
+
+            if (
+                source.get("source_type") != "submitted_link"
+                and not _is_commerce_host(source.get("host", ""))
+            ):
                 continue
 
             product = source.get("product") or {}
@@ -1180,14 +1331,6 @@ class ProductResearchEngine:
                     source.get("image_url"),
                 ),
                 base,
-                source,
-            )
-
-            # Preço pesquisado é apenas rascunho; a LIVE pode ter outro valor.
-            add(
-                "current_price",
-                product.get("price"),
-                0.82 if source.get("source_type") == "submitted_link" else 0.55,
                 source,
             )
 
@@ -1600,9 +1743,12 @@ class ProductResearchEngine:
         return [unique[key] for key in ordered]
 
     def _public_source_record(self, source: dict) -> dict:
+        host = source.get("host")
+        root = _commerce_root(host or "")
         return {
             "url": source.get("final_url") or source.get("url"),
-            "host": source.get("host"),
+            "host": host,
+            "marketplace": COMMERCE_LABELS.get(root) if root else None,
             "title": source.get("title"),
             "description": source.get("description"),
             "source_type": source.get("source_type"),
