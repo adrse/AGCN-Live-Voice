@@ -397,6 +397,16 @@ class ProductResearchEngineV054(ProductResearchEngine):
                     ),
                     "query": enrichment.get("query") or "",
                     "discovery": enrichment.get("discovery") or {},
+                    "confirmed_match_count": enrichment.get(
+                        "confirmed_match_count",
+                        0,
+                    ),
+                    "needs_confirmation": bool(
+                        enrichment.get("needs_confirmation")
+                    ),
+                    "candidate_matches": enrichment.get(
+                        "candidate_matches"
+                    ) or [],
                 },
             },
         }
