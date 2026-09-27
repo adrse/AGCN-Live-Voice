@@ -143,6 +143,28 @@ details{margin-top:10px}summary{cursor:pointer;font-weight:850;color:#1e64b7;fon
 .product-chip{min-width:145px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fbfdff}
 .product-chip.active{border-color:#4d8edf;background:#f3f8ff}
 .product-chip-name{font-size:10px;font-weight:850}.product-chip .row{margin-top:6px}.product-chip .btn{padding:6px 7px;font-size:9px}
+.intel-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.intel-title{font-size:16px;font-weight:900}
+.intel-sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+.link-analyzer{display:grid;grid-template-columns:1fr auto;gap:8px;background:#f6f9fd;border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px}
+.section-label{font-size:11px;font-weight:900;color:#203754;margin:14px 0 8px}
+.field{display:grid;gap:5px}
+.field-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.field-label{font-size:10px;font-weight:800;color:#58677d}
+.meta-badge{font-size:8px;border-radius:999px;padding:3px 6px;background:#eef2f7;color:#6c7889;white-space:nowrap}
+.meta-badge.user{background:#eaf7ef;color:#18834a}
+.meta-badge.research{background:#eaf3ff;color:#246cc3}
+.live-box{background:#fffaf2;border:1px solid #f0dfbf;border-radius:12px;padding:11px}
+.research-box{background:#f5f9ff;border:1px solid #dbe8fa;border-radius:12px;padding:11px;margin:10px 0}
+.research-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+.research-stat{background:#fff;border:1px solid #e3ebf5;border-radius:9px;padding:8px}
+.research-stat b{display:block;font-size:14px}.research-stat span{font-size:8px;color:var(--muted)}
+.editor-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.editor-actions .btn{flex:1;min-width:135px}
+.editing-pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 8px;background:#fff3df;color:#a7660a;font-size:9px;font-weight:850}
+.product-chip{min-width:210px}
+.product-chip-meta{font-size:8px;color:var(--muted);margin-top:4px}
+.product-chip .row{display:grid;grid-template-columns:repeat(3,1fr)}
 .debug-card{margin-top:12px}
 pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:10px;max-height:280px;overflow:auto;margin:8px 0 0}
 .hidden{display:none!important}
@@ -158,7 +180,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
   .brand{margin:0 10px 0 0}.brand-mark{width:36px;height:36px}.nav{display:flex}.nav-item{padding:9px}.side-bottom{margin:0 0 0 auto}
   .main{padding:10px}.topbar,.grid-top,.bottom-grid{grid-template-columns:1fr}.topbar .topbox:last-child,.grid-top>.card:last-child,.bottom-grid>.card:last-child{grid-column:auto}
   .metrics-grid{grid-template-columns:1fr 1fr}.product-active{grid-template-columns:92px 1fr}.product-image{width:92px;height:92px}
-  .form-grid{grid-template-columns:1fr}.full{grid-column:auto}.live-actions{grid-template-columns:1fr}.row{display:grid;grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}.full{grid-column:auto}.live-actions{grid-template-columns:1fr}.row{display:grid;grid-template-columns:1fr}.link-analyzer{grid-template-columns:1fr}.research-grid{grid-template-columns:1fr 1fr}.editor-actions{display:grid;grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -179,7 +201,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5</span><span class="dot"></span><span>Presenter Behavior</span>
+      <span>v0.5.1</span><span class="dot"></span><span>Product Intelligence</span>
     </div>
   </aside>
 
@@ -267,41 +289,83 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </section>
 
     <section id="productPanel" class="card hidden">
-      <div class="card-title"><span class="ico">⚙</span>Configuração de produtos</div>
-      <details open>
-        <summary>+ Cadastrar novo produto</summary>
-        <div class="form-grid">
-          <input id="pName" class="full" placeholder="Nome do produto">
-          <input id="pBrand" placeholder="Marca">
-          <input id="pCategory" placeholder="Categoria">
-          <textarea id="pDescription" class="full" placeholder="Descrição geral"></textarea>
-          <input id="pRegular" placeholder="Preço normal">
-          <input id="pCurrent" placeholder="Preço atual">
-          <input id="pDiscount" placeholder="Desconto (%)">
-          <input id="pStock" placeholder="Estoque real (se conhecido)">
-          <textarea id="pBenefits" class="full" placeholder="Principais benefícios"></textarea>
-          <textarea id="pProblems" class="full" placeholder="Problemas / dores que resolve"></textarea>
-          <textarea id="pDifferentials" class="full" placeholder="Diferenciais"></textarea>
-          <textarea id="pIncluded" class="full" placeholder="Itens inclusos no kit"></textarea>
-          <textarea id="pCompatibility" class="full" placeholder="Compatibilidade"></textarea>
-          <textarea id="pSize" placeholder="Tamanho / medidas"></textarea>
-          <textarea id="pBattery" placeholder="Bateria / autonomia"></textarea>
-          <textarea id="pUsage" class="full" placeholder="Como usar"></textarea>
-          <textarea id="pShipping" class="full" placeholder="Frete / entrega"></textarea>
-          <textarea id="pWarranty" class="full" placeholder="Garantia"></textarea>
-          <textarea id="pLimitations" class="full" placeholder="Limitações conhecidas"></textarea>
-          <textarea id="pInfo" class="full" placeholder="Outras informações adicionais"></textarea>
+      <div class="intel-head">
+        <div>
+          <div class="intel-title">Product Intelligence</div>
+          <div class="intel-sub">Ficha inteligente, editável e preparada para pesquisa automática. Dados permanentes do produto ficam separados das condições temporárias da LIVE.</div>
+        </div>
+        <span id="editingPill" class="editing-pill hidden">✎ Editando produto</span>
+      </div>
+
+      <div class="link-analyzer">
+        <div>
+          <div class="field-label">Link do produto TikTok</div>
+          <input id="pUrl" placeholder="https://vt.tiktok.com/...">
+        </div>
+        <button class="btn" id="analyzeLink" disabled title="Será ativado na V0.5.2">🔎 Analisar link — próxima etapa</button>
+      </div>
+
+      <div id="researchBox" class="research-box">
+        <b style="font-size:11px">Pesquisa do produto</b>
+        <div id="researchStatusText" class="intel-sub">Ainda não analisado automaticamente. Nesta versão, a ficha e a edição manual já ficam prontas.</div>
+        <div class="research-grid">
+          <div class="research-stat"><b id="researchSources">0</b><span>FONTES</span></div>
+          <div class="research-stat"><b id="researchReviews">0</b><span>AVALIAÇÕES</span></div>
+          <div class="research-stat"><b id="researchFaq">0</b><span>FAQ</span></div>
+          <div class="research-stat"><b id="researchLocked">0</b><span>CAMPOS MANUAIS</span></div>
+        </div>
+      </div>
+
+      <div class="section-label">DADOS PERMANENTES DO PRODUTO</div>
+      <div class="form-grid">
+        <div class="field full"><div class="field-head"><span class="field-label">Nome</span><span id="meta-name" class="meta-badge">Não informado</span></div><input id="pName" placeholder="Nome do produto"></div>
+        <div class="field"><div class="field-head"><span class="field-label">Marca</span><span id="meta-brand" class="meta-badge">Não informado</span></div><input id="pBrand" placeholder="Marca"></div>
+        <div class="field"><div class="field-head"><span class="field-label">Modelo</span><span id="meta-model" class="meta-badge">Não informado</span></div><input id="pModel" placeholder="Modelo"></div>
+        <div class="field"><div class="field-head"><span class="field-label">Categoria</span><span id="meta-category" class="meta-badge">Não informado</span></div><input id="pCategory" placeholder="Categoria"></div>
+        <div class="field"><div class="field-head"><span class="field-label">Imagem</span><span id="meta-image_url" class="meta-badge">Não informado</span></div><input id="pImage" placeholder="URL da imagem"></div>
+
+        <div class="field full"><div class="field-head"><span class="field-label">Descrição geral</span><span id="meta-description" class="meta-badge">Não informado</span></div><textarea id="pDescription" placeholder="O que é o produto e para que serve"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Principais benefícios</span><span id="meta-key_benefits" class="meta-badge">Não informado</span></div><textarea id="pBenefits" placeholder="Benefícios reais para o cliente"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Problemas / dores que resolve</span><span id="meta-problems_solved" class="meta-badge">Não informado</span></div><textarea id="pProblems" placeholder="Problemas que o produto ajuda a resolver"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Diferenciais</span><span id="meta-differentials" class="meta-badge">Não informado</span></div><textarea id="pDifferentials" placeholder="O que diferencia este produto"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Itens inclusos</span><span id="meta-included_items" class="meta-badge">Não informado</span></div><textarea id="pIncluded" placeholder="Tudo que acompanha o produto"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Compatibilidade</span><span id="meta-compatibility" class="meta-badge">Não informado</span></div><textarea id="pCompatibility" placeholder="Compatibilidade, aparelhos, sistemas, superfícies etc."></textarea></div>
+        <div class="field"><div class="field-head"><span class="field-label">Tamanho / medidas</span><span id="meta-size_info" class="meta-badge">Não informado</span></div><textarea id="pSize" placeholder="Medidas"></textarea></div>
+        <div class="field"><div class="field-head"><span class="field-label">Bateria / autonomia</span><span id="meta-battery_info" class="meta-badge">Não informado</span></div><textarea id="pBattery" placeholder="Bateria, carga, autonomia"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Como usar</span><span id="meta-usage_info" class="meta-badge">Não informado</span></div><textarea id="pUsage" placeholder="Modo de uso"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Garantia</span><span id="meta-warranty" class="meta-badge">Não informado</span></div><textarea id="pWarranty" placeholder="Garantia confirmada"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Limitações conhecidas</span><span id="meta-limitations" class="meta-badge">Não informado</span></div><textarea id="pLimitations" placeholder="O que o produto não faz / restrições"></textarea></div>
+        <div class="field full"><div class="field-head"><span class="field-label">Informações adicionais</span><span id="meta-additional_info" class="meta-badge">Não informado</span></div><textarea id="pInfo" placeholder="Outros fatos úteis para o Presenter"></textarea></div>
+      </div>
+
+      <div class="section-label">CONDIÇÃO DESTA LIVE <span style="font-weight:500;color:var(--muted)">— temporária</span></div>
+      <div class="live-box">
+        <div class="form-grid" style="margin-top:0">
+          <div class="field"><div class="field-head"><span class="field-label">Preço normal</span><span id="meta-regular_price" class="meta-badge">Não informado</span></div><input id="pRegular" placeholder="R$ 0,00"></div>
+          <div class="field"><div class="field-head"><span class="field-label">Preço atual</span><span id="meta-current_price" class="meta-badge">Não informado</span></div><input id="pCurrent" placeholder="R$ 0,00"></div>
+          <div class="field"><div class="field-head"><span class="field-label">Desconto (%)</span><span id="meta-discount" class="meta-badge">Não informado</span></div><input id="pDiscount" placeholder="0"></div>
+          <div class="field"><div class="field-head"><span class="field-label">Estoque real</span><span id="meta-stock" class="meta-badge">Não informado</span></div><input id="pStock" placeholder="Somente se realmente conhecido"></div>
+          <div class="field full"><div class="field-head"><span class="field-label">Frete / entrega</span><span id="meta-shipping_info" class="meta-badge">Não informado</span></div><textarea id="pShipping" placeholder="Condição de frete ou entrega desta LIVE"></textarea></div>
+          <div class="field"><div class="field-head"><span class="field-label">Cupom</span><span id="meta-coupon" class="meta-badge">Não informado</span></div><input id="pCoupon" placeholder="Cupom confirmado"></div>
+          <div class="field"><div class="field-head"><span class="field-label">Observação promocional</span><span id="meta-promotion_note" class="meta-badge">Não informado</span></div><input id="pPromotionNote" placeholder="Ex.: oferta até o fim da LIVE"></div>
           <label class="full toggle-line" style="margin:2px 0">
             <input id="pLiveOffer" type="checkbox" style="width:auto">
-            Oferta exclusiva/especial da LIVE foi confirmada
+            Oferta especial/exclusiva da LIVE foi confirmada
           </label>
-          <textarea id="pLiveOfferText" class="full" placeholder="Texto verdadeiro da oferta da LIVE"></textarea>
-          <input id="pImage" class="full" placeholder="URL da imagem (opcional)">
-          <div class="note full">Quanto mais fatos reais você cadastrar, mais o Presenter consegue responder sem inventar. Estoque e promoção só serão usados quando estiverem preenchidos.</div>
-          <button class="btn primary full" id="saveProduct">Salvar produto</button>
+          <div class="field full"><div class="field-head"><span class="field-label">Texto da oferta confirmada</span><span id="meta-live_offer_text" class="meta-badge">Não informado</span></div><textarea id="pLiveOfferText" placeholder="Exatamente o que é verdadeiro sobre a oferta"></textarea></div>
         </div>
-        <div id="productMessage" class="status-text"></div>
-      </details>
+      </div>
+
+      <div class="note" style="margin-top:10px">Campos editados por você ficam marcados como <b>Manual</b> e têm prioridade sobre futuras pesquisas automáticas. O sistema não poderá sobrescrevê-los silenciosamente.</div>
+
+      <div class="editor-actions">
+        <button class="btn primary" id="saveProduct">Salvar produto</button>
+        <button class="btn primary" id="saveActivateProduct">Salvar e ativar</button>
+        <button class="btn hidden" id="cancelEdit">Cancelar edição</button>
+      </div>
+      <div id="productMessage" class="status-text"></div>
+
+      <div class="section-label">PRODUTOS SALVOS</div>
       <div id="products" class="saved-products"></div>
     </section>
 
@@ -380,6 +444,8 @@ const esc = v => String(v ?? "")
 let liveStartedAt = null;
 let lastStatus = "parado";
 let wsConnected = false;
+let editingProductId = null;
+let editorOriginal = {};
 
 async function api(url,options={}){
   const r = await fetch(url,{headers:{"Content-Type":"application/json"},...options});
@@ -442,16 +508,58 @@ function renderSystem(data){
   lastStatus=data.status||"parado";
 }
 
+function originBadge(meta){
+  if(!meta) return ["Não informado",""];
+  if(meta.origin==="user") return ["Manual","user"];
+  if(meta.origin==="research"){
+    const pct=meta.confidence==null?"":(" • "+Math.round(Number(meta.confidence)*100)+"%");
+    return ["Pesquisa"+pct,"research"];
+  }
+  return ["Não informado",""];
+}
+
+function setMetaBadge(id,meta){
+  const el=$("#meta-"+id);
+  if(!el) return;
+  const [label,cls]=originBadge(meta);
+  el.textContent=label;
+  el.className="meta-badge"+(cls?" "+cls:"");
+}
+
+function renderEditorMeta(product){
+  const fieldMeta=(product&&product.field_meta)||{};
+  const liveMeta=(product&&product.live_meta)||{};
+  const permanent=["name","brand","model","category","image_url","description","key_benefits","problems_solved","differentials","included_items","compatibility","size_info","battery_info","usage_info","warranty","limitations","additional_info"];
+  const live=["regular_price","current_price","discount","stock","shipping_info","coupon","promotion_note","live_offer_text"];
+  permanent.forEach(k=>setMetaBadge(k,fieldMeta[k]));
+  live.forEach(k=>setMetaBadge(k,liveMeta[k]));
+
+  const research=(product&&product.research)||{};
+  $("#researchSources").textContent=research.source_count||0;
+  $("#researchReviews").textContent=research.review_count||0;
+  $("#researchFaq").textContent=Array.isArray(research.faq)?research.faq.length:0;
+  $("#researchLocked").textContent=[
+    ...Object.values(fieldMeta),
+    ...Object.values(liveMeta)
+  ].filter(x=>x&&x.locked_by_user).length;
+
+  const status=research.status||"not_analyzed";
+  $("#researchStatusText").textContent=status==="completed"
+    ? "Pesquisa concluída. Revise as informações antes de usar na LIVE."
+    : "Ainda não analisado automaticamente. Nesta versão, a ficha e a edição manual já ficam prontas.";
+}
+
 function renderProduct(data){
   const p=data.active_product||{};
+  const live=p.live_conditions||{};
   $("#activeName").textContent=p.name||"Nenhum produto ativo";
   $("#activeDesc").textContent=p.description||"Cadastre um produto para iniciar os testes.";
-  $("#oldPrice").textContent=brl(p.regular_price);
-  $("#currentPrice").textContent=brl(p.current_price ?? p.regular_price);
+  $("#oldPrice").textContent=brl(live.regular_price);
+  $("#currentPrice").textContent=brl(live.current_price ?? live.regular_price);
 
   const discount=$("#discount");
-  if(p.discount!==null && p.discount!==undefined && p.discount!==""){
-    discount.textContent=Number(p.discount).toLocaleString("pt-BR")+"% OFF";
+  if(live.discount!==null && live.discount!==undefined && live.discount!==""){
+    discount.textContent=Number(live.discount).toLocaleString("pt-BR")+"% OFF";
     discount.classList.remove("hidden");
   }else{
     discount.classList.add("hidden");
@@ -465,17 +573,20 @@ function renderProduct(data){
   }
 
   const products=Array.isArray(data.products)?data.products:[];
-  $("#products").innerHTML=products.length ? products.map(x =>
-    '<div class="product-chip '+(x.active?"active":"")+'">'+
+  $("#products").innerHTML=products.length ? products.map(x =>{
+    const xr=x.research||{};
+    const status=xr.status==="completed" ? "Pesquisa concluída" : "Ficha manual";
+    return '<div class="product-chip '+(x.active?"active":"")+'">'+
       '<div class="product-chip-name">'+esc(x.name)+'</div>'+
+      '<div class="product-chip-meta">'+esc(x.brand||"Sem marca")+' • '+status+'</div>'+
       '<div class="row">'+
+        '<button class="btn" onclick="editProduct(\''+esc(x.id)+'\')">Editar</button>'+
         '<button class="btn" onclick="activateProduct(\''+esc(x.id)+'\')" '+(x.active?"disabled":"")+'>'+(x.active?"Ativo":"Ativar")+'</button>'+
         '<button class="btn" onclick="deleteProduct(\''+esc(x.id)+'\')">Excluir</button>'+
       '</div>'+
-    '</div>'
-  ).join("") : '<div class="helper">Nenhum produto cadastrado.</div>';
+    '</div>';
+  }).join("") : '<div class="helper">Nenhum produto cadastrado.</div>';
 }
-
 function renderComments(data){
   const comments=(data.comments||[]).slice().reverse();
   $("#comments").innerHTML=comments.length ? comments.map((c,index) =>
@@ -570,45 +681,117 @@ $("#username").addEventListener("keydown",e=>{
 
 $("#stop").onclick=()=>api("/api/live/stop",{method:"POST"}).catch(()=>{});
 
-$("#saveProduct").onclick=async()=>{
+const editorMap={
+  product_url:"#pUrl",name:"#pName",brand:"#pBrand",model:"#pModel",category:"#pCategory",
+  image_url:"#pImage",description:"#pDescription",key_benefits:"#pBenefits",
+  problems_solved:"#pProblems",differentials:"#pDifferentials",included_items:"#pIncluded",
+  compatibility:"#pCompatibility",size_info:"#pSize",battery_info:"#pBattery",
+  usage_info:"#pUsage",warranty:"#pWarranty",limitations:"#pLimitations",
+  additional_info:"#pInfo",regular_price:"#pRegular",current_price:"#pCurrent",
+  discount:"#pDiscount",stock:"#pStock",shipping_info:"#pShipping",coupon:"#pCoupon",
+  promotion_note:"#pPromotionNote",live_offer_text:"#pLiveOfferText"
+};
+
+function editorValues(){
+  const values={};
+  for(const [key,selector] of Object.entries(editorMap)){
+    values[key]=$(selector).value;
+  }
+  values.live_offer=$("#pLiveOffer").checked;
+  return values;
+}
+
+function resetEditor(){
+  editingProductId=null;
+  editorOriginal={};
+  Object.values(editorMap).forEach(selector=>{$(selector).value=""});
+  $("#pLiveOffer").checked=false;
+  $("#editingPill").classList.add("hidden");
+  $("#cancelEdit").classList.add("hidden");
+  $("#saveProduct").textContent="Salvar produto";
+  renderEditorMeta(null);
+}
+
+function loadEditor(product){
+  const live=product.live_conditions||{};
+  editingProductId=product.id;
+
+  const values={
+    product_url:product.product_url||"",name:product.name||"",brand:product.brand||"",
+    model:product.model||"",category:product.category||"",image_url:product.image_url||"",
+    description:product.description||"",key_benefits:product.key_benefits||"",
+    problems_solved:product.problems_solved||"",differentials:product.differentials||"",
+    included_items:product.included_items||"",compatibility:product.compatibility||"",
+    size_info:product.size_info||"",battery_info:product.battery_info||"",
+    usage_info:product.usage_info||"",warranty:product.warranty||"",
+    limitations:product.limitations||"",additional_info:product.additional_info||"",
+    regular_price:live.regular_price??"",current_price:live.current_price??"",
+    discount:live.discount??"",stock:live.stock??"",shipping_info:live.shipping_info||"",
+    coupon:live.coupon||"",promotion_note:live.promotion_note||"",
+    live_offer_text:live.live_offer_text||"",live_offer:Boolean(live.live_offer)
+  };
+
+  for(const [key,selector] of Object.entries(editorMap)){
+    $(selector).value=values[key]??"";
+  }
+  $("#pLiveOffer").checked=values.live_offer;
+  editorOriginal=values;
+  $("#editingPill").classList.remove("hidden");
+  $("#cancelEdit").classList.remove("hidden");
+  $("#saveProduct").textContent="Salvar alterações";
+  renderEditorMeta(product);
+  $("#productPanel").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function changedFields(values){
+  if(!editingProductId){
+    return Object.entries(values)
+      .filter(([k,v])=>v!=="" && v!==null && v!==false)
+      .map(([k])=>k);
+  }
+  return Object.keys(values).filter(k=>String(values[k]??"")!==String(editorOriginal[k]??""));
+}
+
+async function saveEditor(activateAfter=false){
   try{
-    await api("/api/products",{
-      method:"POST",
-      body:JSON.stringify({
-        name:$("#pName").value,
-        brand:$("#pBrand").value,
-        description:$("#pDescription").value,
-        regular_price:$("#pRegular").value,
-        current_price:$("#pCurrent").value,
-        discount:$("#pDiscount").value,
-        stock:$("#pStock").value,
-        category:$("#pCategory").value,
-        key_benefits:$("#pBenefits").value,
-        problems_solved:$("#pProblems").value,
-        differentials:$("#pDifferentials").value,
-        included_items:$("#pIncluded").value,
-        compatibility:$("#pCompatibility").value,
-        size_info:$("#pSize").value,
-        battery_info:$("#pBattery").value,
-        usage_info:$("#pUsage").value,
-        shipping_info:$("#pShipping").value,
-        warranty:$("#pWarranty").value,
-        limitations:$("#pLimitations").value,
-        additional_info:$("#pInfo").value,
-        live_offer:$("#pLiveOffer").checked,
-        live_offer_text:$("#pLiveOfferText").value,
-        image_url:$("#pImage").value
-      })
-    });
-    $("#productMessage").innerHTML='<span class="ok">Produto salvo.</span>';
+    const values=editorValues();
+    if(!String(values.name||"").trim()) throw new Error("Informe o nome do produto.");
+
+    values.manual_fields=changedFields(values);
+    const url=editingProductId?("/api/products/"+editingProductId):"/api/products";
+    const method=editingProductId?"PUT":"POST";
+    const result=await api(url,{method,body:JSON.stringify(values)});
+    const savedId=result.product&&result.product.id;
+
+    if(activateAfter && savedId){
+      await api("/api/products/"+savedId+"/activate",{method:"POST"});
+    }
+
+    $("#productMessage").innerHTML='<span class="ok">'+(editingProductId?"Alterações salvas.":"Produto salvo.")+'</span>';
+    resetEditor();
+  }catch(e){
+    $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
+  }
+}
+
+$("#saveProduct").onclick=()=>saveEditor(false);
+$("#saveActivateProduct").onclick=()=>saveEditor(true);
+$("#cancelEdit").onclick=()=>resetEditor();
+
+window.editProduct=async id=>{
+  try{
+    const result=await api("/api/products/"+id);
+    loadEditor(result.product);
   }catch(e){
     $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
   }
 };
 
 window.activateProduct=id=>api("/api/products/"+id+"/activate",{method:"POST"}).catch(()=>{});
-window.deleteProduct=id=>api("/api/products/"+id,{method:"DELETE"}).catch(()=>{});
-
+window.deleteProduct=async id=>{
+  if(editingProductId===id) resetEditor();
+  await api("/api/products/"+id,{method:"DELETE"}).catch(()=>{});
+};
 function connect(){
   const proto=location.protocol==="https:"?"wss":"ws";
   const ws=new WebSocket(proto+"://"+location.host+"/ws");
