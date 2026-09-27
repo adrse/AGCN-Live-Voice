@@ -34,10 +34,10 @@ def default_store_file() -> Path:
 
 
 class ProductStore:
-    """Ficha Inteligente do Produto — V0.5.1.
+    """Product Intelligence Store V3.
 
-    Mantém compatibilidade com os produtos antigos e prepara a base
-    para o Product Intelligence automático da próxima etapa.
+    Preserva origem/confiança das informações e garante que pesquisa
+    automática nunca sobrescreva silenciosamente um campo travado pelo usuário.
     """
 
     def __init__(self, path: str | Path | None = None):
@@ -150,29 +150,71 @@ class ProductStore:
         }
 
         manual_fields = set(payload.pop("manual_fields", []) or [])
+        research_meta = deepcopy(payload.pop("research_meta", {}) or {})
+        research_summary = deepcopy(
+            payload.pop("research_summary", {}) or {}
+        )
 
         for field in PERMANENT_FIELDS:
-            if field in payload:
-                product[field] = self._normalize(field, payload.get(field))
-                if (
-                    field in manual_fields
-                    or product[field] not in (None, "", False)
-                ):
-                    product["field_meta"][field] = default_field_meta("user")
+            if field not in payload:
+                continue
+
+            value = self._normalize(field, payload.get(field))
+            product[field] = value
+
+            if value in (None, "", False):
+                continue
+
+            if field in manual_fields:
+                product["field_meta"][field] = default_field_meta("user")
+            elif field in research_meta:
+                product["field_meta"][field] = self._normalize_research_meta(
+                    research_meta[field]
+                )
+            else:
+                product["field_meta"][field] = default_field_meta("user")
 
         live = product["live_conditions"]
 
         for field in LIVE_FIELDS:
-            if field in payload:
-                live[field] = self._normalize(field, payload.get(field))
-                if (
-                    field in manual_fields
-                    or live[field] not in (None, "", False)
-                ):
-                    product["live_meta"][field] = default_field_meta("user")
+            if field not in payload:
+                continue
+
+            value = self._normalize(field, payload.get(field))
+            live[field] = value
+
+            if value in (None, "", False):
+                continue
+
+            if field in manual_fields:
+                product["live_meta"][field] = default_field_meta("user")
+            elif field in research_meta:
+                product["live_meta"][field] = self._normalize_research_meta(
+                    research_meta[field]
+                )
+            else:
+                product["live_meta"][field] = default_field_meta("user")
 
         product["name"] = name
-        product["field_meta"]["name"] = default_field_meta("user")
+
+        if "name" in manual_fields:
+            product["field_meta"]["name"] = default_field_meta("user")
+        elif "name" in research_meta:
+            product["field_meta"]["name"] = self._normalize_research_meta(
+                research_meta["name"]
+            )
+        else:
+            product["field_meta"]["name"] = default_field_meta("user")
+
+        if research_summary:
+            product["research"] = {
+                **product.get("research", {}),
+                **research_summary,
+                "status": research_summary.get("status", "completed"),
+                "last_run_at": research_summary.get(
+                    "last_run_at"
+                ) or now_iso(),
+            }
 
         with self.lock:
             self.data["products"].append(product)
@@ -188,34 +230,85 @@ class ProductStore:
         product_id: str,
         *,
         manual_fields: list[str] | None = None,
+        research_meta: dict | None = None,
+        research_summary: dict | None = None,
         **changes,
     ) -> dict:
         with self.lock:
             product = self._find_mutable(product_id)
             manual = set(manual_fields or [])
+            research_meta = deepcopy(research_meta or {})
 
             for field, value in changes.items():
                 if field in PERMANENT_FIELDS:
-                    product[field] = self._normalize(field, value)
+                    normalized = self._normalize(field, value)
+                    existing_meta = product["field_meta"].get(field) or {}
+
+                    if (
+                        field in research_meta
+                        and existing_meta.get("locked_by_user")
+                        and field not in manual
+                    ):
+                        continue
+
+                    product[field] = normalized
 
                     if field in manual:
                         product["field_meta"][field] = default_field_meta(
                             "user"
                         )
+                    elif (
+                        field in research_meta
+                        and normalized not in (None, "", False)
+                    ):
+                        product["field_meta"][field] = (
+                            self._normalize_research_meta(
+                                research_meta[field]
+                            )
+                        )
 
                 elif field in LIVE_FIELDS:
-                    product["live_conditions"][field] = self._normalize(
-                        field,
-                        value,
-                    )
+                    normalized = self._normalize(field, value)
+                    existing_meta = product["live_meta"].get(field) or {}
+
+                    if (
+                        field in research_meta
+                        and existing_meta.get("locked_by_user")
+                        and field not in manual
+                    ):
+                        continue
+
+                    product["live_conditions"][field] = normalized
 
                     if field in manual:
                         product["live_meta"][field] = default_field_meta(
                             "user"
                         )
+                    elif (
+                        field in research_meta
+                        and normalized not in (None, "", False)
+                    ):
+                        product["live_meta"][field] = (
+                            self._normalize_research_meta(
+                                research_meta[field]
+                            )
+                        )
 
             if not str(product.get("name") or "").strip():
                 raise ValueError("O nome do produto é obrigatório.")
+
+            if research_summary:
+                product["research"] = {
+                    **product.get("research", {}),
+                    **deepcopy(research_summary),
+                    "status": research_summary.get(
+                        "status",
+                        "completed",
+                    ),
+                    "last_run_at": research_summary.get(
+                        "last_run_at"
+                    ) or now_iso(),
+                }
 
             product["updated_at"] = now_iso()
             self.save()
@@ -230,7 +323,7 @@ class ProductStore:
         confidence: dict | None = None,
         research_summary: dict | None = None,
     ) -> dict:
-        """Aplica pesquisa sem sobrescrever campos travados pelo usuário."""
+        """Aplica pesquisa salva sem sobrescrever campos travados."""
         field_sources = field_sources or {}
         confidence = confidence or {}
 
@@ -238,25 +331,34 @@ class ProductStore:
             product = self._find_mutable(product_id)
 
             for field, value in (values or {}).items():
-                if field not in PERMANENT_FIELDS:
+                target_meta = (
+                    product["field_meta"]
+                    if field in PERMANENT_FIELDS
+                    else product["live_meta"]
+                    if field in LIVE_FIELDS
+                    else None
+                )
+                if target_meta is None:
                     continue
 
-                meta = product["field_meta"].get(field) or {}
+                meta = target_meta.get(field) or {}
                 if meta.get("locked_by_user"):
                     continue
 
                 normalized = self._normalize(field, value)
-                if normalized in (None, ""):
+                if normalized in (None, "", False):
                     continue
 
-                product[field] = normalized
-                product["field_meta"][field] = {
+                if field in PERMANENT_FIELDS:
+                    product[field] = normalized
+                else:
+                    product["live_conditions"][field] = normalized
+
+                target_meta[field] = self._normalize_research_meta({
                     "origin": "research",
                     "confidence": confidence.get(field),
-                    "locked_by_user": False,
                     "sources": deepcopy(field_sources.get(field) or []),
-                    "updated_at": now_iso(),
-                }
+                })
 
             if research_summary:
                 product["research"] = {
@@ -271,7 +373,6 @@ class ProductStore:
             return deepcopy(product)
 
     def unlock_field(self, product_id: str, field: str) -> dict:
-        """Permite que uma futura pesquisa volte a atualizar um campo."""
         with self.lock:
             product = self._find_mutable(product_id)
 
@@ -280,20 +381,16 @@ class ProductStore:
                     field,
                     default_field_meta("unknown"),
                 )
-                meta["locked_by_user"] = False
-                meta["updated_at"] = now_iso()
-
             elif field in LIVE_FIELDS:
                 meta = product["live_meta"].setdefault(
                     field,
                     default_field_meta("unknown"),
                 )
-                meta["locked_by_user"] = False
-                meta["updated_at"] = now_iso()
-
             else:
                 raise KeyError("Campo não encontrado.")
 
+            meta["locked_by_user"] = False
+            meta["updated_at"] = now_iso()
             product["updated_at"] = now_iso()
             self.save()
             return deepcopy(product)
@@ -367,6 +464,17 @@ class ProductStore:
             return str(value or "").strip()
 
         return value
+
+    @staticmethod
+    def _normalize_research_meta(meta: dict | None) -> dict:
+        meta = deepcopy(meta or {})
+        return {
+            "origin": "research",
+            "confidence": meta.get("confidence"),
+            "locked_by_user": False,
+            "sources": deepcopy(meta.get("sources") or []),
+            "updated_at": meta.get("updated_at") or now_iso(),
+        }
 
     @staticmethod
     def _number_or_none(value):
