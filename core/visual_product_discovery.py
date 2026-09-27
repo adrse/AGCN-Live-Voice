@@ -562,24 +562,35 @@ class GoogleLensDiscovery:
         }
 
     def _launch_browser(self, playwright):
+        common_args = [
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-gpu",
+        ]
+
+        # Em Railway/Linux usamos diretamente o Chromium instalado pelo
+        # Playwright. Tentar o canal "chrome" primeiro nesse ambiente pode
+        # encerrar o processo antes de criar a página.
+        if os.getenv("RAILWAY_ENVIRONMENT"):
+            return playwright.chromium.launch(
+                headless=True,
+                args=common_args,
+            )
+
         # No Windows final, tenta usar o Chrome já instalado. Se não existir,
         # usa o Chromium empacotado pelo AGCN.
         try:
             return playwright.chromium.launch(
                 channel="chrome",
                 headless=self.headless,
-                args=[
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled",
-                ],
+                args=common_args,
             )
         except Exception:
             return playwright.chromium.launch(
                 headless=self.headless,
-                args=[
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled",
-                ],
+                args=common_args,
             )
 
     def _accept_consent(self, page) -> None:
