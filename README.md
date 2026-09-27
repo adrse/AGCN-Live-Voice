@@ -69,3 +69,12 @@ uvicorn backend.app:app --host 0.0.0.0 --port $PORT
 - Sales Guard
 - Anti-repetição
 - AGCN Presenter Dataset V1
+
+
+## Branch de desenvolvimento V0.5
+
+A branch `v0.5-presenter-behavior` implementa o primeiro Presenter Behavior V1:
+memória operacional, inteligência e fusão de comentários, Decision Engine V2,
+Silence Watchdog, Speech Planner, Sales Guard e contexto comercial ampliado do produto.
+
+Esta branch é testada em um serviço Railway separado antes de qualquer alteração da baseline `main`.
