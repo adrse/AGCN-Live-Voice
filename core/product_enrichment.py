@@ -8,6 +8,12 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from core.visual_product_discovery import (
+    GoogleLensDiscovery,
+    VisualImageMatcher,
+    lens_enabled_for_current_machine,
+)
+
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -189,12 +195,15 @@ class MarketplaceEnrichmentEngine:
                 "Accept": "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.5",
             },
         )
+        self.lens = GoogleLensDiscovery(headless=True)
+        self.image_matcher = VisualImageMatcher()
 
     def enrich(self, identity: dict) -> dict:
         name = clean(identity.get("name"))
         brand = clean(identity.get("brand"))
         model = clean(identity.get("model"))
         category = clean(identity.get("category"))
+        image_url = clean(identity.get("image_url"))
 
         if not name:
             return {
@@ -204,14 +213,66 @@ class MarketplaceEnrichmentEngine:
                 "technical_specs": [],
                 "sources": [],
                 "notes": ["Sem nome do produto para pesquisa externa."],
+                "discovery": {
+                    "lens_enabled": False,
+                    "lens_used": False,
+                    "lens_result_count": 0,
+                },
             }
 
         query = self._build_query(name, brand, model, category)
-        search_results = self._search_marketplaces(
+
+        discovery = {
+            "lens_enabled": lens_enabled_for_current_machine(),
+            "lens_used": False,
+            "lens_result_count": 0,
+            "lens_marketplace_count": 0,
+            "lens_reason": "",
+        }
+
+        lens_results = []
+        if discovery["lens_enabled"] and image_url:
+            lens_result = self.lens.search(
+                image_url=image_url,
+                title_hint=query,
+                max_results=36,
+            )
+            discovery["lens_used"] = bool(lens_result.get("ok"))
+            discovery["lens_result_count"] = len(
+                lens_result.get("results") or []
+            )
+            discovery["lens_marketplace_count"] = int(
+                lens_result.get("marketplace_count") or 0
+            )
+            discovery["lens_reason"] = clean(
+                lens_result.get("reason")
+            )
+
+            for item in lens_result.get("results") or []:
+                root = marketplace_root(item.get("host", ""))
+                if not root:
+                    continue
+                lens_results.append({
+                    "url": item["url"],
+                    "host": item["host"],
+                    "marketplace": MARKETPLACES[root],
+                    "title": clean(item.get("title")),
+                    "snippet": "",
+                    "source": "google_lens",
+                    "lens_rank": item.get("rank"),
+                })
+
+        text_results = self._search_marketplaces(
             query=query,
             brand=brand,
             model=model,
         )
+
+        search_results = self._merge_discovery_results(
+            lens_results,
+            text_results,
+        )
+
         accepted = self._accept_candidates(
             identity={
                 "name": name,
@@ -220,17 +281,53 @@ class MarketplaceEnrichmentEngine:
                 "category": category,
             },
             candidates=search_results,
-            limit=10,
+            limit=12,
         )
 
         sources = []
         for candidate in accepted:
             fetched = self._fetch_marketplace_page(candidate)
-            if fetched.get("ok"):
-                fetched["match_score"] = candidate["match_score"]
-                sources.append(fetched)
+            if not fetched.get("ok"):
+                continue
 
-        return self._fuse(
+            match_score = float(candidate["match_score"])
+            image_match = {
+                "ok": False,
+                "score": None,
+            }
+
+            if image_url and fetched.get("image_url"):
+                image_match = self.image_matcher.compare_urls(
+                    image_url,
+                    fetched["image_url"],
+                )
+
+                if image_match.get("ok"):
+                    visual_score = float(
+                        image_match.get("score") or 0
+                    )
+                    match_score = min(
+                        1.0,
+                        (match_score * 0.72)
+                        + (visual_score * 0.28),
+                    )
+
+                    if image_match.get("same_catalog_photo"):
+                        match_score = max(match_score, 0.94)
+
+            fetched["match_score"] = round(
+                match_score,
+                3,
+            )
+            fetched["discovery_source"] = candidate.get(
+                "source",
+                "text_search",
+            )
+            fetched["lens_rank"] = candidate.get("lens_rank")
+            fetched["image_match"] = image_match
+            sources.append(fetched)
+
+        fused = self._fuse(
             identity={
                 "name": name,
                 "brand": brand,
@@ -240,6 +337,8 @@ class MarketplaceEnrichmentEngine:
             sources=sources,
             query=query,
         )
+        fused["discovery"] = discovery
+        return fused
 
     def _build_query(
         self,
@@ -337,6 +436,27 @@ class MarketplaceEnrichmentEngine:
 
         return results
 
+    def _merge_discovery_results(
+        self,
+        lens_results: list[dict],
+        text_results: list[dict],
+    ) -> list[dict]:
+        merged = []
+        seen = set()
+
+        for item in [*lens_results, *text_results]:
+            url = (item.get("url") or "").split("#")[0]
+            if not url or url in seen:
+                continue
+            seen.add(url)
+
+            copy = dict(item)
+            copy["url"] = url
+            copy.setdefault("source", "text_search")
+            merged.append(copy)
+
+        return merged
+
     def _accept_candidates(
         self,
         *,
@@ -373,20 +493,42 @@ class MarketplaceEnrichmentEngine:
                 model and model.casefold() in low
             )
 
+            from_lens = item.get("source") == "google_lens"
+
             if brand and model:
                 if not (brand_match and model_match):
                     continue
             else:
-                if len(common) < 3 or overlap < 0.40:
+                minimum_common = 2 if from_lens else 3
+                minimum_overlap = 0.24 if from_lens else 0.40
+
+                if len(common) < minimum_common and not (
+                    base_specific & item_specific
+                ):
                     continue
+
+                if overlap < minimum_overlap and not (
+                    base_specific & item_specific
+                ):
+                    continue
+
                 if (
-                    base_specific
+                    not from_lens
+                    and base_specific
                     and item_specific
                     and not (base_specific & item_specific)
                 ):
                     continue
 
             score = overlap
+
+            if from_lens:
+                rank = item.get("lens_rank")
+                try:
+                    rank = int(rank)
+                except Exception:
+                    rank = 20
+                score += max(0.08, 0.24 - (rank - 1) * 0.012)
             if brand_match:
                 score += 0.28
             if model_match:
@@ -716,6 +858,9 @@ class MarketplaceEnrichmentEngine:
                 "marketplace": source["marketplace"],
                 "title": source.get("title", ""),
                 "match_score": source.get("match_score"),
+                "discovery_source": source.get("discovery_source"),
+                "lens_rank": source.get("lens_rank"),
+                "image_match": source.get("image_match") or {},
             })
 
         # Só completa marca/modelo quando existe confirmação forte.
@@ -1009,6 +1154,9 @@ class MarketplaceEnrichmentEngine:
             "marketplace": source.get("marketplace"),
             "title": source.get("title"),
             "match_score": source.get("match_score"),
+            "discovery_source": source.get("discovery_source"),
+            "lens_rank": source.get("lens_rank"),
+            "image_match": source.get("image_match") or {},
         }
 
     def _merge_sources(
