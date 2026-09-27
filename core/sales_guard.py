@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.product_knowledge import ProductKnowledge
+
 
 class SalesGuard:
     """Expõe somente fatos comerciais realmente cadastrados."""
@@ -25,6 +27,7 @@ class SalesGuard:
 
     def __init__(self, product: dict | None):
         self.product = dict(product or {})
+        self.knowledge = ProductKnowledge(self.product)
 
     def get(self, fact: str):
         key = self.FACT_MAP.get(fact, fact)
@@ -65,6 +68,15 @@ class SalesGuard:
                 "discount": self.product.get("discount"),
             }
         return self.get(topic)
+
+    def fact_for_decision(self, decision: dict) -> dict:
+        """Resolve uma pergunta usando somente informações cadastradas."""
+        packet = self.knowledge.resolve(
+            intent=decision.get("intent"),
+            topic=decision.get("topic"),
+            comment=decision.get("comment"),
+        )
+        return packet
 
     def can_claim(self, claim: str) -> bool:
         if claim == "live_exclusive":
