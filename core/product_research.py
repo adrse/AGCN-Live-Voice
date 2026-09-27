@@ -392,11 +392,62 @@ class ProductResearchEngine:
                 native_confidence["stock"] = 0.98
                 native_field_sources["stock"] = native_source
 
+            native_attributes = native.get("attributes") or []
             attribute_text = "; ".join(
                 f"{item.get('name')}: {item.get('value')}"
-                for item in (native.get("attributes") or [])
+                for item in native_attributes
                 if item.get("name") and item.get("value")
             )
+
+            grouped_specs = {
+                "size_info": [],
+                "battery_info": [],
+                "compatibility": [],
+                "warranty": [],
+                "usage_info": [],
+            }
+
+            for item in native_attributes:
+                label = _clean(item.get("name")).casefold()
+                value = _clean(item.get("value"))
+                if not label or not value:
+                    continue
+
+                if any(k in label for k in (
+                    "capacidade", "dimens", "tamanho", "peso", "volume"
+                )):
+                    grouped_specs["size_info"].append(
+                        f"{_clean(item.get('name'))}: {value}"
+                    )
+                elif any(k in label for k in (
+                    "bateria", "autonomia", "carregamento"
+                )):
+                    grouped_specs["battery_info"].append(
+                        f"{_clean(item.get('name'))}: {value}"
+                    )
+                elif any(k in label for k in (
+                    "voltagem", "tensão", "tensao", "compatib",
+                    "sistema operacional", "conectividade"
+                )):
+                    grouped_specs["compatibility"].append(
+                        f"{_clean(item.get('name'))}: {value}"
+                    )
+                elif "garantia" in label:
+                    grouped_specs["warranty"].append(
+                        f"{_clean(item.get('name'))}: {value}"
+                    )
+                elif any(k in label for k in (
+                    "uso", "função", "funcao", "programa"
+                )):
+                    grouped_specs["usage_info"].append(
+                        f"{_clean(item.get('name'))}: {value}"
+                    )
+
+            for field, items in grouped_specs.items():
+                if items:
+                    native_values[field] = "; ".join(items)
+                    native_confidence[field] = 0.97
+                    native_field_sources[field] = native_source
 
             sku_text = "; ".join(
                 " / ".join(
@@ -1114,17 +1165,37 @@ class ProductResearchEngine:
         model = ""
         category = ""
 
-        # O primeiro token costuma ser a marca quando o título vem da própria
-        # ficha do produto. Evitamos termos genéricos.
+        # Títulos de marketplace podem começar pela categoria
+        # ("Fritadeira Elétrica Arno..."), então a primeira palavra nem sempre
+        # é a marca. Procuramos o primeiro token não genérico nos primeiros
+        # termos; em produtos sem marca clara, deixamos vazio.
         generic_first = {
             "smartwatch", "relogio", "relógio", "kit", "produto",
-            "oferta", "novo", "original",
+            "oferta", "novo", "original", "fritadeira", "elétrica",
+            "eletrica", "air", "fryer", "sem", "óleo", "oleo",
+            "cafeteira", "ventilador", "liquidificador", "batedeira",
+            "calça", "calca", "legging", "conjunto", "pote", "potes",
+            "vidro", "hermético", "hermetico", "marmita", "fitness",
+            "premium", "top", "para", "esportes", "cozinha",
         }
-        first = words[0]
-        if first.casefold() not in generic_first and not first.isdigit():
-            brand = first
 
-        for token in words[1:8]:
+        for token in words[:8]:
+            low_token = token.casefold()
+            if (
+                low_token not in generic_first
+                and not token.isdigit()
+                and not re.fullmatch(r"\d+(?:[.,]\d+)?(?:l|ml|w|v|cm|mm|kg|g)?", low_token)
+                and len(token) >= 3
+            ):
+                # Evita tratar adjetivos/complementos comuns como marca.
+                if low_token not in {
+                    "digital", "mega", "maxxi", "expert", "preta",
+                    "preto", "inox", "alta", "tampa", "trava",
+                }:
+                    brand = token
+                    break
+
+        for token in words[1:12]:
             if re.fullmatch(r"[A-Za-z]{1,5}\d+[A-Za-z0-9-]*", token):
                 model = token
                 break
@@ -1132,6 +1203,12 @@ class ProductResearchEngine:
         low = text.casefold()
         if "smartwatch" in low or "relógio" in low or "relogio" in low:
             category = "Smartwatch"
+        elif (
+            "fritadeira" in low
+            or "air fryer" in low
+            or "airfryer" in low
+        ):
+            category = "Fritadeira elétrica / Air Fryer"
         elif (
             "fitness" in low
             and any(x in low for x in ("calça", "calca", "top", "legging"))
