@@ -5,7 +5,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import httpx
 
@@ -231,25 +231,168 @@ class GoogleLensDiscovery:
                 "reason": "Playwright não está disponível",
             }
 
+        # Quando já temos uma imagem pública do TikTok, tentamos primeiro o
+        # fluxo direto do Lens por URL. Isso evita depender do seletor de
+        # upload e funciona tanto no protótipo web quanto no Windows local.
+        direct = self._search_public_image_url(
+            image_url,
+            title_hint=title_hint,
+            max_results=max_results,
+        )
+        if direct.get("ok"):
+            return direct
+
+        # Fallback: baixa uma cópia temporária e usa o upload visual normal.
         temp_path = self._download_temp_image(image_url)
         if not temp_path:
             return {
                 "ok": False,
                 "results": [],
-                "reason": "não foi possível baixar a imagem do TikTok",
+                "reason": direct.get("reason")
+                or "não foi possível baixar a imagem do TikTok",
             }
 
         try:
-            return self._search_file(
+            fallback = self._search_file(
                 temp_path,
                 title_hint=title_hint,
                 max_results=max_results,
             )
+            if not fallback.get("ok") and direct.get("reason"):
+                fallback["reason"] = (
+                    str(direct.get("reason"))
+                    + " | fallback: "
+                    + str(fallback.get("reason") or "sem resultado")
+                )
+            return fallback
         finally:
             try:
                 Path(temp_path).unlink(missing_ok=True)
             except Exception:
                 pass
+
+    def _search_public_image_url(
+        self,
+        image_url: str,
+        *,
+        title_hint: str,
+        max_results: int,
+    ) -> dict:
+        results = []
+        final_url = ""
+
+        try:
+            lens_url = (
+                "https://lens.google.com/uploadbyurl?hl=pt-BR&url="
+                + quote(image_url, safe="")
+            )
+
+            # Primeiro resolvemos o redirecionamento do Lens. Quando o Google
+            # devolve uma URL de resultados com vsrid, abrimos diretamente
+            # essa página no navegador.
+            resolved_url = lens_url
+            try:
+                probe = self.client.get(lens_url)
+                if str(probe.url).startswith("http"):
+                    resolved_url = str(probe.url)
+            except Exception:
+                pass
+
+            with sync_playwright() as p:
+                browser = self._launch_browser(p)
+                context = browser.new_context(
+                    locale="pt-BR",
+                    timezone_id="America/Sao_Paulo",
+                    user_agent=USER_AGENT,
+                    viewport={"width": 1440, "height": 960},
+                )
+                page = context.new_page()
+                page.goto(
+                    resolved_url,
+                    wait_until="domcontentloaded",
+                    timeout=self.timeout_ms,
+                )
+                self._accept_consent(page)
+                page.wait_for_timeout(3500)
+
+                if title_hint:
+                    self._add_text_hint(page, title_hint)
+
+                page.wait_for_timeout(2500)
+                final_url = page.url
+
+                raw_links = page.locator("a").evaluate_all(
+                    """els => els.map((a, i) => ({
+                        href: a.href || "",
+                        text: (a.innerText || a.textContent || "").trim(),
+                        aria: a.getAttribute("aria-label") || "",
+                        index: i
+                    }))"""
+                )
+
+                seen = set()
+                for item in raw_links:
+                    href = self._decode_google_href(
+                        item.get("href") or ""
+                    )
+                    if not href.startswith(("http://", "https://")):
+                        continue
+
+                    h = _host(href)
+                    if not h or _root_matches(h, BLOCKED_ROOTS):
+                        continue
+
+                    key = href.split("#")[0]
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
+                    results.append({
+                        "url": key,
+                        "host": h,
+                        "title": _clean(
+                            item.get("text")
+                            or item.get("aria")
+                        )[:240],
+                        "rank": len(results) + 1,
+                        "is_marketplace": _root_matches(
+                            h,
+                            MARKETPLACE_ROOTS,
+                        ),
+                        "source": "google_lens",
+                    })
+
+                    if len(results) >= max_results:
+                        break
+
+                context.close()
+                browser.close()
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "results": [],
+                "reason": _clean(str(exc))[:220],
+                "final_url": final_url,
+                "mode": "uploadbyurl",
+            }
+
+        return {
+            "ok": bool(results),
+            "results": results,
+            "marketplace_count": sum(
+                1
+                for item in results
+                if item.get("is_marketplace")
+            ),
+            "final_url": final_url,
+            "notes": (
+                []
+                if results
+                else ["Lens por URL abriu, mas não expôs links utilizáveis."]
+            ),
+            "mode": "uploadbyurl",
+        }
 
     def _download_temp_image(self, image_url: str) -> str | None:
         try:
