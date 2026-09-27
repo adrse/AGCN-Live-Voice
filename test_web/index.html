@@ -179,7 +179,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.4.1</span><span class="dot"></span><span>Ambiente de teste</span>
+      <span>v0.5</span><span class="dot"></span><span>Presenter Behavior</span>
     </div>
   </aside>
 
@@ -252,7 +252,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <div class="presenter-status">
           <div class="control-box">
             <div class="control-label">Motor atual</div>
-            <div class="control-value">Presenter V0.4.1</div>
+            <div class="control-value">Presenter Behavior V1</div>
           </div>
           <div class="control-box">
             <div class="control-label">Saída</div>
@@ -260,9 +260,9 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
           </div>
         </div>
         <div class="toggle-line"><span class="toggle on"></span>Responder comentários relevantes</div>
-        <div class="toggle-line"><span class="toggle on"></span>Usar produto ativo como contexto</div>
-        <div class="toggle-line"><span class="toggle on"></span>Gerar falas proativas</div>
-        <div class="note">A voz/TTS ainda não está nesta etapa. Aqui estamos validando o comportamento do apresentador.</div>
+        <div class="toggle-line"><span class="toggle on"></span>Memória curta + retomada de assunto</div>
+        <div class="toggle-line"><span class="toggle on"></span>Silence Watchdog — alvo máximo 8s</div>
+        <div id="behaviorStatus" class="note">Memória: aguardando • Watchdog: aguardando</div>
       </div>
     </section>
 
@@ -272,13 +272,32 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <summary>+ Cadastrar novo produto</summary>
         <div class="form-grid">
           <input id="pName" class="full" placeholder="Nome do produto">
-          <textarea id="pDescription" class="full" placeholder="Descrição"></textarea>
+          <input id="pBrand" placeholder="Marca">
+          <input id="pCategory" placeholder="Categoria">
+          <textarea id="pDescription" class="full" placeholder="Descrição geral"></textarea>
           <input id="pRegular" placeholder="Preço normal">
           <input id="pCurrent" placeholder="Preço atual">
           <input id="pDiscount" placeholder="Desconto (%)">
-          <input id="pCategory" placeholder="Categoria">
-          <textarea id="pInfo" class="full" placeholder="Informações adicionais"></textarea>
+          <input id="pStock" placeholder="Estoque real (se conhecido)">
+          <textarea id="pBenefits" class="full" placeholder="Principais benefícios"></textarea>
+          <textarea id="pProblems" class="full" placeholder="Problemas / dores que resolve"></textarea>
+          <textarea id="pDifferentials" class="full" placeholder="Diferenciais"></textarea>
+          <textarea id="pIncluded" class="full" placeholder="Itens inclusos no kit"></textarea>
+          <textarea id="pCompatibility" class="full" placeholder="Compatibilidade"></textarea>
+          <textarea id="pSize" placeholder="Tamanho / medidas"></textarea>
+          <textarea id="pBattery" placeholder="Bateria / autonomia"></textarea>
+          <textarea id="pUsage" class="full" placeholder="Como usar"></textarea>
+          <textarea id="pShipping" class="full" placeholder="Frete / entrega"></textarea>
+          <textarea id="pWarranty" class="full" placeholder="Garantia"></textarea>
+          <textarea id="pLimitations" class="full" placeholder="Limitações conhecidas"></textarea>
+          <textarea id="pInfo" class="full" placeholder="Outras informações adicionais"></textarea>
+          <label class="full toggle-line" style="margin:2px 0">
+            <input id="pLiveOffer" type="checkbox" style="width:auto">
+            Oferta exclusiva/especial da LIVE foi confirmada
+          </label>
+          <textarea id="pLiveOfferText" class="full" placeholder="Texto verdadeiro da oferta da LIVE"></textarea>
           <input id="pImage" class="full" placeholder="URL da imagem (opcional)">
+          <div class="note full">Quanto mais fatos reais você cadastrar, mais o Presenter consegue responder sem inventar. Estoque e promoção só serão usados quando estiverem preenchidos.</div>
           <button class="btn primary full" id="saveProduct">Salvar produto</button>
         </div>
         <div id="productMessage" class="status-text"></div>
@@ -520,6 +539,14 @@ function render(data){
   renderComments(data);
   renderDecision(data);
   renderSpeech(data);
+
+  const presenter=data.presenter||{};
+  const memory=presenter.memory||{};
+  const watchdog=presenter.watchdog||{};
+  $("#behaviorStatus").textContent=
+    "Silêncio: "+String(memory.seconds_since_speech??"—")+"s / alvo 8s • "+
+    "Tópico: "+String(memory.current_topic||"—")+" • Watchdog: "+String(watchdog.status||"—");
+
   $("#summary").textContent=data.summary||"Aguardando...";
 }
 
@@ -549,12 +576,27 @@ $("#saveProduct").onclick=async()=>{
       method:"POST",
       body:JSON.stringify({
         name:$("#pName").value,
+        brand:$("#pBrand").value,
         description:$("#pDescription").value,
         regular_price:$("#pRegular").value,
         current_price:$("#pCurrent").value,
         discount:$("#pDiscount").value,
+        stock:$("#pStock").value,
         category:$("#pCategory").value,
+        key_benefits:$("#pBenefits").value,
+        problems_solved:$("#pProblems").value,
+        differentials:$("#pDifferentials").value,
+        included_items:$("#pIncluded").value,
+        compatibility:$("#pCompatibility").value,
+        size_info:$("#pSize").value,
+        battery_info:$("#pBattery").value,
+        usage_info:$("#pUsage").value,
+        shipping_info:$("#pShipping").value,
+        warranty:$("#pWarranty").value,
+        limitations:$("#pLimitations").value,
         additional_info:$("#pInfo").value,
+        live_offer:$("#pLiveOffer").checked,
+        live_offer_text:$("#pLiveOfferText").value,
         image_url:$("#pImage").value
       })
     });
