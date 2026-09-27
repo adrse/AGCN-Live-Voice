@@ -47,6 +47,30 @@ GENERIC_BRANDS = {
     "espátula",
     "espatula",
     "antiaderente",
+    "hélice",
+    "hélices",
+    "helice",
+    "helices",
+    "ventilador",
+    "teto",
+    "potente",
+    "controle",
+    "remoto",
+    "led",
+    "regulável",
+    "regulavel",
+    "cores",
+    "silêncio",
+    "silencio",
+    "inteligente",
+    "forte",
+    "elétrica",
+    "eletrica",
+    "sem",
+    "óleo",
+    "oleo",
+    "expert",
+    "maxxi",
 }
 
 
@@ -123,29 +147,22 @@ class ProductResearchEngineV054(ProductResearchEngine):
         native_model = _clean(native.get("model"))
         native_category = _clean(native.get("category"))
 
-        identity_guess = self._identity_from_title(title)
-        brand = native_brand or _clean(identity_guess.get("brand"))
-        model = native_model or _clean(identity_guess.get("model"))
-        category = (
-            native_category
-            or _clean(identity_guess.get("category"))
-            or self._category_from_title(title)
+        # Identidade conservadora. O título é confiável para nome/imagem,
+        # mas marca/modelo só entram quando há evidência forte. Isso evita
+        # erros como "Hélices" virar marca de um ventilador.
+        category = native_category or self._category_from_title(title)
+        model = native_model or self._model_from_title(title)
+        brand = (
+            native_brand
+            or self._brand_from_title_if_strong(
+                title,
+                model=model,
+                category=category,
+            )
         )
 
         if brand.casefold() in GENERIC_BRANDS:
             brand = ""
-
-        # Produtos genéricos sem modelo não recebem marca inventada do título.
-        if (
-            not model
-            and category in {
-                "Panelas e frigideiras",
-                "Potes e Marmitas",
-                "Moda Fitness",
-                "Calça",
-            }
-        ):
-            brand = native_brand
 
         description = _clean(native.get("description"))
         if self._is_generic_description(description):
@@ -179,12 +196,12 @@ class ProductResearchEngineV054(ProductResearchEngine):
 
         if brand:
             values["brand"] = brand
-            confidence["brand"] = 0.98 if native_brand else 0.84
+            confidence["brand"] = 0.98 if native_brand else 0.80
             field_sources["brand"] = [tiktok_source]
 
         if model:
             values["model"] = model
-            confidence["model"] = 0.98 if native_model else 0.88
+            confidence["model"] = 0.98 if native_model else 0.82
             field_sources["model"] = [tiktok_source]
 
         if category:
@@ -411,6 +428,92 @@ class ProductResearchEngineV054(ProductResearchEngine):
             },
         }
 
+    def _model_from_title(self, title: str) -> str:
+        text = _clean(title)
+        if not text:
+            return ""
+
+        # Códigos que normalmente são especificações, não modelos.
+        ignored = {
+            "e14", "e27", "e40",
+            "ip44", "ip54", "ip65", "ip67", "ip68",
+            "5atm", "3atm",
+        }
+
+        candidates = re.findall(
+            r"\b[A-Za-zÀ-ÿ]{1,8}\d+[A-Za-z0-9-]*\b",
+            text,
+        )
+
+        for token in candidates:
+            low = token.casefold()
+            if low in ignored:
+                continue
+            if re.fullmatch(
+                r"(?:usb|wifi|bt|led)\d+",
+                low,
+                flags=re.I,
+            ):
+                continue
+            return token
+
+        return ""
+
+    def _brand_from_title_if_strong(
+        self,
+        title: str,
+        *,
+        model: str,
+        category: str,
+    ) -> str:
+        # Sem modelo explícito, não inventamos marca pelo título.
+        if not model:
+            return ""
+
+        words = re.findall(
+            r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9-]*",
+            _clean(title),
+        )
+        if not words:
+            return ""
+
+        model_index = next(
+            (
+                index
+                for index, token in enumerate(words)
+                if token.casefold() == model.casefold()
+            ),
+            len(words),
+        )
+
+        # Procura um nome de marca antes do modelo, ignorando palavras
+        # claramente descritivas/de categoria. O primeiro candidato forte
+        # costuma capturar "Arno ... AFD7" e "Aurafit G6", mas não
+        # "Hélices"/"Ventilador".
+        for token in words[:model_index]:
+            low = token.casefold()
+            if low in GENERIC_BRANDS:
+                continue
+            if len(token) < 3:
+                continue
+            if token.isdigit():
+                continue
+            if re.fullmatch(
+                r"\d+(?:[.,]\d+)?(?:w|v|l|ml|kg|g|cm|mm|hz)",
+                low,
+            ):
+                continue
+            # Evita conectores/adjetivos comuns.
+            if low in {
+                "para", "com", "sem", "de", "do", "da", "dos", "das",
+                "preto", "preta", "branco", "branca", "inox", "digital",
+                "painel", "programas", "produto", "original", "novo", "nova",
+            }:
+                continue
+            return token
+
+        return ""
+
     def _category_from_title(self, title: str) -> str:
         low = _clean(title).casefold()
 
@@ -464,6 +567,38 @@ class ProductResearchEngineV054(ProductResearchEngine):
             )
         ):
             return "Moda Fitness"
+
+        if "ventilador de teto" in low:
+            return "Ventilador de teto"
+
+        if "ventilador" in low:
+            return "Ventilador"
+
+        if any(
+            token in low
+            for token in (
+                "fone de ouvido",
+                "earbuds",
+                "headphone",
+                "headset",
+            )
+        ):
+            return "Fone de ouvido"
+
+        if "mop" in low:
+            return "Mop / Limpeza"
+
+        if any(
+            token in low
+            for token in (
+                "liquidificador",
+                "cafeteira",
+                "batedeira",
+                "micro-ondas",
+                "microondas",
+            )
+        ):
+            return "Eletroportátil"
 
         return ""
 
