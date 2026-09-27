@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter, defaultdict
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -424,6 +424,13 @@ class ProductResearchEngine:
 
             reviews.extend(_review_texts(node))
 
+        # TikTok e algumas lojas colocam os dados do produto em JSON
+        # de hidratação, sem JSON-LD padrão.
+        embedded_product = self._extract_embedded_product(soup)
+        for key, value in embedded_product.items():
+            if value not in (None, "", [], {}):
+                product[key] = _first(product.get(key), value)
+
         # Alguns sites usam FAQPage em JSON-LD.
         faq = []
         for node in all_nodes:
@@ -458,6 +465,167 @@ class ProductResearchEngine:
             "faq": faq[:30],
         }
 
+    def _extract_embedded_product(self, soup) -> dict:
+        candidates = []
+
+        for script in soup.find_all("script"):
+            raw = script.string or script.get_text() or ""
+            if len(raw) < 80:
+                continue
+
+            script_id = str(script.get("id") or "").casefold()
+            script_type = str(script.get("type") or "").casefold()
+
+            if (
+                "json" not in script_type
+                and "universal" not in script_id
+                and "sigi" not in script_id
+                and "next_data" not in script_id
+            ):
+                continue
+
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+
+            for node in _iter_jsonld(data):
+                keys = {str(k).casefold() for k in node.keys()}
+                has_product_id = any(
+                    k in keys
+                    for k in (
+                        "product_id",
+                        "productid",
+                        "product_id_str",
+                        "item_id",
+                    )
+                )
+                has_product_name = any(
+                    k in keys
+                    for k in (
+                        "product_name",
+                        "productname",
+                        "product_title",
+                        "title",
+                    )
+                )
+
+                if not (has_product_id and has_product_name):
+                    continue
+
+                name = _first(
+                    node.get("product_name"),
+                    node.get("productName"),
+                    node.get("product_title"),
+                    node.get("title"),
+                    node.get("name"),
+                )
+
+                if not name:
+                    continue
+
+                candidate = {
+                    "name": _clean(name),
+                    "brand": _clean(
+                        _first(
+                            node.get("brand_name"),
+                            node.get("brandName"),
+                            node.get("brand"),
+                        )
+                    ),
+                    "model": _clean(
+                        _first(
+                            node.get("model"),
+                            node.get("sku_name"),
+                            node.get("skuName"),
+                        )
+                    ),
+                    "description": _clean(
+                        _first(
+                            node.get("description"),
+                            node.get("product_description"),
+                            node.get("productDescription"),
+                        )
+                    ),
+                    "price": self._deep_price(node),
+                    "image_url": self._deep_image(node),
+                }
+                candidates.append(candidate)
+
+        if not candidates:
+            return {}
+
+        candidates.sort(
+            key=lambda x: (
+                bool(x.get("price")),
+                bool(x.get("brand")),
+                len(x.get("description") or ""),
+            ),
+            reverse=True,
+        )
+        return candidates[0]
+
+    def _deep_price(self, node: dict):
+        direct_keys = (
+            "sale_price",
+            "salePrice",
+            "current_price",
+            "currentPrice",
+            "price",
+        )
+        for key in direct_keys:
+            if key not in node:
+                continue
+            value = node.get(key)
+            if isinstance(value, dict):
+                for nested_key in (
+                    "amount",
+                    "price",
+                    "value",
+                    "min_price",
+                    "minPrice",
+                ):
+                    parsed = _safe_float(value.get(nested_key))
+                    if parsed is not None:
+                        return parsed
+            else:
+                parsed = _safe_float(value)
+                if parsed is not None:
+                    return parsed
+        return None
+
+    def _deep_image(self, node: dict) -> str:
+        for key in (
+            "image_url",
+            "imageUrl",
+            "cover_url",
+            "coverUrl",
+            "image",
+            "images",
+            "cover",
+        ):
+            value = node.get(key)
+            if isinstance(value, str) and value.startswith("http"):
+                return value
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.startswith("http"):
+                        return item
+                    if isinstance(item, dict):
+                        found = self._deep_image(item)
+                        if found:
+                            return found
+            if isinstance(value, dict):
+                for nested in ("url", "url_list", "urlList"):
+                    nested_value = value.get(nested)
+                    if isinstance(nested_value, str) and nested_value.startswith("http"):
+                        return nested_value
+                    if isinstance(nested_value, list):
+                        for item in nested_value:
+                            if isinstance(item, str) and item.startswith("http"):
+                                return item
+        return ""
+
     def _seed_from_source(self, source: dict) -> dict:
         product = source.get("product") or {}
         title = _clean(
@@ -490,6 +658,15 @@ class ProductResearchEngine:
         }
 
     def _clean_product_title(self, title: str) -> str:
+        original = _clean(title)
+        if original.casefold() in {
+            "tiktok",
+            "tiktok - make your day",
+            "tiktok shop",
+            "make your day | tiktok",
+        }:
+            return ""
+
         title = re.sub(
             r"\s*[|·-]\s*(TikTok Shop|TikTok).*?$",
             "",
@@ -547,6 +724,20 @@ class ProductResearchEngine:
                         if snippet
                         else ""
                     )
+
+                    if href.startswith("//"):
+                        href = "https:" + href
+
+                    # DuckDuckGo costuma retornar um redirect com o destino
+                    # real no parâmetro uddg.
+                    if "duckduckgo.com/l/" in href:
+                        try:
+                            parsed = urlparse(href)
+                            target = parse_qs(parsed.query).get("uddg", [None])[0]
+                            if target:
+                                href = unquote(target)
+                        except Exception:
+                            pass
 
                     if not href.startswith("http"):
                         continue
