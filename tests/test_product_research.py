@@ -71,3 +71,54 @@ def test_decodes_tiktok_share_metadata():
 def test_security_check_is_not_a_product_name():
     engine = ProductResearchEngine()
     assert engine._clean_product_title("Security Check") == ""
+
+
+
+def test_name_from_marketplace_description():
+    engine = ProductResearchEngine()
+    name = engine._name_from_description(
+        "Compre Conjunto Fitness Premium Cintura Alta Calça e Top na Shopee. "
+        "Descubra ótimos preços e frete grátis."
+    )
+    assert name == "Conjunto Fitness Premium Cintura Alta Calça e Top"
+
+
+def test_identity_from_watch_title():
+    engine = ProductResearchEngine()
+    identity = engine._identity_from_title(
+        "Aurafit G6 Smartwatch para Esportes Relógio: GPS Interno + Strava "
+        "+ WhatsApp + Resistente à Água 5ATM + 60Hz AMOLED + 150 Modos"
+    )
+    assert identity["brand"] == "Aurafit"
+    assert identity["model"] == "G6"
+    assert identity["category"] == "Smartwatch"
+
+
+def test_structured_fields_from_tiktok_title():
+    engine = ProductResearchEngine()
+    source = {
+        "ok": True,
+        "source_type": "submitted_link",
+        "title": (
+            "Aurafit G6 Smartwatch para Esportes Relógio: GPS Interno + "
+            "Strava + WhatsApp + Resistente à Água 5ATM + 60Hz AMOLED + "
+            "150 Modos Leve o ChatGPT na Sua Aventura."
+        ),
+        "description": "",
+        "product": {},
+        "final_url": "https://shop.tiktok.com/br/pdp/123",
+        "url": "https://shop.tiktok.com/br/pdp/123",
+        "host": "shop.tiktok.com",
+        "status_code": 200,
+    }
+    seed = {
+        "name": source["title"],
+        "brand": "Aurafit",
+        "model": "G6",
+        "category": "Smartwatch",
+    }
+    result = engine._derive_structured_fields([source], seed)
+
+    assert "GPS interno" in result["differentials"]["value"]
+    assert "Tela AMOLED" in result["differentials"]["value"]
+    assert "Resistência à água 5ATM" in result["differentials"]["value"]
