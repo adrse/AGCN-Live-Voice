@@ -398,6 +398,86 @@ class MarketplaceEnrichmentEngine:
 
         return fused
 
+    def enrich_confirmed_candidate(
+        self,
+        identity: dict,
+        candidate: dict,
+    ) -> dict:
+        """Completa a ficha depois que o usuário confirma um candidato visual."""
+        url = clean(candidate.get("url"))
+        h = host(url)
+        root = marketplace_root(h)
+
+        if not url or not root:
+            raise ValueError(
+                "O candidato confirmado precisa ser de um marketplace suportado."
+            )
+
+        fetched = self._fetch_marketplace_page({
+            "url": url,
+            "host": h,
+            "marketplace": MARKETPLACES[root],
+            "title": clean(candidate.get("title")),
+            "snippet": "",
+        })
+
+        if not fetched.get("ok"):
+            raise ValueError(
+                "Não foi possível ler a página do produto confirmado."
+            )
+
+        image_url = clean(identity.get("image_url"))
+        image_match = {
+            "ok": False,
+            "score": None,
+            "same_catalog_photo": False,
+        }
+
+        if image_url and fetched.get("image_url"):
+            image_match = self.image_matcher.compare_urls(
+                image_url,
+                fetched["image_url"],
+            )
+
+        fetched["match_score"] = 1.0
+        fetched["text_match_score"] = 1.0
+        fetched["discovery_source"] = "user_confirmation"
+        fetched["image_match"] = image_match
+        fetched["verification"] = "confirmed"
+        fetched["verification_reason"] = "confirmado pelo usuário"
+
+        query = self._build_query(
+            clean(identity.get("name")),
+            clean(identity.get("brand")),
+            clean(identity.get("model")),
+            clean(identity.get("category")),
+        )
+
+        fused = self._fuse(
+            identity={
+                "name": clean(identity.get("name")),
+                "brand": clean(identity.get("brand")),
+                "model": clean(identity.get("model")),
+                "category": clean(identity.get("category")),
+            },
+            sources=[fetched],
+            query=query,
+        )
+        fused["confirmed_match_count"] = 1
+        fused["needs_confirmation"] = False
+        fused["candidate_matches"] = [
+            self._source_card(fetched)
+        ]
+        fused["discovery"] = {
+            "lens_enabled": lens_enabled_for_current_machine(),
+            "lens_used": bool(
+                candidate.get("discovery_source") == "google_lens"
+                or candidate.get("source") == "google_lens"
+            ),
+            "confirmed_by_user": True,
+        }
+        return fused
+
     def _build_query(
         self,
         name: str,
