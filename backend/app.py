@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.runtime import AGCNVoiceRuntime
 
@@ -15,7 +15,7 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5-presenter-behavior",
+    version="0.5.1-product-intelligence",
 )
 
 runtime = AGCNVoiceRuntime()
@@ -26,29 +26,40 @@ class LiveStartRequest(BaseModel):
 
 
 class ProductRequest(BaseModel):
+    product_url: str = ""
     name: str
-    description: str = ""
-    regular_price: str | float | None = None
-    current_price: str | float | None = None
-    discount: str | float | None = None
-    additional_info: str = ""
-    category: str = ""
-    image_url: str = ""
     brand: str = ""
+    model: str = ""
+    category: str = ""
+    description: str = ""
     key_benefits: str = ""
     problems_solved: str = ""
     differentials: str = ""
     included_items: str = ""
     compatibility: str = ""
-    limitations: str = ""
     size_info: str = ""
     battery_info: str = ""
     usage_info: str = ""
-    shipping_info: str = ""
     warranty: str = ""
+    limitations: str = ""
+    additional_info: str = ""
+    image_url: str = ""
+
+    regular_price: str | float | None = None
+    current_price: str | float | None = None
+    discount: str | float | None = None
     stock: str | float | None = None
+    shipping_info: str = ""
+    coupon: str = ""
     live_offer: bool = False
     live_offer_text: str = ""
+    promotion_note: str = ""
+
+    manual_fields: list[str] = Field(default_factory=list)
+
+
+class UnlockFieldRequest(BaseModel):
+    field: str
 
 
 @app.get("/")
@@ -61,7 +72,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5-presenter-behavior",
+        "version": "0.5.1-product-intelligence",
     }
 
 
@@ -98,6 +109,17 @@ def products():
     }
 
 
+@app.get("/api/products/{product_id}")
+def product(product_id: str):
+    item = runtime.store.get(product_id)
+    if not item:
+        raise HTTPException(
+            status_code=404,
+            detail="Produto não encontrado.",
+        )
+    return {"ok": True, "product": item}
+
+
 @app.post("/api/products")
 def add_product(req: ProductRequest):
     try:
@@ -115,6 +137,25 @@ def update_product(product_id: str, req: ProductRequest):
         )
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/products/{product_id}/unlock-field")
+def unlock_product_field(
+    product_id: str,
+    req: UnlockFieldRequest,
+):
+    try:
+        item = runtime.store.unlock_field(
+            product_id,
+            req.field,
+        )
+        return {
+            "ok": True,
+            "message": "Campo liberado para pesquisa futura.",
+            "product": item,
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/products/{product_id}/activate")
@@ -139,6 +180,7 @@ def delete_product(product_id: str):
 @app.websocket("/ws")
 async def websocket_status(websocket: WebSocket):
     await websocket.accept()
+
     try:
         while True:
             await websocket.send_json(runtime.snapshot())
