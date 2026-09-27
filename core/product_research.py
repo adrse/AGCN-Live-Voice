@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter, defaultdict
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, unquote_plus, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -182,7 +182,39 @@ class ProductResearchEngine:
 
         direct = self._fetch_source(url, source_type="submitted_link")
         resolved_url = direct.get("final_url") or url
+
+        # O TikTok inclui no próprio link compartilhado metadados muito úteis
+        # (og_info/ec_search_share_params). Eles são mais confiáveis para
+        # IDENTIFICAR o produto do que o HTML de uma página anti-bot.
+        metadata = {}
+        candidate_urls = [
+            url,
+            *(direct.get("redirect_urls") or []),
+            resolved_url,
+        ]
+        for candidate_url in candidate_urls:
+            found = self._metadata_from_url(candidate_url)
+            if found:
+                metadata = {**metadata, **found}
+
+        if metadata:
+            product = direct.setdefault("product", {})
+            if metadata.get("name"):
+                product["name"] = metadata["name"]
+                direct["title"] = metadata["name"]
+            if metadata.get("image_url"):
+                product["image_url"] = metadata["image_url"]
+                direct["image_url"] = metadata["image_url"]
+            direct["url_metadata"] = metadata
+
         seed = self._seed_from_source(direct)
+
+        if metadata.get("name"):
+            seed["name"] = metadata["name"]
+        if metadata.get("image_url"):
+            seed["image_url"] = metadata["image_url"]
+        if metadata.get("product_url"):
+            seed["product_url"] = metadata["product_url"]
 
         if hint:
             seed["name"] = _clean(hint)
@@ -263,7 +295,73 @@ class ProductResearchEngine:
                 "sources": usable_sources,
                 "notes": notes,
                 "search_query": search_name or "",
+                "identifiers": {
+                    "tiktok_product_id": metadata.get("product_id"),
+                    "group_id": metadata.get("group_id"),
+                },
             },
+        }
+
+    def _decode_json_query_param(self, url: str, key: str) -> dict:
+        try:
+            values = parse_qs(
+                urlparse(url).query,
+                keep_blank_values=True,
+            ).get(key)
+        except Exception:
+            return {}
+
+        if not values:
+            return {}
+
+        raw = values[0]
+        for _ in range(5):
+            try:
+                decoded = json.loads(raw)
+                return decoded if isinstance(decoded, dict) else {}
+            except Exception:
+                pass
+
+            new_raw = unquote_plus(raw)
+            if new_raw == raw:
+                break
+            raw = new_raw
+
+        return {}
+
+    def _metadata_from_url(self, url: str) -> dict:
+        if not url:
+            return {}
+
+        og = self._decode_json_query_param(url, "og_info")
+        share = self._decode_json_query_param(
+            url,
+            "ec_search_share_params",
+        )
+
+        parsed = urlparse(url)
+        path_match = re.search(r"/pdp/(\d+)", parsed.path)
+
+        product_id = _first(
+            share.get("product_id"),
+            path_match.group(1) if path_match else None,
+        )
+        group_id = share.get("group_id")
+
+        name = self._clean_product_title(
+            _clean(og.get("title"))
+        )
+        image_url = _clean(og.get("image"))
+
+        if not any((name, image_url, product_id, group_id)):
+            return {}
+
+        return {
+            "name": name,
+            "image_url": image_url,
+            "product_id": str(product_id) if product_id else None,
+            "group_id": str(group_id) if group_id else None,
+            "product_url": url,
         }
 
     def _fetch_source(
@@ -287,11 +385,17 @@ class ProductResearchEngine:
             "product": {},
             "reviews": [],
             "error": None,
+            "redirect_urls": [],
         }
 
         try:
             response = self.client.get(url)
             record["status_code"] = response.status_code
+            record["redirect_urls"] = [
+                str(item.next_request.url)
+                for item in response.history
+                if getattr(item, "next_request", None) is not None
+            ]
             record["final_url"] = str(response.url)
             record["host"] = _host(str(response.url))
 
@@ -659,12 +763,30 @@ class ProductResearchEngine:
 
     def _clean_product_title(self, title: str) -> str:
         original = _clean(title)
-        if original.casefold() in {
+        low = original.casefold()
+        blocked_titles = {
             "tiktok",
             "tiktok - make your day",
             "tiktok shop",
             "make your day | tiktok",
-        }:
+            "security check",
+            "access denied",
+            "just a moment...",
+            "just a moment",
+            "verify you are human",
+            "are you a robot?",
+            "robot or human?",
+        }
+        if low in blocked_titles or any(
+            marker in low
+            for marker in (
+                "security check",
+                "verify you are human",
+                "captcha",
+                "access denied",
+                "attention required",
+            )
+        ):
             return ""
 
         title = re.sub(
