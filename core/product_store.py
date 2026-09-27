@@ -3,29 +3,22 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime
+from copy import deepcopy
 from pathlib import Path
 from threading import RLock
-from zoneinfo import ZoneInfo
 
-
-TEXT_FIELDS = {
-    "name", "description", "additional_info", "category", "image_url",
-    "brand", "key_benefits", "problems_solved", "differentials",
-    "included_items", "compatibility", "limitations", "size_info",
-    "battery_info", "usage_info", "shipping_info", "warranty",
-    "live_offer_text",
-}
-
-NUMBER_FIELDS = {
-    "regular_price", "current_price", "discount", "stock",
-}
-
-
-def agora_iso() -> str:
-    return datetime.now(
-        ZoneInfo("America/Araguaina")
-    ).isoformat(timespec="seconds")
+from core.product_profile import (
+    BOOL_FIELDS,
+    LIVE_FIELDS,
+    NUMBER_FIELDS,
+    PERMANENT_FIELDS,
+    TEXT_FIELDS,
+    default_field_meta,
+    empty_product,
+    flatten_for_presenter,
+    migrate_product,
+    now_iso,
+)
 
 
 def default_store_file() -> Path:
@@ -41,14 +34,18 @@ def default_store_file() -> Path:
 
 
 class ProductStore:
-    """Product Store portável e compatível com a V0.2."""
+    """Ficha Inteligente do Produto — V0.5.1.
+
+    Mantém compatibilidade com os produtos antigos e prepara a base
+    para o Product Intelligence automático da próxima etapa.
+    """
 
     def __init__(self, path: str | Path | None = None):
         self.path = Path(path) if path else default_store_file()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = RLock()
         self.data = {
-            "version": 2,
+            "version": 3,
             "active_product_id": None,
             "products": [],
         }
@@ -62,23 +59,27 @@ class ProductStore:
                         self.path.read_text(encoding="utf-8")
                     )
                     if isinstance(content, dict):
-                        self.data["version"] = content.get("version", 1)
                         self.data["active_product_id"] = content.get(
                             "active_product_id"
                         )
-                        self.data["products"] = (
+                        raw_products = (
                             content.get("products")
                             if isinstance(content.get("products"), list)
                             else []
                         )
+                        self.data["products"] = [
+                            migrate_product(p)
+                            for p in raw_products
+                            if isinstance(p, dict)
+                        ]
                 except Exception:
                     self.data = {
-                        "version": 2,
+                        "version": 3,
                         "active_product_id": None,
                         "products": [],
                     }
 
-            self.data["version"] = 2
+            self.data["version"] = 3
             self._repair_active()
             self.save()
 
@@ -107,87 +108,12 @@ class ProductStore:
             active_id = self.data.get("active_product_id")
             items = []
             for product in self.data["products"]:
-                item = dict(product)
+                item = deepcopy(product)
                 item["active"] = product.get("id") == active_id
                 items.append(item)
             return items
 
     def get(self, product_id: str) -> dict | None:
-        with self.lock:
-            return next(
-                (
-                    dict(p)
-                    for p in self.data["products"]
-                    if p.get("id") == product_id
-                ),
-                None,
-            )
-
-    def active(self) -> dict | None:
-        with self.lock:
-            active_id = self.data.get("active_product_id")
-            if not active_id:
-                return None
-            return self.get(active_id)
-
-    def add(self, **payload) -> dict:
-        name = str(payload.get("name") or "").strip()
-        if not name:
-            raise ValueError("O nome do produto é obrigatório.")
-
-        product = {
-            "id": uuid.uuid4().hex[:12],
-            "name": name,
-            "description": "",
-            "regular_price": None,
-            "current_price": None,
-            "discount": None,
-            "additional_info": "",
-            "category": "",
-            "image_url": "",
-            "brand": "",
-            "key_benefits": "",
-            "problems_solved": "",
-            "differentials": "",
-            "included_items": "",
-            "compatibility": "",
-            "limitations": "",
-            "size_info": "",
-            "battery_info": "",
-            "usage_info": "",
-            "shipping_info": "",
-            "warranty": "",
-            "stock": None,
-            "live_offer": False,
-            "live_offer_text": "",
-            "created_at": agora_iso(),
-            "updated_at": agora_iso(),
-        }
-
-        for key in TEXT_FIELDS:
-            if key == "name":
-                continue
-            if key in payload:
-                product[key] = str(payload.get(key) or "").strip()
-
-        for key in NUMBER_FIELDS:
-            if key in payload:
-                product[key] = self._number_or_none(payload.get(key))
-
-        product["live_offer"] = self._bool_value(
-            payload.get("live_offer", False)
-        )
-
-        with self.lock:
-            self.data["products"].append(product)
-
-            if not self.data.get("active_product_id"):
-                self.data["active_product_id"] = product["id"]
-
-            self.save()
-            return dict(product)
-
-    def update(self, product_id: str, **changes) -> dict:
         with self.lock:
             product = next(
                 (
@@ -197,24 +123,180 @@ class ProductStore:
                 ),
                 None,
             )
+            return deepcopy(product) if product else None
 
-            if not product:
-                raise KeyError("Produto não encontrado.")
+    def active(self) -> dict | None:
+        with self.lock:
+            active_id = self.data.get("active_product_id")
+            if not active_id:
+                return None
+            return self.get(active_id)
 
-            for key, value in changes.items():
-                if key in TEXT_FIELDS:
-                    product[key] = str(value or "").strip()
-                elif key in NUMBER_FIELDS:
-                    product[key] = self._number_or_none(value)
-                elif key == "live_offer":
-                    product[key] = self._bool_value(value)
+    def active_for_presenter(self) -> dict:
+        return flatten_for_presenter(self.active())
 
-            if not product.get("name"):
+    def add(self, **payload) -> dict:
+        base = empty_product()
+        name = str(payload.get("name") or "").strip()
+
+        if not name:
+            raise ValueError("O nome do produto é obrigatório.")
+
+        product = {
+            **base,
+            "id": uuid.uuid4().hex[:12],
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+        }
+
+        manual_fields = set(payload.pop("manual_fields", []) or [])
+
+        for field in PERMANENT_FIELDS:
+            if field in payload:
+                product[field] = self._normalize(field, payload.get(field))
+                if (
+                    field in manual_fields
+                    or product[field] not in (None, "", False)
+                ):
+                    product["field_meta"][field] = default_field_meta("user")
+
+        live = product["live_conditions"]
+
+        for field in LIVE_FIELDS:
+            if field in payload:
+                live[field] = self._normalize(field, payload.get(field))
+                if (
+                    field in manual_fields
+                    or live[field] not in (None, "", False)
+                ):
+                    product["live_meta"][field] = default_field_meta("user")
+
+        product["name"] = name
+        product["field_meta"]["name"] = default_field_meta("user")
+
+        with self.lock:
+            self.data["products"].append(product)
+
+            if not self.data.get("active_product_id"):
+                self.data["active_product_id"] = product["id"]
+
+            self.save()
+            return deepcopy(product)
+
+    def update(
+        self,
+        product_id: str,
+        *,
+        manual_fields: list[str] | None = None,
+        **changes,
+    ) -> dict:
+        with self.lock:
+            product = self._find_mutable(product_id)
+            manual = set(manual_fields or [])
+
+            for field, value in changes.items():
+                if field in PERMANENT_FIELDS:
+                    product[field] = self._normalize(field, value)
+
+                    if field in manual:
+                        product["field_meta"][field] = default_field_meta(
+                            "user"
+                        )
+
+                elif field in LIVE_FIELDS:
+                    product["live_conditions"][field] = self._normalize(
+                        field,
+                        value,
+                    )
+
+                    if field in manual:
+                        product["live_meta"][field] = default_field_meta(
+                            "user"
+                        )
+
+            if not str(product.get("name") or "").strip():
                 raise ValueError("O nome do produto é obrigatório.")
 
-            product["updated_at"] = agora_iso()
+            product["updated_at"] = now_iso()
             self.save()
-            return dict(product)
+            return deepcopy(product)
+
+    def apply_research(
+        self,
+        product_id: str,
+        *,
+        values: dict,
+        field_sources: dict | None = None,
+        confidence: dict | None = None,
+        research_summary: dict | None = None,
+    ) -> dict:
+        """Aplica pesquisa sem sobrescrever campos travados pelo usuário."""
+        field_sources = field_sources or {}
+        confidence = confidence or {}
+
+        with self.lock:
+            product = self._find_mutable(product_id)
+
+            for field, value in (values or {}).items():
+                if field not in PERMANENT_FIELDS:
+                    continue
+
+                meta = product["field_meta"].get(field) or {}
+                if meta.get("locked_by_user"):
+                    continue
+
+                normalized = self._normalize(field, value)
+                if normalized in (None, ""):
+                    continue
+
+                product[field] = normalized
+                product["field_meta"][field] = {
+                    "origin": "research",
+                    "confidence": confidence.get(field),
+                    "locked_by_user": False,
+                    "sources": deepcopy(field_sources.get(field) or []),
+                    "updated_at": now_iso(),
+                }
+
+            if research_summary:
+                product["research"] = {
+                    **product.get("research", {}),
+                    **deepcopy(research_summary),
+                    "status": research_summary.get("status", "completed"),
+                    "last_run_at": now_iso(),
+                }
+
+            product["updated_at"] = now_iso()
+            self.save()
+            return deepcopy(product)
+
+    def unlock_field(self, product_id: str, field: str) -> dict:
+        """Permite que uma futura pesquisa volte a atualizar um campo."""
+        with self.lock:
+            product = self._find_mutable(product_id)
+
+            if field in PERMANENT_FIELDS:
+                meta = product["field_meta"].setdefault(
+                    field,
+                    default_field_meta("unknown"),
+                )
+                meta["locked_by_user"] = False
+                meta["updated_at"] = now_iso()
+
+            elif field in LIVE_FIELDS:
+                meta = product["live_meta"].setdefault(
+                    field,
+                    default_field_meta("unknown"),
+                )
+                meta["locked_by_user"] = False
+                meta["updated_at"] = now_iso()
+
+            else:
+                raise KeyError("Campo não encontrado.")
+
+            product["updated_at"] = now_iso()
+            self.save()
+            return deepcopy(product)
 
     def delete(self, product_id: str) -> bool:
         with self.lock:
@@ -245,6 +327,47 @@ class ProductStore:
             self.save()
             return self.active()
 
+    def presenter_context(self) -> dict:
+        product = self.active_for_presenter()
+
+        if not product:
+            return {
+                "ready": False,
+                "message": "Nenhum produto ativo.",
+            }
+
+        return {
+            "ready": True,
+            "product": product,
+        }
+
+    def _find_mutable(self, product_id: str) -> dict:
+        product = next(
+            (
+                p
+                for p in self.data["products"]
+                if p.get("id") == product_id
+            ),
+            None,
+        )
+
+        if not product:
+            raise KeyError("Produto não encontrado.")
+
+        return product
+
+    def _normalize(self, field: str, value):
+        if field in NUMBER_FIELDS:
+            return self._number_or_none(value)
+
+        if field in BOOL_FIELDS:
+            return self._bool_value(value)
+
+        if field in TEXT_FIELDS:
+            return str(value or "").strip()
+
+        return value
+
     @staticmethod
     def _number_or_none(value):
         if value in (None, ""):
@@ -267,20 +390,11 @@ class ProductStore:
     def _bool_value(value) -> bool:
         if isinstance(value, bool):
             return value
+
         return str(value or "").strip().casefold() in {
-            "1", "true", "sim", "yes", "on"
-        }
-
-    def presenter_context(self) -> dict:
-        product = self.active()
-
-        if not product:
-            return {
-                "ready": False,
-                "message": "Nenhum produto ativo.",
-            }
-
-        return {
-            "ready": True,
-            "product": dict(product),
+            "1",
+            "true",
+            "sim",
+            "yes",
+            "on",
         }
