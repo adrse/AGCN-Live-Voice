@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from core.product_research import ProductResearchEngine
 from core.runtime import AGCNVoiceRuntime
 
 
@@ -15,10 +17,11 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5.1-product-intelligence",
+    version="0.5.2-product-research",
 )
 
 runtime = AGCNVoiceRuntime()
+research_engine = ProductResearchEngine()
 
 
 class LiveStartRequest(BaseModel):
@@ -56,10 +59,17 @@ class ProductRequest(BaseModel):
     promotion_note: str = ""
 
     manual_fields: list[str] = Field(default_factory=list)
+    research_meta: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    research_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class UnlockFieldRequest(BaseModel):
     field: str
+
+
+class ProductResearchRequest(BaseModel):
+    url: str
+    hint: str = ""
 
 
 @app.get("/")
@@ -72,7 +82,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5.1-product-intelligence",
+        "version": "0.5.2-product-research",
     }
 
 
@@ -98,6 +108,26 @@ def start_live(req: LiveStartRequest):
 @app.post("/api/live/stop")
 def stop_live():
     return runtime.stop()
+
+
+@app.post("/api/product-research/analyze")
+def analyze_product(req: ProductResearchRequest):
+    try:
+        result = research_engine.analyze(
+            req.url,
+            hint=req.hint,
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "A pesquisa não conseguiu concluir esta tentativa: "
+                + str(exc)[:180]
+            ),
+        ) from exc
 
 
 @app.get("/api/products")
