@@ -207,7 +207,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5.2</span><span class="dot"></span><span>Product Research</span>
+      <span>v0.5.3</span><span class="dot"></span><span>TikTok Native Extractor</span>
     </div>
   </aside>
 
@@ -814,6 +814,7 @@ function renderResearchResult(result){
   const reviews=summary.review_summary||{};
   const faq=summary.faq||[];
   const notes=summary.notes||[];
+  const native=summary.tiktok_native||{};
 
   $("#researchSources").textContent=summary.source_count||0;
   $("#researchReviews").textContent=summary.review_count||0;
@@ -822,10 +823,25 @@ function renderResearchResult(result){
     ? "Pesquisa concluída. As informações abaixo são um rascunho: revise antes de salvar."
     : "A pesquisa foi parcial. Complete o nome/modelo manualmente e tente novamente.";
 
-  $("#researchNotes").textContent=notes.join(" ");
-  $("#researchSourceList").innerHTML=sources.length
-    ? sources.map(s=>'<div class="research-row"><b>'+esc(s.host||"Fonte")+'</b><br>'+esc(s.title||s.url||"")+'</div>').join("")
-    : '<div class="research-row">Nenhuma fonte pública adicional foi acessível.</div>';
+  const nativeLine=native.used
+    ? "TikTok direto: "+String(native.attribute_count||0)+" atributos técnicos, "+
+      String(native.sku_count||0)+" variações/SKUs"+
+      (native.browser_used?" • página renderizada pelo navegador":"")
+    : "TikTok direto: dados completos não expostos nesta tentativa.";
+  $("#researchNotes").textContent=[nativeLine,...notes].filter(Boolean).join(" ");
+  const nativeRows=[];
+  if(native.used){
+    nativeRows.push(
+      '<div class="research-row"><b>TikTok Shop — fonte principal</b><br>'+
+      'Dados extraídos da própria página do produto. '+
+      esc(String(native.attribute_count||0))+' atributos • '+
+      esc(String(native.sku_count||0))+' variações.</div>'
+    );
+  }
+  $("#researchSourceList").innerHTML=(nativeRows.join("")+
+    (sources.length
+      ? sources.map(s=>'<div class="research-row"><b>'+esc(s.marketplace||s.host||"Fonte")+'</b><br>'+esc(s.title||s.url||"")+'</div>').join("")
+      : '<div class="research-row">Nenhuma fonte pública adicional foi acessível.</div>'));
 
   const positives=reviews.positives||[];
   const negatives=reviews.negatives||[];
