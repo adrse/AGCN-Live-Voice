@@ -284,16 +284,22 @@ class MarketplaceEnrichmentEngine:
             limit=12,
         )
 
-        sources = []
+        verified_sources = []
+        candidate_matches = []
+
+        strong_identity = bool(brand and model)
+
         for candidate in accepted:
             fetched = self._fetch_marketplace_page(candidate)
             if not fetched.get("ok"):
                 continue
 
-            match_score = float(candidate["match_score"])
+            text_score = float(candidate["match_score"])
+            match_score = text_score
             image_match = {
                 "ok": False,
                 "score": None,
+                "same_catalog_photo": False,
             }
 
             if image_url and fetched.get("image_url"):
@@ -308,15 +314,39 @@ class MarketplaceEnrichmentEngine:
                     )
                     match_score = min(
                         1.0,
-                        (match_score * 0.72)
-                        + (visual_score * 0.28),
+                        (text_score * 0.68)
+                        + (visual_score * 0.32),
                     )
 
                     if image_match.get("same_catalog_photo"):
-                        match_score = max(match_score, 0.94)
+                        match_score = max(match_score, 0.96)
+
+            from_lens = (
+                candidate.get("source") == "google_lens"
+            )
+            same_photo = bool(
+                image_match.get("same_catalog_photo")
+            )
+
+            if strong_identity:
+                verification = "confirmed"
+                reason = "marca e modelo conferidos"
+            elif same_photo:
+                verification = "confirmed"
+                reason = "mesma foto ou foto de catálogo quase idêntica"
+            elif from_lens:
+                verification = "needs_confirmation"
+                reason = "correspondência visual do Google Lens"
+            else:
+                verification = "needs_confirmation"
+                reason = "correspondência textual sem identidade única"
 
             fetched["match_score"] = round(
                 match_score,
+                3,
+            )
+            fetched["text_match_score"] = round(
+                text_score,
                 3,
             )
             fetched["discovery_source"] = candidate.get(
@@ -325,7 +355,17 @@ class MarketplaceEnrichmentEngine:
             )
             fetched["lens_rank"] = candidate.get("lens_rank")
             fetched["image_match"] = image_match
-            sources.append(fetched)
+            fetched["verification"] = verification
+            fetched["verification_reason"] = reason
+
+            card = self._source_card(fetched)
+            card["verification"] = verification
+            card["verification_reason"] = reason
+            card["image_url"] = fetched.get("image_url")
+            candidate_matches.append(card)
+
+            if verification == "confirmed":
+                verified_sources.append(fetched)
 
         fused = self._fuse(
             identity={
@@ -334,10 +374,28 @@ class MarketplaceEnrichmentEngine:
                 "model": model,
                 "category": category,
             },
-            sources=sources,
+            sources=verified_sources,
             query=query,
         )
         fused["discovery"] = discovery
+        fused["candidate_matches"] = candidate_matches[:12]
+        fused["confirmed_match_count"] = len(
+            verified_sources
+        )
+        fused["needs_confirmation"] = any(
+            item.get("verification") == "needs_confirmation"
+            for item in candidate_matches
+        )
+
+        if (
+            not verified_sources
+            and fused["needs_confirmation"]
+        ):
+            fused.setdefault("notes", []).insert(
+                0,
+                "Foram encontrados produtos visualmente parecidos, mas a identidade não é forte o suficiente para copiar dados automaticamente. Confirme um candidato."
+            )
+
         return fused
 
     def _build_query(
@@ -1157,6 +1215,9 @@ class MarketplaceEnrichmentEngine:
             "discovery_source": source.get("discovery_source"),
             "lens_rank": source.get("lens_rank"),
             "image_match": source.get("image_match") or {},
+            "image_url": source.get("image_url"),
+            "verification": source.get("verification"),
+            "verification_reason": source.get("verification_reason"),
         }
 
     def _merge_sources(
