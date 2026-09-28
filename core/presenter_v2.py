@@ -210,7 +210,14 @@ class PresenterV2:
         elif intent == "objection":
             speech = self._objection_text(user, name)
         else:
-            speech = self._fact_answer(user, intent, name, fact)
+            speech = self._fact_answer(
+                user,
+                intent,
+                name,
+                fact,
+                fact_label=plan.get("fact_label"),
+                comment=plan.get("comment"),
+            )
 
         if not speech:
             return None
@@ -241,32 +248,60 @@ class PresenterV2:
             "created_at": time.time(),
         }
 
-    def _fact_answer(self, user, intent, name, fact):
+    def _fact_answer(
+        self,
+        user,
+        intent,
+        name,
+        fact,
+        *,
+        fact_label=None,
+        comment=None,
+    ):
         text = as_text(fact)
         labels = {
             "availability": "disponibilidade",
             "compatibility": "compatibilidade",
+            "technical_question": "essa especificação",
             "shipping": "frete e entrega",
             "warranty": "garantia",
-            "included_items": "o que vem no kit",
+            "included_items": "o que acompanha",
             "size": "tamanho e medidas",
             "battery": "bateria",
-            "usage": "como usar",
-            "safety_or_critical": "essa informação importante",
+            "usage": "modo de uso",
+            "safety_or_critical": "essa informação",
         }
+        label = as_text(fact_label) or labels.get(intent, "esse detalhe")
+        address = f"{user}, " if user else ""
+        question = str(comment or "").casefold()
 
         if text:
-            return f"{user}, sobre {labels.get(intent, 'isso')}: {text}."
+            negative = any(
+                marker in text.casefold()
+                for marker in ("não ", "nao ", "sem ")
+            )
+            yes_no_question = any(
+                question.startswith(prefix)
+                for prefix in (
+                    "tem ", "vem ", "possui ", "é ", "e ",
+                    "serve ", "funciona ",
+                )
+            )
 
-        if intent == "direct_question":
+            if yes_no_question and not negative:
+                return f"{address}tem sim. {label}: {text}."
+
+            return f"{address}{label}: {text}."
+
+        if intent in {"direct_question", "technical_question"}:
             return (
-                f"{user}, vi sua pergunta, mas esse detalhe não está "
-                "cadastrado no produto. Prefiro não inventar informação."
+                f"{address}esse detalhe não está cadastrado na ficha do {name}. "
+                "Prefiro não te passar informação no chute."
             )
 
         return (
-            f"{user}, eu ainda não tenho {labels.get(intent, 'essa informação')} "
-            "cadastrado pra te responder com segurança."
+            f"{address}eu ainda não tenho {label} cadastrado "
+            "pra te responder com segurança."
         )
 
     def _objection_text(self, user, name):
@@ -357,6 +392,14 @@ class PresenterV2:
 
         desc = as_text(self.product.get("description"))
         if desc:
-            return f"Pra quem chegou agora, estamos mostrando o {name}. {desc}"
+            options = [
+                f"Pra quem chegou agora, o {name} é o produto que estamos mostrando. {desc}",
+                f"Se você acabou de entrar na LIVE, presta atenção no {name}: {desc}",
+                f"Rapidinho pra quem chegou agora: estamos com o {name}. {desc}",
+            ]
+            return random.choice(options)
 
-        return f"Pra quem chegou agora, o produto ativo é o {name}."
+        return random.choice([
+            f"Pra quem chegou agora, o produto que está na tela é o {name}.",
+            f"Se você acabou de entrar, estamos mostrando o {name}.",
+        ])
