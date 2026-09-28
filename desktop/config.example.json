@@ -3,7 +3,8 @@
     "provider": "qwen_local",
     "ollama_url": "http://127.0.0.1:11434",
     "model": "qwen3:4b",
-    "timeout_seconds": 30
+    "timeout_seconds": 30,
+    "policy": "core.presenter_policy"
   },
   "tts": {
     "provider": "local",
@@ -19,10 +20,5 @@
     "silence_hard_limit_seconds": 10,
     "cta_cooldown_seconds": 45,
     "fact_cooldown_seconds": 120
-  },
-  "media": {
-    "loop": true,
-    "mute_source_audio": true,
-    "fit_mode": "cover"
   }
 }
