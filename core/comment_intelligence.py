@@ -24,6 +24,7 @@ class CommentIntelligence:
         "included_items": 85,
         "size": 84,
         "battery": 84,
+        "benefits": 84,
         "usage": 82,
         "direct_question": 80,
         "purchase_confirmation": 68,
@@ -44,6 +45,7 @@ class CommentIntelligence:
         "included_items": "Itens inclusos",
         "size": "Tamanho / medida",
         "battery": "Bateria",
+        "benefits": "Benefícios",
         "usage": "Como usar",
         "direct_question": "Pergunta direta",
         "purchase_confirmation": "Compra confirmada",
@@ -146,6 +148,16 @@ class CommentIntelligence:
             "carregamento", "autonomia"
         )):
             intent, topic = "battery", "battery"
+
+        elif any(k in t for k in (
+            "quais benefícios", "quais beneficios", "benefícios quais",
+            "beneficios quais", "benefícios?", "beneficios?",
+            "benefício", "beneficio", "vantagens", "vantagem",
+            "o que ele tem de bom", "o que tem de bom",
+            "qual o benefício", "qual o beneficio",
+            "quais as vantagens", "qual vantagem"
+        )):
+            intent, topic = "benefits", "benefits"
 
         elif any(k in t for k in (
             "como usa", "como usar", "funciona", "serve pra",
