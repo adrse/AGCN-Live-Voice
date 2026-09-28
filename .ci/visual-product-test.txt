@@ -1,0 +1,131 @@
+...........FFFFF                                                         [100%]
+=================================== FAILURES ===================================
+_________________________ test_grounded_stock_scarcity _________________________
+
+    def test_grounded_stock_scarcity():
+        engine = PersuasionEngine({
+            "name": "Produto X",
+            "stock": 3,
+        })
+        memory = MemoryManager()
+        text = engine.grounded_urgency(memory)
+        assert "3" in text
+>       assert "estoque" in text.casefold()
+E       AssertionError: assert 'estoque' in 'restam 3 unidades só.'
+E        +  where 'restam 3 unidades só.' = <built-in method casefold of str object at 0x7ff5aab87460>()
+E        +    where <built-in method casefold of str object at 0x7ff5aab87460> = 'Restam 3 unidades só.'.casefold
+
+tests/test_persuasion_engine.py:26: AssertionError
+____________________ test_price_anchor_uses_real_difference ____________________
+
+    def test_price_anchor_uses_real_difference():
+        engine = PersuasionEngine({
+            "current_price": 59.90,
+            "regular_price": 129.90,
+        })
+        text = engine.price_anchor()
+        assert "59,90" in text
+        assert "129,90" in text
+>       assert "diferença" in text.casefold()
+E       AssertionError: assert 'diferença' in 'tá r$ 59,90 só. ele era r$ 129,90.'
+E        +  where 'tá r$ 59,90 só. ele era r$ 129,90.' = <built-in method casefold of str object at 0x7ff5aaa2cab0>()
+E        +    where <built-in method casefold of str object at 0x7ff5aaa2cab0> = 'Tá R$ 59,90 só. Ele era R$ 129,90.'.casefold
+
+tests/test_persuasion_engine.py:37: AssertionError
+_____________ test_purchase_confirmation_becomes_real_social_proof _____________
+
+    def test_purchase_confirmation_becomes_real_social_proof():
+        memory = MemoryManager()
+        memory.remember_speech({
+            "speech": "Parabéns pela compra",
+            "topic": "purchase",
+            "intent": "purchase_confirmation",
+            "cta": None,
+            "user": "Ana",
+            "type": "reactive",
+        })
+        engine = PersuasionEngine({"name": "Produto X"})
+        proof = engine.social_proof(memory)
+>       assert "compra" in proof.casefold()
+E       AssertionError: assert 'compra' in 'já teve gente levando agora há pouco.'
+E        +  where 'já teve gente levando agora há pouco.' = <built-in method casefold of str object at 0x7ff5aab656b0>()
+E        +    where <built-in method casefold of str object at 0x7ff5aab656b0> = 'Já teve gente levando agora há pouco.'.casefold
+
+tests/test_persuasion_engine.py:52: AssertionError
+______________________ test_buying_intent_gets_direct_cta ______________________
+
+    def test_buying_intent_gets_direct_cta():
+        presenter = PresenterV2({
+            "name": "Mop 14L",
+            "current_price": 44.89,
+            "regular_price": 99.90,
+            "stock": 5,
+            "key_benefits": "centrifuga sem exigir torcer o refil com as mãos",
+        })
+    
+        analyzed = presenter.intelligence.analyze(
+            "Joana",
+            "eu quero, como compra?",
+        )
+        assert analyzed is not None
+    
+        decision = presenter.decision_engine.decide(
+            {
+                "primary": analyzed,
+                "items": [analyzed],
+                "priority": analyzed["priority"],
+                "users": ["Joana"],
+                "topics": [analyzed["topic"]],
+            },
+            presenter.memory.snapshot(),
+        )
+        plan = presenter.planner.plan(
+            decision,
+            presenter.guard,
+            presenter.memory,
+        )
+        item = presenter._render_plan(plan)
+    
+        assert item is not None
+>       assert "produto fixado" in item["speech"].casefold()
+E       AssertionError: assert 'produto fixado' in 'joana, boa! se era isso que você queria, já pega o seu. ó, tá em 5 unidades agora.'
+E        +  where 'joana, boa! se era isso que você queria, já pega o seu. ó, tá em 5 unidades agora.' = <built-in method casefold of str object at 0x7ff5b0597750>()
+E        +    where <built-in method casefold of str object at 0x7ff5b0597750> = 'Joana, boa! Se era isso que você queria, já pega o seu. Ó, tá em 5 unidades agora.'.casefold
+
+tests/test_persuasion_engine.py:89: AssertionError
+_______________ test_objection_reframes_value_without_inventing ________________
+
+    def test_objection_reframes_value_without_inventing():
+        presenter = PresenterV2({
+            "name": "Conjunto de Frigideiras",
+            "current_price": 59.90,
+            "regular_price": 129.90,
+            "key_benefits": "revestimento antiaderente e três tamanhos no conjunto",
+            "problems_solved": "ter opções de tamanho para diferentes preparos",
+        })
+    
+        speech = presenter.persuasion.objection_response(
+            "Maria",
+            "Conjunto de Frigideiras",
+            memory=presenter.memory,
+        )
+    
+>       assert "59,90" in speech
+E       AssertionError: assert '59,90' in 'Maria, presta atenção nisso. Pra quem quer ter opções de tamanho para diferentes preparos, ele ajuda porque revestimento antiaderente e três tamanhos no conjunto.'
+
+tests/test_persuasion_engine.py:108: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_persuasion_engine.py::test_grounded_stock_scarcity - AssertionError: assert 'estoque' in 'restam 3 unidades só.'
+ +  where 'restam 3 unidades só.' = <built-in method casefold of str object at 0x7ff5aab87460>()
+ +    where <built-in method casefold of str object at 0x7ff5aab87460> = 'Restam 3 unidades só.'.casefold
+FAILED tests/test_persuasion_engine.py::test_price_anchor_uses_real_difference - AssertionError: assert 'diferença' in 'tá r$ 59,90 só. ele era r$ 129,90.'
+ +  where 'tá r$ 59,90 só. ele era r$ 129,90.' = <built-in method casefold of str object at 0x7ff5aaa2cab0>()
+ +    where <built-in method casefold of str object at 0x7ff5aaa2cab0> = 'Tá R$ 59,90 só. Ele era R$ 129,90.'.casefold
+FAILED tests/test_persuasion_engine.py::test_purchase_confirmation_becomes_real_social_proof - AssertionError: assert 'compra' in 'já teve gente levando agora há pouco.'
+ +  where 'já teve gente levando agora há pouco.' = <built-in method casefold of str object at 0x7ff5aab656b0>()
+ +    where <built-in method casefold of str object at 0x7ff5aab656b0> = 'Já teve gente levando agora há pouco.'.casefold
+FAILED tests/test_persuasion_engine.py::test_buying_intent_gets_direct_cta - AssertionError: assert 'produto fixado' in 'joana, boa! se era isso que você queria, já pega o seu. ó, tá em 5 unidades agora.'
+ +  where 'joana, boa! se era isso que você queria, já pega o seu. ó, tá em 5 unidades agora.' = <built-in method casefold of str object at 0x7ff5b0597750>()
+ +    where <built-in method casefold of str object at 0x7ff5b0597750> = 'Joana, boa! Se era isso que você queria, já pega o seu. Ó, tá em 5 unidades agora.'.casefold
+FAILED tests/test_persuasion_engine.py::test_objection_reframes_value_without_inventing - AssertionError: assert '59,90' in 'Maria, presta atenção nisso. Pra quem quer ter opções de tamanho para diferentes preparos, ele ajuda porque revestimento antiaderente e três tamanhos no conjunto.'
+5 failed, 11 passed in 0.77s
