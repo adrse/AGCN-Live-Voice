@@ -1,0 +1,28 @@
+{
+  "brain": {
+    "provider": "qwen_local",
+    "ollama_url": "http://127.0.0.1:11434",
+    "model": "qwen3:4b",
+    "timeout_seconds": 30
+  },
+  "tts": {
+    "provider": "local",
+    "voice": "",
+    "fallback_local": true
+  },
+  "audio": {
+    "output_device": "",
+    "volume": 1.0
+  },
+  "presenter": {
+    "silence_target_seconds": 8,
+    "silence_hard_limit_seconds": 10,
+    "cta_cooldown_seconds": 45,
+    "fact_cooldown_seconds": 120
+  },
+  "media": {
+    "loop": true,
+    "mute_source_audio": true,
+    "fit_mode": "cover"
+  }
+}
