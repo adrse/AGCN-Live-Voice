@@ -9,6 +9,7 @@ from core.comment_fusion import CommentFusion
 from core.comment_intelligence import CommentIntelligence
 from core.decision_engine import DecisionEngine
 from core.memory_manager import MemoryManager
+from core.persuasion_engine import PersuasionEngine
 from core.sales_guard import SalesGuard
 from core.silence_watchdog import SilenceWatchdog
 from core.speech_planner import SpeechPlanner
@@ -45,9 +46,12 @@ class PresenterV2:
     def __init__(self, product: dict | None):
         self.product = dict(product or {})
         self.guard = SalesGuard(self.product)
+        self.persuasion = PersuasionEngine(self.product)
         self.memory = MemoryManager()
         self.intelligence = CommentIntelligence()
-        self.fusion = CommentFusion(window_seconds=1.4)
+        # Benchmark forte responde em poucos segundos. Janela menor preserva
+        # fusão de comentários sem deixar a pergunta esperando.
+        self.fusion = CommentFusion(window_seconds=0.9)
         self.decision_engine = DecisionEngine()
         self.planner = SpeechPlanner()
         self.watchdog = SilenceWatchdog(
@@ -61,6 +65,7 @@ class PresenterV2:
     def set_product(self, product: dict | None) -> None:
         self.product = dict(product or {})
         self.guard = SalesGuard(self.product)
+        self.persuasion.set_product(self.product)
 
     def ingest_comment(self, user: str, text: str) -> dict | None:
         analyzed = self.intelligence.analyze(user, text)
@@ -168,7 +173,7 @@ class PresenterV2:
 
     def _render_plan(self, plan: dict) -> dict | None:
         intent = plan.get("intent")
-        user = plan.get("user")
+        user = self._display_user(plan)
         name = self.product.get("name") or "produto"
         fact = plan.get("fact")
         speech = None
@@ -184,31 +189,37 @@ class PresenterV2:
                 else f"{user}, a marca não está cadastrada aqui pra eu te confirmar com segurança."
             )
         elif intent == "price":
-            current = self.product.get("current_price")
-            regular = self.product.get("regular_price")
-            if current is not None and regular is not None:
-                speech = f"{user}, hoje ele está por {brl(current)}, de {brl(regular)}."
-            elif current is not None:
-                speech = f"{user}, hoje ele está por {brl(current)}."
-            elif regular is not None:
-                speech = f"{user}, o preço cadastrado é {brl(regular)}."
+            anchor = self.persuasion.price_anchor()
+            if anchor:
+                speech = f"{user}, {anchor}" if user else anchor
             else:
-                speech = f"{user}, o preço não está cadastrado aqui pra eu te confirmar agora."
+                speech = (
+                    f"{user}, o preço não está cadastrado aqui pra eu te confirmar agora."
+                    if user
+                    else "O preço não está cadastrado aqui pra eu confirmar agora."
+                )
         elif intent == "buying_intent":
-            speech = f"{user}, boa! Se você quer garantir o {name}, pode finalizar pelo produto fixado na LIVE."
+            prefix = f"{user}, boa! " if user else ""
+            speech = prefix + self.persuasion.cta(
+                "buy_now",
+                memory=self.memory,
+                allow_urgency=True,
+            )
+            # O CTA já foi aplicado diretamente.
+            cta = None
         elif intent == "purchase_confirmation":
-            speech = random.choice([
-                f"Boa, {user}! Parabéns pela compra.",
-                f"{user}, aí sim! Obrigado pela compra.",
-                f"Parabéns, {user}! Você garantiu o seu.",
-            ])
+            speech = self.persuasion.purchase_celebration(user)
         elif intent == "engagement":
             speech = random.choice([
                 f"Valeu, {user}! Esse {name} tá chamando atenção mesmo.",
                 f"{user}, bom demais! Vou continuar mostrando os detalhes dele.",
             ])
         elif intent == "objection":
-            speech = self._objection_text(user, name)
+            speech = self.persuasion.objection_response(
+                user,
+                name,
+                memory=self.memory,
+            )
         else:
             speech = self._fact_answer(
                 user,
@@ -231,6 +242,11 @@ class PresenterV2:
             speech,
             cta,
         )
+        speech = self._append_resume_if_useful(
+            speech,
+            plan,
+            name,
+        )
 
         return {
             "type": plan.get("type"),
@@ -247,6 +263,64 @@ class PresenterV2:
             "resume_topic": plan.get("resume_topic"),
             "created_at": time.time(),
         }
+
+    def _display_user(self, plan: dict) -> str:
+        users = [
+            str(x).strip()
+            for x in (plan.get("users") or [])
+            if str(x or "").strip()
+        ]
+
+        if len(users) >= 2 and plan.get("intent") not in {
+            "purchase_confirmation",
+            "buying_intent",
+        }:
+            return " e ".join(users[:2])
+
+        return str(plan.get("user") or "").strip()
+
+    def _append_resume_if_useful(
+        self,
+        speech: str,
+        plan: dict,
+        name: str,
+    ) -> str:
+        if plan.get("type") != "reactive":
+            return speech
+
+        if not plan.get("interrupt"):
+            return speech
+
+        resume = plan.get("resume_topic")
+        current = plan.get("topic")
+
+        if not resume or resume == current:
+            return speech
+
+        if self.memory.recently_used_tactic(
+            "resume_" + str(resume),
+            within=18,
+        ):
+            return speech
+
+        phrases = {
+            "benefits": "E voltando no ponto que eu estava mostrando: olha os benefícios dele.",
+            "pain_solution": "E voltando ao que eu estava explicando: é justamente aí que esse produto resolve o problema.",
+            "differentials": "E voltando ao diferencial que eu estava mostrando.",
+            "price_value": "E voltando ao valor da oferta, presta atenção nessa diferença de preço.",
+            "bundle_value": "E voltando ao kit, olha tudo que acompanha.",
+            "usage": "E voltando ao uso no dia a dia.",
+            "scarcity": "E voltando à condição da LIVE, presta atenção no estoque e na oferta cadastrada.",
+            "trust": "E voltando ao que eu estava explicando sobre o produto.",
+            "product_recap": f"E voltando ao {name}, deixa eu resumir o principal.",
+        }
+
+        line = phrases.get(str(resume))
+        if not line:
+            return speech
+
+        self.memory.remember_tactic("resume_" + str(resume))
+        return f"{speech} {line}"
 
     def _fact_answer(
         self,
@@ -305,69 +379,89 @@ class PresenterV2:
         )
 
     def _objection_text(self, user, name):
-        benefits = as_text(self.guard.get("benefits"))
-        current = self.product.get("current_price")
-        regular = self.product.get("regular_price")
-
-        parts = [f"{user}, entendi seu ponto sobre o {name}."]
-
-        if benefits:
-            parts.append(f"O valor dele está principalmente em {benefits}.")
-
-        if current is not None and regular is not None:
-            parts.append(f"Hoje está {brl(current)}, de {brl(regular)}.")
-
-        return " ".join(parts)
+        return self.persuasion.objection_response(
+            user,
+            name,
+            memory=self.memory,
+        )
 
     def _append_value_if_useful(self, speech, plan, name):
         if "expand_with_value" not in plan.get("steps", []):
             return speech
 
         if plan.get("intent") in {
-            "brand", "price", "purchase_confirmation",
-            "engagement", "buying_intent",
+            "brand",
+            "price",
+            "purchase_confirmation",
+            "engagement",
+            "buying_intent",
         }:
             return speech
 
-        benefits = as_text(self.guard.get("benefits"))
-        if benefits and not self.memory.recently_said_topic(
-            "benefits",
-            within=30,
-        ):
-            return f"{speech} E um ponto forte do {name} é {benefits}."
+        bridge = self.persuasion.value_bridge(
+            intent=plan.get("intent"),
+            memory=self.memory,
+            name=name,
+        )
+        if bridge:
+            return f"{speech} {bridge}"
 
         return speech
 
     def _append_cta(self, speech, cta):
-        if cta == "buy_now":
-            return f"{speech} Se fizer sentido pra você, aproveita o produto fixado na LIVE."
-        if cta == "soft_close":
-            return f"{speech} Dá uma olhada na oferta fixada e vê se encaixa no que você procura."
+        if not cta:
+            return speech
+
+        if cta in {"buy_now", "soft_close"}:
+            close = self.persuasion.cta(
+                cta,
+                memory=self.memory,
+                allow_urgency=True,
+            )
+            return f"{speech} {close}" if close else speech
+
         if cta == "live_offer":
             offer = self.guard.live_offer()
             if offer:
-                return f"{speech} {offer}"
+                close = self.persuasion.cta(
+                    "after_answer",
+                    memory=self.memory,
+                    allow_urgency=False,
+                )
+                return f"{speech} {offer} {close}".strip()
+
         return speech
 
     def _proactive_text(self, plan, name):
         topic = plan.get("topic")
+
+        strategic = self.persuasion.proactive_pitch(
+            topic,
+            name,
+            self.memory,
+        )
+        if strategic:
+            return strategic
 
         if topic == "benefits":
             value = as_text(self.guard.get("benefits"))
             if value:
                 return f"Pra quem tá chegando agora, olha o principal do {name}: {value}."
 
-        if topic == "problems_solved":
-            value = as_text(self.guard.get("problems_solved"))
-            if value:
-                return f"Esse {name} faz sentido principalmente pra quem quer resolver {value}."
+        if topic in {"problems_solved", "pain_solution"}:
+            problems = as_text(self.guard.get("problems_solved"))
+            benefits = as_text(self.guard.get("benefits"))
+            if problems and benefits:
+                return f"Se você quer resolver {problems}, o {name} entrega {benefits}."
+            if problems:
+                return f"Esse {name} faz sentido principalmente pra quem quer resolver {problems}."
 
         if topic == "differentials":
             value = as_text(self.guard.get("differentials"))
             if value:
                 return f"Um diferencial importante desse {name} é {value}."
 
-        if topic == "included_items":
+        if topic in {"included_items", "bundle_value"}:
             value = as_text(self.guard.get("included_items"))
             if value:
                 return f"E presta atenção no que você recebe com o {name}: {value}."
@@ -377,7 +471,7 @@ class PresenterV2:
             if value:
                 return f"No uso do dia a dia, o {name} funciona assim: {value}."
 
-        if topic == "price":
+        if topic in {"price", "price_value"}:
             current = self.product.get("current_price")
             regular = self.product.get("regular_price")
             if current is not None and regular is not None:
