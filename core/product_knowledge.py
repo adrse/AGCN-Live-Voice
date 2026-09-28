@@ -119,6 +119,7 @@ class ProductKnowledge:
             "value": None,
             "label": None,
             "field": None,
+            "items": [],
         }
 
     def get(self, field: str):
@@ -148,13 +149,40 @@ class ProductKnowledge:
             value = self.product.get(field)
             if value in (None, "", [], {}):
                 continue
+            items = self.entries(value)
             return {
                 "found": True,
                 "value": value,
+                "items": items,
                 "label": self.FIELD_LABELS.get(field, field),
                 "field": field,
             }
         return None
+
+    @staticmethod
+    def entries(value) -> list[str]:
+        if value in (None, "", [], {}):
+            return []
+
+        if isinstance(value, (list, tuple, set)):
+            raw = [clean(x) for x in value]
+        else:
+            raw = [
+                clean(x)
+                for x in re.split(r"[\n;|]+", clean(value))
+            ]
+
+        out = []
+        seen = set()
+        for item in raw:
+            if not item:
+                continue
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(item)
+        return out
 
     def _parse_specs(self) -> dict[str, str]:
         specs = {}
