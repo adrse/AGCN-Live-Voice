@@ -175,3 +175,12 @@ Uma implementação não está pronta se:
 - despeja toda a ficha do produto;
 - usa frases robóticas;
 - manda saída do LLM direto para voz sem validação.
+
+## Implementação já preparada na branch de handoff
+
+- `core/presenter_policy.py`: instrução central compartilhada por Qwen e API.
+- `core/comment_selection_policy.py`: filtro de ruído, prioridade comercial e contrato para roteamento semântico de comentários ambíguos.
+- `core/brain_orchestrator.py`: força todo provider a passar pela mesma PresenterPolicy, exige JSON estruturado, permite retry e validações antes do TTS.
+- `tests/test_presenter_policy.py`, `tests/test_comment_selection_policy.py` e `tests/test_brain_orchestrator.py`: testes preparados para a camada de inteligência.
+
+Regra: provider de modelo é transporte. Nenhum provider pode ter prompt comercial próprio ou enviar texto direto ao TTS.
