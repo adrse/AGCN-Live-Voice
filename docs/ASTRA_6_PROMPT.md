@@ -8,10 +8,12 @@ Leia obrigatoriamente, nesta ordem:
 1. `docs/ASTRA_HANDOFF_2026-09-29.md`
 2. `docs/PRESENTER_BRAIN_SPEC.md`
 3. `core/presenter_policy.py`
-4. `data/presenter_dataset/behavior_v3.json`
-5. `docs/DESKTOP_MVP_SPEC.md`
-6. `docs/ACCEPTANCE_TESTS_MVP.md`
-7. core existente.
+4. `core/comment_selection_policy.py`
+5. `core/brain_orchestrator.py`
+6. `data/presenter_dataset/behavior_v3.json`
+7. `docs/DESKTOP_MVP_SPEC.md`
+8. `docs/ACCEPTANCE_TESTS_MVP.md`
+9. core existente.
 
 MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
 
