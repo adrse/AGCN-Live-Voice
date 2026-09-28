@@ -1,56 +1,70 @@
-# Prompt pronto para Astra 6 — construir o programa
+# Prompt para Astra 6 — construir o programa
 
-Você está assumindo o projeto privado `adrse/AGCN-Live-Voice`.
+Você está assumindo o repositório privado `adrse/AGCN-Live-Voice`.
 
-Trabalhe na branch `astra-handoff-2026-09-29`. Leia primeiro:
+Trabalhe na branch `astra-handoff-2026-09-29`.
+
+Leia obrigatoriamente, nesta ordem:
 1. `docs/ASTRA_HANDOFF_2026-09-29.md`
-2. `docs/DESKTOP_MVP_SPEC.md`
-3. `docs/ACCEPTANCE_TESTS_MVP.md`
-4. código atual de `core/`
+2. `docs/PRESENTER_BRAIN_SPEC.md`
+3. `core/presenter_policy.py`
+4. `data/presenter_dataset/behavior_v3.json`
+5. `docs/DESKTOP_MVP_SPEC.md`
+6. `docs/ACCEPTANCE_TESTS_MVP.md`
+7. core existente.
 
-MISSÃO: transformar o projeto atual em um programa Windows funcional chamado **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
+MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
 
-Não faça uma demo superficial. Entregue a aplicação desktop funcional, reaproveitando o core que já existe.
+A prioridade máxima NÃO é a interface. É a qualidade e segurança da inteligência de fala.
 
-Decisão final do MVP:
-- sem avatar/rosto IA;
-- vídeo real do produto em loop/playlist;
-- Qwen local como cérebro padrão;
-- provider API opcional;
-- voz local/offline padrão;
-- voz premium por API opcional;
-- TikTok LIVE monitorado pelo core atual;
-- produto cadastrado manualmente;
+Decisão final:
+- sem avatar;
+- sem MuseTalk;
+- sem player/playlist/loop de vídeo no AGCN;
+- o vídeo é responsabilidade externa do TikTok LIVE Studio/OBS;
+- Qwen local é o Brain padrão;
+- provider API é opcional;
+- Qwen e API usam a MESMA PresenterPolicy;
+- TTS local padrão;
+- TTS premium/API opcional;
+- TikTok Monitor atual deve ser reaproveitado;
+- produto manual;
 - PySide6;
-- janela vertical 9:16 limpa para o TikTok LIVE Studio capturar;
-- áudio enviado ao dispositivo de saída selecionado, pensado para VB-CABLE;
-- nenhuma chave de API embutida.
+- áudio sai no dispositivo selecionado/VB-CABLE;
+- nenhum secret embutido.
 
-Prioridade absoluta:
-1. Desktop PySide6.
-2. Produto + playlist.
-3. Conexão TikTok usando monitor atual.
-4. Brain Provider local Qwen/Ollama.
-5. TTS local.
-6. Audio device routing.
-7. Fala contínua + resposta a comentário + retomada.
-8. Janela 9:16.
-9. Provider premium/API.
-10. Empacotamento Windows.
+Implementação obrigatória do Brain:
+1. Comment Intelligence + Decision Engine decidem o que merece resposta.
+2. ProductKnowledge/SalesGuard montam fatos permitidos.
+3. Speech Planner cria missão/tópico.
+4. BrainContext é enviado a `PresenterPolicy`.
+5. Qwen/API geram JSON `BrainResult`.
+6. Validator checa fatos antes do TTS.
+7. Memory registra fala/fatos/tópico.
+8. Após comentário, retomar `sales_thread`.
+9. Sem comentário, gerar fala proativa variada.
+10. Nunca mandar texto bruto de LLM direto ao TTS.
 
-Não perca tempo com MuseTalk, pesquisa automática de produto, mobile, pagamentos ou avatar.
+O Brain deve:
+- entender linguagem natural, gírias e erros;
+- priorizar compra/preço/objeção/pergunta relevante;
+- ignorar chat inútil;
+- responder direto primeiro;
+- continuar vendendo;
+- não repetir "pra quem chegou agora";
+- não repetir CTA/fato;
+- não inventar nada;
+- manter continuidade depois de interrupção.
 
-Antes de alterar o core, rode os testes existentes e preserve comportamento já validado. Faça adapters ao redor do core quando possível.
+Não gaste tempo com vídeo, avatar, mobile, pagamentos ou pesquisa automática.
 
-A aplicação deve manter o modo atual de segurança factual: nunca inventar informação de produto. O LLM serve para entendimento e naturalidade, não para criar fatos.
+Faça testes de ponta a ponta, incluindo Qwen local, provider API mockado, fila, fallback, segurança factual e retomada.
 
-Implemente e teste de ponta a ponta. Crie testes para providers, queue/scheduler e fallback. Deixe instruções de build/execução e gere um executável Windows se o ambiente permitir; se não permitir gerar .exe no ambiente atual, deixe o build script pronto e validado por estrutura.
-
-Ao terminar, entregue um resumo objetivo de:
-- arquivos criados/alterados;
+Ao terminar entregue:
+- arquivos alterados;
 - como rodar;
 - dependências externas;
-- o que foi testado;
+- testes executados;
 - pendências reais;
-- caminho exato para build do .exe.
+- comando/caminho de build do exe.
 
