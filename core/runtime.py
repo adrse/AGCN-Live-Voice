@@ -4,15 +4,28 @@ import threading
 import time
 from collections import deque
 
+from core.brain_factory import build_brain_provider
+from core.integration_contracts import BrainProvider
 from core.presenter_v2 import PresenterV2
+from core.presenter_v3 import PresenterV3
 from core.product_store import ProductStore
 from core.tiktok_monitor import TikTokMonitor
 
 
 class AGCNVoiceRuntime:
-    """V0.6 Presenter Brain Runtime — conversa, memória e persuasão."""
+    """Runtime da LIVE.
 
-    def __init__(self, store: ProductStore | None = None):
+    Sem brain_config mantém o PresenterV2 determinístico para compatibilidade.
+    Com brain_config/brain_provider usa PresenterV3 com Qwen ou API real.
+    """
+
+    def __init__(
+        self,
+        store: ProductStore | None = None,
+        *,
+        brain_provider: BrainProvider | None = None,
+        brain_config: dict | None = None,
+    ):
         self.store = store or ProductStore()
         self.lock = threading.RLock()
 
@@ -28,13 +41,22 @@ class AGCNVoiceRuntime:
         self.current_speech = None
         self.current_speech_until = 0.0
 
+        self.brain_provider = brain_provider
+        if self.brain_provider is None and brain_config is not None:
+            self.brain_provider = build_brain_provider(brain_config)
+
         active = self.store.active_for_presenter() or {}
-        self.presenter = PresenterV2(active)
+        self.presenter = self._new_presenter(active)
         self.product_signature = self._product_signature(active)
 
         self.monitor = TikTokMonitor(
             event_callback=self._on_monitor_event
         )
+
+    def _new_presenter(self, product: dict):
+        if self.brain_provider is not None:
+            return PresenterV3(product, self.brain_provider)
+        return PresenterV2(product)
 
     @staticmethod
     def _product_signature(product: dict) -> tuple:
@@ -54,7 +76,7 @@ class AGCNVoiceRuntime:
             if previous_id == active_id:
                 self.presenter.set_product(active)
             else:
-                self.presenter = PresenterV2(active)
+                self.presenter = self._new_presenter(active)
                 self.current_speech = None
                 self.current_speech_until = 0.0
                 self.last_decision = None
@@ -215,7 +237,7 @@ class AGCNVoiceRuntime:
         if item.get("type") == "reactive":
             self.last_decision = item
 
-        # Simulação textual da duração. O TTS real virá depois.
+        # Temporário: duração textual. Será substituída pelo playback TTS real.
         duration = min(
             12.0,
             max(2.5, len(item["speech"]) / 16.0),
@@ -232,7 +254,17 @@ class AGCNVoiceRuntime:
 
             data = {
                 **live,
-                "version": "0.6-presenter-brain",
+                "version": (
+                    "0.7-llm-brain"
+                    if self.brain_provider is not None
+                    else "0.6-presenter-brain"
+                ),
+                "brain_enabled": self.brain_provider is not None,
+                "brain_provider": (
+                    self.brain_provider.name
+                    if self.brain_provider is not None
+                    else "deterministic-v2"
+                ),
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
@@ -299,12 +331,13 @@ class AGCNVoiceRuntime:
         passed = sum(1 for ok in checks.values() if ok)
 
         lines = [
-            "AGCN LIVE VOICE — TESTE V0.6 PRESENTER BRAIN",
+            "AGCN LIVE VOICE — TESTE PRESENTER BRAIN",
             "",
             f"LIVE: {data.get('username') or 'NÃO INICIADA'}",
             f"Status: {data.get('status', '—')}",
             f"Room ID: {data.get('room_id') or 'NÃO RECEBIDO'}",
             f"Produto ativo: {product.get('name') or 'NÃO CARREGADO'}",
+            f"Brain: {data.get('brain_provider', '—')}",
             "",
             "CHECKLIST:",
         ]
