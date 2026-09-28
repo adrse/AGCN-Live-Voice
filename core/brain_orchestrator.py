@@ -7,6 +7,8 @@ para inventar o próprio prompt comercial ou mandar texto cru direto ao TTS.
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from collections.abc import Callable
 
 from core.integration_contracts import BrainContext, BrainResult, TextModelTransport
@@ -18,6 +20,12 @@ class BrainOutputError(RuntimeError):
 
 
 Validator = Callable[[BrainResult, BrainContext], tuple[bool, str]]
+
+
+def _fold(text: str) -> str:
+    value = unicodedata.normalize("NFKD", str(text or ""))
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    return value.casefold()
 
 
 def _strip_code_fence(text: str) -> str:
@@ -60,11 +68,7 @@ def validate_reported_facts(
     result: BrainResult,
     context: BrainContext,
 ) -> tuple[bool, str]:
-    """Confere se fatos declarados pelo modelo pertencem à lista permitida.
-
-    A validação semântica da fala continua sendo responsabilidade de SalesGuard
-    / validador factual mais forte.
-    """
+    """Exige que used_facts seja subconjunto exato de ALLOWED_FACTS."""
     allowed = {
         str(x).strip().casefold()
         for x in context.allowed_facts
@@ -73,6 +77,98 @@ def validate_reported_facts(
     for fact in result.used_facts:
         if fact.casefold() not in allowed:
             return False, f"used_fact não autorizado: {fact}"
+    return True, ""
+
+
+def validate_sensitive_claims(
+    result: BrainResult,
+    context: BrainContext,
+) -> tuple[bool, str]:
+    """Segunda barreira para fatos comerciais de alto risco.
+
+    O modelo pode esquecer de reportar um fato em used_facts. Para preço,
+    desconto, estoque, frete, cupom, garantia e números explícitos, exigimos
+    evidência também nos fatos reportados/autorizados. Respostas de ausência
+    com needs_fact=true são permitidas sem fabricar o dado.
+    """
+    if result.needs_fact:
+        return True, ""
+
+    speech = _fold(result.speech)
+    reported = [_fold(x) for x in result.used_facts]
+    allowed = [_fold(x) for x in context.allowed_facts]
+
+    requirements = [
+        (
+            ("r$", " reais", "preco", "valor de"),
+            ("preco atual:", "preco regular:"),
+            "preço",
+        ),
+        (
+            ("desconto", "%"),
+            ("desconto:",),
+            "desconto",
+        ),
+        (
+            ("estoque", "restam", "ultima unidade", "ultimas unidades"),
+            ("estoque:",),
+            "estoque",
+        ),
+        (
+            ("frete", "entrega gratis", "frete gratis"),
+            ("frete/entrega:",),
+            "frete",
+        ),
+        (
+            ("cupom",),
+            ("cupom:",),
+            "cupom",
+        ),
+        (
+            ("garantia",),
+            ("garantia:",),
+            "garantia",
+        ),
+    ]
+
+    for markers, prefixes, label in requirements:
+        if not any(marker in speech for marker in markers):
+            continue
+        if not any(
+            any(fact.startswith(prefix) for prefix in prefixes)
+            for fact in reported
+        ):
+            return False, f"alegação de {label} sem used_fact correspondente"
+
+    water_markers = (
+        "ip67",
+        "ip68",
+        "impermeavel",
+        "a prova d'agua",
+        "resistente a agua",
+        "resistencia a agua",
+        " atm",
+    )
+    if any(marker in speech for marker in water_markers):
+        if not any(
+            any(marker in fact for marker in water_markers)
+            for fact in allowed
+        ):
+            return False, "alegação de resistência à água sem fato autorizado"
+
+    # Números explícitos normalmente são especificação, preço, desconto,
+    # estoque, medida ou autonomia. Se aparecem na fala, devem existir em algum
+    # fato autorizado. Ignoramos números em respostas needs_fact=true acima.
+    allowed_numbers = {
+        token.replace(".", ",")
+        for fact in context.allowed_facts
+        for token in re.findall(r"\d+(?:[.,]\d+)?", str(fact))
+    }
+    for token in re.findall(r"\d+(?:[.,]\d+)?", result.speech):
+        normalized = token.replace(".", ",")
+        if normalized not in allowed_numbers:
+            return False, f"número não autorizado na fala: {token}"
+
     return True, ""
 
 
@@ -85,7 +181,11 @@ class PresenterBrain:
         max_retries: int = 1,
     ) -> None:
         self.transport = transport
-        self.validators = [validate_reported_facts, *(validators or [])]
+        self.validators = [
+            validate_reported_facts,
+            validate_sensitive_claims,
+            *(validators or []),
+        ]
         self.max_retries = max(0, int(max_retries))
 
     @property
