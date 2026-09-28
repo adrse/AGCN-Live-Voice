@@ -17,6 +17,7 @@ class CommentIntelligence:
         "objection": 94,
         "availability": 92,
         "compatibility": 91,
+        "technical_question": 90,
         "shipping": 89,
         "warranty": 88,
         "brand": 86,
@@ -36,6 +37,7 @@ class CommentIntelligence:
         "objection": "Objeção",
         "availability": "Disponibilidade",
         "compatibility": "Compatibilidade",
+        "technical_question": "Pergunta técnica",
         "shipping": "Frete / entrega",
         "warranty": "Garantia",
         "brand": "Marca",
@@ -101,6 +103,31 @@ class CommentIntelligence:
 
         elif any(k in t for k in ("qual a marca", "que marca", "marca dele", "marca é", "marca e")):
             intent, topic = "brand", "brand"
+
+        elif any(k in t for k in (
+            "qual o modelo", "qual modelo", "modelo dele", "modelo é",
+            "modelo e", "que modelo"
+        )):
+            intent, topic = "technical_question", "model"
+
+        elif any(k in t for k in (
+            "qual a categoria", "que tipo de produto", "qual tipo"
+        )):
+            intent, topic = "technical_question", "category"
+
+        elif any(k in t for k in (
+            "potência", "potencia", "watts", "watt",
+            "material", "feito de", "fabricado em",
+            "qual a cor", "que cor", "cores",
+            "temperatura", "graus",
+            "peso", "quantos kg", "quantos quilos",
+            "dimensões", "dimensoes", "comprimento",
+            "controle remoto", "vem controle", "tem controle",
+            "quantos programas", "quantas funções", "quantas funcoes",
+            "frequência", "frequencia", "hz",
+            "tipo de pino", "tomada"
+        )):
+            intent, topic = "technical_question", "technical"
 
         elif any(k in t for k in (
             "vem com", "acompanha", "acessórios", "acessorios",
