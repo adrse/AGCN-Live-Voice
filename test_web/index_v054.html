@@ -450,6 +450,26 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
       </div>
     </section>
 
+    <section class="card" id="presenterLab" style="margin-top:12px">
+      <div class="card-title" style="justify-content:space-between">
+        <span><span class="ico">🧠</span> Laboratório da IA de conversa</span>
+        <span class="pill">Presenter Brain V0.6</span>
+      </div>
+      <div class="helper" style="margin-bottom:12px">
+        Teste a conversa sem iniciar uma LIVE. O produto ativo será usado como conhecimento e contexto comercial.
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(120px,.32fr) minmax(0,1fr);gap:8px">
+        <input id="labUser" value="Cliente" placeholder="Nome do cliente">
+        <input id="labComment" placeholder="Ex.: tá caro / qual a potência? / eu quero, como compra?">
+      </div>
+      <div class="row" style="margin-top:9px;flex-wrap:wrap">
+        <button class="btn primary" id="labSend">Testar comentário</button>
+        <button class="btn secondary" id="labProactive">Gerar fala proativa</button>
+      </div>
+      <div id="labMeta" class="helper" style="margin-top:12px">Aguardando teste...</div>
+      <div id="labSpeech" class="speech-box" style="margin-top:8px">A resposta da IA aparecerá aqui.</div>
+    </section>
+
     <section class="card debug-card">
       <details>
         <summary>Resumo técnico do teste</summary>
@@ -692,6 +712,62 @@ function render(data){
 
   $("#summary").textContent=data.summary||"Aguardando...";
 }
+
+async function runLabComment(){
+  const button=$("#labSend");
+  const user=$("#labUser").value.trim()||"Cliente";
+  const text=$("#labComment").value.trim();
+
+  if(!text){
+    $("#labMeta").innerHTML='<span class="bad">Digite um comentário para testar.</span>';
+    return;
+  }
+
+  button.disabled=true;
+  $("#labMeta").textContent="A IA está analisando intenção, contexto e estratégia comercial...";
+
+  try{
+    const result=await api("/api/presenter/test-comment",{
+      method:"POST",
+      body:JSON.stringify({user,text})
+    });
+    const analyzed=result.analyzed||{};
+    const speech=result.speech||{};
+    $("#labMeta").innerHTML=
+      '<b>'+esc(analyzed.label||analyzed.intent||"Resposta")+'</b>'+
+      ' • prioridade '+esc(analyzed.priority||"—")+
+      ' • tópico '+esc(analyzed.topic||"—");
+    $("#labSpeech").textContent=speech.speech||"Sem resposta.";
+  }catch(e){
+    $("#labMeta").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
+    $("#labSpeech").textContent="Não foi possível gerar a resposta.";
+  }finally{
+    button.disabled=false;
+  }
+}
+
+$("#labSend").onclick=runLabComment;
+$("#labComment").addEventListener("keydown",event=>{
+  if(event.key==="Enter") runLabComment();
+});
+
+$("#labProactive").onclick=async()=>{
+  const button=$("#labProactive");
+  button.disabled=true;
+  $("#labMeta").textContent="Gerando próxima fala comercial...";
+
+  try{
+    const result=await api("/api/presenter/test-proactive",{method:"POST"});
+    const speech=result.speech||{};
+    $("#labMeta").innerHTML='<b>Fala proativa</b> • tópico '+esc(result.topic||"—");
+    $("#labSpeech").textContent=speech.speech||"Sem fala.";
+  }catch(e){
+    $("#labMeta").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
+    $("#labSpeech").textContent="Não foi possível gerar a fala.";
+  }finally{
+    button.disabled=false;
+  }
+};
 
 $("#toggleProducts").onclick=()=>$("#productPanel").classList.toggle("hidden");
 $("#goConfig").onclick=()=>{
