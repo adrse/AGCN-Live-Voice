@@ -1,22 +1,19 @@
 # AGCN Live Voice — handoff para Astra 6 (29/09/2026)
 
-## Decisão de produto congelada para o MVP
+## Decisão final do MVP
 
 O AGCN Live Voice é o cérebro e a voz da LIVE.
 
-O MVP NÃO terá:
-- avatar/rosto IA;
-- MuseTalk/lip-sync;
-- player/playlist/loop de vídeo dentro do programa;
+Fora do MVP:
+- avatar/rosto IA e MuseTalk;
+- player/playlist/loop de vídeo dentro do AGCN;
 - janela 9:16 própria;
-- pesquisa automática de produto;
-- câmera virtual própria.
+- câmera virtual;
+- pesquisa automática de produto.
 
-O vídeo do produto será preparado e exibido manualmente no TikTok LIVE Studio/OBS ou por outra fonte externa. O AGCN não gerencia vídeo nesta fase.
+O vídeo do produto fica no TikTok LIVE Studio/OBS. O AGCN acompanha a LIVE, recebe comentários/métricas, conduz a venda continuamente e envia a voz para o dispositivo de áudio escolhido.
 
-Objetivo: entregar um programa Windows que acompanhe uma TikTok LIVE, receba comentários/métricas, conduza a venda continuamente, escolha comentários relevantes, responda com naturalidade e envie a voz para o dispositivo de áudio selecionado.
-
-## Arquitetura alvo
+## Arquitetura congelada
 
 TikTok LIVE
 -> TikTokMonitor
@@ -25,200 +22,174 @@ TikTok LIVE
 -> Speech Planner
 -> BrainContext factual
 -> PresenterPolicy compartilhada
--> Qwen local OU provider API
+-> Qwen/Ollama local OU API
+-> BrainResult JSON
 -> validação factual
--> fila de fala
--> TTS local OU premium
--> dispositivo de áudio / cabo virtual
+-> fila
+-> TTS
+-> dispositivo/VB-CABLE
 -> TikTok LIVE Studio
 
-Produto manual -> ProductStore/ProductKnowledge -> fatos permitidos ao Brain
+Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
 
-## O que já existe e deve ser reaproveitado
+## Implementado em 28/09
 
-Branch base histórica: `v0.5.2-product-research`
-Commit de referência: `608f840f96d00f0160910b1629ac30ccf13691c2`.
+Além do core histórico, agora existem:
 
-Core funcional:
-- `core/tiktok_monitor.py`
-- `core/product_store.py`
-- `core/product_knowledge.py`
-- `core/comment_intelligence.py`
-- `core/comment_fusion.py`
-- `core/decision_engine.py`
-- `core/memory_manager.py`
-- `core/silence_watchdog.py`
-- `core/speech_planner.py`
-- `core/persuasion_engine.py`
-- `core/presenter_v2.py`
+- `core/model_transports.py`
+  - `OllamaTransport` para Qwen local em `/api/chat`;
+  - JSON Schema/Structured Output;
+  - `OpenAIResponsesTransport` para Responses API;
+  - `OpenAICompatibleChatTransport` para outros providers compatíveis.
+
+- `core/brain_factory.py`
+  - escolhe provider por configuração;
+  - Qwen local é padrão;
+  - API pode cair automaticamente para Qwen local;
+  - secrets vêm de variável de ambiente, nunca do exe/repo.
+
+- `core/brain_context_builder.py`
+  - separa PRODUCT e LIVE_CONDITIONS;
+  - transforma somente campos realmente cadastrados em `ALLOWED_FACTS`;
+  - cadastro do produto é a fonte factual da LIVE.
+
+- `core/presenter_v3.py`
+  - reaproveita Comment Intelligence, Fusion, Decision Engine, Speech Planner, Memory e Watchdog;
+  - chama o Brain real para resposta e fala proativa;
+  - registra fatos usados e continuidade;
+  - comentário relevante vira missão para o Brain, não prompt solto.
+
 - `core/runtime.py`
+  - aceita `brain_provider` ou `brain_config`;
+  - sem configuração mantém V2 para compatibilidade;
+  - com configuração usa PresenterV3/Qwen/API.
 
-Novo contrato para desktop/providers:
-- `core/integration_contracts.py`
-- `core/presenter_policy.py`
-- `core/comment_selection_policy.py`
-- `core/brain_orchestrator.py`
-- `docs/PRESENTER_BRAIN_SPEC.md`
+- `scripts/test_brain.py`
+  - laboratório manual sem precisar iniciar uma LIVE;
+  - usa produto ativo do ProductStore.
 
-O monitor TikTok e o fluxo de produto já foram testados em LIVE real. Não reescrever do zero.
+- testes novos:
+  - `tests/test_model_transports.py`
+  - `tests/test_brain_context_builder.py`
+  - `tests/test_brain_factory.py`
+  - `tests/test_presenter_v3.py`
 
-## Parte mais importante: Presenter Brain
+## Regra central da inteligência
 
-A inteligência de fala NÃO é simplesmente "mandar comentário para uma IA".
+Qwen e API recebem a MESMA `PresenterPolicy`.
 
-Qwen local e qualquer provider por API devem receber a MESMA `PresenterPolicy`. O provider só troca o motor; as regras de condução da LIVE pertencem ao AGCN.
-
-Ler obrigatoriamente:
-- `docs/PRESENTER_BRAIN_SPEC.md`
-- `data/presenter_dataset/behavior_v3.json`
-- `core/presenter_policy.py`
-
-A PresenterPolicy define:
-- como falar;
-- o que nunca inventar;
-- como responder comentário;
-- quais comentários têm prioridade;
-- como falar proativamente;
-- como evitar repetição;
-- como retomar o assunto depois de interrupção;
-- como usar memória;
-- formato JSON de saída.
-
-O Decision Engine continua responsável por escolher a fila/prioridade. O LLM é responsável por interpretação natural e realização da fala, não por criar fatos.
-
-## Prioridade comercial de comentários
-
-Ordem geral:
-1. intenção clara de compra / como comprar;
-2. preço, desconto, cupom, frete, disponibilidade/estoque;
-3. objeção que pode impedir a compra;
-4. pergunta técnica, compatibilidade e uso;
-5. benefícios/diferenciais;
-6. confirmação de compra;
-7. comentário geral relevante;
-8. saudação/emoji/conversa paralela: normalmente ignorar.
-
-## Comportamento da fala
-
-Pergunta:
-**resposta direta -> expansão curta -> ponte para venda**
-
-Sem comentários:
-- continuar falando;
-- variar fatos/tópicos;
-- não repetir CTA;
-- não repetir "pra quem chegou agora";
-- usar normalmente um fato principal por segmento;
-- respeitar memória e cooldowns.
-
-Depois de responder:
-- preservar `sales_thread`;
-- continuar de onde fazia sentido;
-- não reiniciar a apresentação.
-
-## Fatos e segurança
-
-Somente `ProductKnowledge`, `LIVE_CONDITIONS` e `ALLOWED_FACTS` são fonte da verdade.
-
-Nunca inventar:
-- função;
+O modelo NÃO escolhe livremente os fatos. O cadastro do produto fornece:
+- nome, marca, modelo, categoria;
+- descrição;
+- benefícios;
+- problemas resolvidos;
+- diferenciais;
+- itens inclusos;
 - compatibilidade;
-- especificação;
-- preço;
+- tamanho;
+- bateria;
+- uso;
+- garantia;
+- limitações;
+- informações adicionais.
+
+Condições da LIVE:
+- preço regular;
+- preço atual;
 - desconto;
 - estoque;
 - frete;
 - cupom;
-- garantia;
-- promoção;
-- prazo.
+- oferta;
+- texto da oferta;
+- observação promocional.
 
-Se faltar informação: assumir de forma natural que o dado não está confirmado.
+`ALLOWED_FACTS` é gerado desses campos. Se o Brain disser que usou um fato, `used_facts` deve copiar exatamente o item correspondente. O orquestrador rejeita `used_facts` não autorizados.
 
-## Cadastro de produto
+## Comportamento obrigatório
 
-Preservar os campos já existentes:
-- product_url opcional
-- name, brand, model, category
-- description
-- key_benefits
-- problems_solved
-- differentials
-- included_items
-- compatibility
-- size_info
-- battery_info
-- usage_info
-- warranty
-- limitations
-- additional_info
-- image_url
+Pergunta:
+resposta direta -> expansão curta -> ponte para venda.
 
-Condição da LIVE:
-- regular_price
-- current_price
-- discount
-- stock
-- shipping_info
-- coupon
-- live_offer
-- live_offer_text
-- promotion_note
+Sem comentário:
+- continuar vendendo;
+- variar tópico;
+- usar produto ativo;
+- respeitar memória;
+- evitar repetição de fato/CTA;
+- não depender do chat para continuar.
 
-Não adicionar gerenciamento de vídeo ao cadastro do MVP.
+Depois de comentário:
+- responder;
+- não reiniciar apresentação;
+- manter/atualizar `next_sales_thread`;
+- voltar naturalmente à venda.
 
-## Voz/TTS
+Nunca inventar preço, estoque, frete, cupom, garantia, função, compatibilidade ou especificação.
 
-Dois providers:
-1. Local/offline para funcionar sem API paga.
-2. Premium/API opcional.
+## Configuração
 
-Requisitos:
-- fila de áudio;
-- prefetch;
-- dispositivo de saída selecionável;
-- botão testar voz;
-- volume;
+`desktop/config.example.json` agora contém:
+- provider do Brain;
+- Ollama URL/model/timeout/temperatura;
+- API URL/model/variável de ambiente;
 - fallback local;
-- nenhuma chave embutida no exe.
+- retries.
 
-## Desktop
+OpenAI: chave esperada em `OPENAI_API_KEY`.
+Nenhuma chave deve ser gravada no repositório.
 
-Framework: Python + PySide6.
+## Teste manual de Brain
 
-Telas:
-- Dashboard
-- Produto
-- Configurações
+Com produto ativo:
 
-Dashboard:
-- status TikTok;
-- produto ativo;
-- presenter ON/OFF;
-- comentários;
-- fila/decisão;
-- "Falando agora";
-- Brain escolhido;
-- voz escolhida;
-- dispositivo de áudio.
+```
+python scripts/test_brain.py --provider qwen_local --proactive
+python scripts/test_brain.py --provider qwen_local --comment "quanto custa?"
+python scripts/test_brain.py --provider openai --comment "pega internet?"
+```
 
-Não implementar player de vídeo.
+Para OpenAI, definir `OPENAI_API_KEY` antes.
 
-## Definição de pronto
+## O que Astra 6 deve fazer amanhã
 
-Em Windows:
-1. abre sem terminal para uso normal;
-2. cadastra produto;
-3. conecta a LIVE pelo username;
-4. mostra métricas/comentários;
-5. inicia presenter automático;
-6. Qwen local usa PresenterPolicy e fatos reais;
-7. provider API opcional usa EXATAMENTE a mesma política;
-8. TTS toca no device escolhido;
-9. comentário prioritário é respondido;
+Prioridade 1:
+- auditar o novo Brain;
+- rodar toda a suíte de testes;
+- corrigir incompatibilidades reais;
+- testar Ollama/Qwen de ponta a ponta em Windows;
+- testar API real;
+- integrar PresenterV3 como modo principal do desktop.
+
+Prioridade 2:
+- implementar TTS local;
+- implementar TTS premium/API opcional;
+- fila/prefetch de áudio;
+- saída de áudio selecionável;
+- VB-CABLE;
+- Testar Voz;
+- fallback TTS local.
+
+Prioridade 3:
+- terminar telas Dashboard, Produto e Configurações;
+- ligar produto real, TikTok, Brain e áudio;
+- testar LIVE real;
+- empacotar .exe com PyInstaller.
+
+## Pronto significa
+
+1. programa Windows abre sem terminal;
+2. produto é cadastrado/ativado;
+3. conecta TikTok por username;
+4. recebe métricas/comentários;
+5. PresenterV3 fala continuamente;
+6. Qwen local funciona sem chave;
+7. API usa exatamente a mesma PresenterPolicy;
+8. pergunta relevante interrompe a sequência no momento apropriado;
+9. resposta usa apenas fatos cadastrados;
 10. após resposta a venda continua;
-11. sem comentários a IA continua falando;
-12. não inventa informação ausente;
-13. fallback local funciona sem API;
-14. build do exe fica pronto.
-
+11. TTS toca no device escolhido;
+12. VB-CABLE entrega áudio ao TikTok LIVE Studio;
+13. falha da API cai para local;
+14. secrets não entram no exe/repo;
+15. build Windows fica pronto.
