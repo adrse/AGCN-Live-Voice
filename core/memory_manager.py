@@ -14,7 +14,10 @@ class MemoryManager:
         self.ctas = deque(maxlen=20)
         self.tactics = deque(maxlen=40)
         self.purchase_confirmations = deque(maxlen=30)
+        self.live_started_at = time.time()
         self.last_speech_at = 0.0
+        self.proactive_turns = 0
+        self.last_newcomer_recap_at = 0.0
         self.current_topic = None
         self.current_pitch_topic = None
         self.interrupted_topic = None
@@ -48,6 +51,9 @@ class MemoryManager:
 
             if record["type"] == "proactive":
                 self.current_pitch_topic = record["topic"]
+                self.proactive_turns += 1
+                if record["topic"] == "newcomer_recap":
+                    self.last_newcomer_recap_at = now
 
         if record["cta"]:
             self.ctas.append({
@@ -83,6 +89,22 @@ class MemoryManager:
             x.get("cta") == cta and now - x.get("at", 0) <= within
             for x in self.ctas
         )
+
+    def newcomer_recap_due(
+        self,
+        *,
+        min_since_start: float = 300.0,
+        cooldown: float = 420.0,
+    ) -> bool:
+        now = time.time()
+        if now - self.live_started_at < min_since_start:
+            return False
+        if not self.last_newcomer_recap_at:
+            return True
+        return now - self.last_newcomer_recap_at >= cooldown
+
+    def proactive_cursor(self) -> int:
+        return self.proactive_turns
 
     def remember_tactic(self, tactic: str) -> None:
         tactic = str(tactic or "").strip()
@@ -145,6 +167,9 @@ class MemoryManager:
     def snapshot(self) -> dict:
         return {
             "seconds_since_speech": round(self.seconds_since_speech(), 1),
+            "live_seconds": round(max(0.0, time.time() - self.live_started_at), 1),
+            "proactive_turns": self.proactive_turns,
+            "newcomer_recap_due": self.newcomer_recap_due(),
             "current_topic": self.current_topic,
             "current_pitch_topic": self.current_pitch_topic,
             "interrupted_topic": self.interrupted_topic,
