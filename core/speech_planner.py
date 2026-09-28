@@ -6,18 +6,23 @@ import random
 class SpeechPlanner:
     """Transforma uma decisão em um plano de fala estruturado."""
 
-    PROACTIVE_TOPICS = [
+    # Sequência inspirada no comportamento das LIVEs analisadas:
+    # fala do produto -> uso/benefício -> detalhe -> valor -> urgência real.
+    # Não sorteia "quem chegou agora" a cada rodada.
+    PROACTIVE_FLOW = [
+        "description",
         "benefits",
-        "pain_solution",
-        "differentials",
-        "price_value",
-        "bundle_value",
         "usage",
+        "differentials",
+        "bundle_value",
+        "compatibility",
+        "size",
+        "battery",
+        "pain_solution",
+        "price_value",
+        "trust",
         "scarcity",
         "social_proof",
-        "trust",
-        "cta",
-        "product_recap",
     ]
 
     def plan(self, decision: dict, guard, memory) -> dict:
@@ -59,59 +64,104 @@ class SpeechPlanner:
         }
 
     def choose_proactive_topic(self, guard, memory) -> str:
-        recent = set(memory.last_topics(limit=5))
-        available = []
+        # "Pra quem chegou agora" é recap espaçado, não muleta de toda fala.
+        if memory.newcomer_recap_due(
+            min_since_start=300,
+            cooldown=420,
+        ):
+            return "newcomer_recap"
 
-        mapping = {
-            "benefits": guard.get("benefits"),
-            "pain_solution": (
+        price_fact = guard.fact_for_topic("price")
+        has_price = any(
+            value not in (None, "", [], {})
+            for value in (price_fact or {}).values()
+        )
+
+        availability = {
+            "description": bool(guard.get("description")),
+            "benefits": bool(guard.get("benefits")),
+            "usage": bool(guard.get("usage")),
+            "differentials": bool(guard.get("differentials")),
+            "bundle_value": bool(guard.get("included_items")),
+            "compatibility": bool(guard.get("compatibility")),
+            "size": bool(guard.get("size")),
+            "battery": bool(guard.get("battery")),
+            "pain_solution": bool(
                 guard.get("problems_solved")
                 and guard.get("benefits")
             ),
-            "differentials": guard.get("differentials"),
-            "price_value": guard.fact_for_topic("price"),
-            "bundle_value": guard.get("included_items"),
-            "usage": guard.get("usage"),
-            "trust": (
+            "price_value": has_price,
+            "trust": bool(
                 guard.get("limitations")
                 or guard.get("warranty")
             ),
+            "scarcity": bool(guard.grounded_urgency()),
+            "social_proof": memory.recent_purchase_count(within=180) > 0,
         }
 
-        for topic, fact in mapping.items():
-            if fact not in (None, "", [], {}) and topic not in recent:
-                available.append(topic)
-
-        urgency = guard.grounded_urgency()
-        if urgency and "scarcity" not in recent:
-            available.append("scarcity")
-
-        if (
-            memory.recent_purchase_count(within=180) > 0
-            and "social_proof" not in recent
-        ):
-            available.append("social_proof")
-
-        if guard.live_offer() and "cta" not in recent:
-            available.append("cta")
+        available = [
+            topic
+            for topic in self.PROACTIVE_FLOW
+            if availability.get(topic)
+        ]
 
         if not available:
-            available = [
-                t for t in self.PROACTIVE_TOPICS
-                if t not in recent
-            ] or ["product_recap"]
+            return "product_recap"
 
-        return random.choice(available)
+        # Anda pela sequência em vez de sortear frases com o mesmo sentido.
+        cursor = memory.proactive_cursor()
+        start = cursor % len(self.PROACTIVE_FLOW)
+
+        for offset in range(len(self.PROACTIVE_FLOW)):
+            topic = self.PROACTIVE_FLOW[
+                (start + offset) % len(self.PROACTIVE_FLOW)
+            ]
+            if not availability.get(topic):
+                continue
+
+            # Evita voltar no mesmo assunto logo em seguida.
+            if memory.recently_said_topic(topic, within=24):
+                continue
+            return topic
+
+        # Se todos foram usados recentemente, continua o fluxo no próximo
+        # tópico disponível sem travar a LIVE.
+        for offset in range(len(self.PROACTIVE_FLOW)):
+            topic = self.PROACTIVE_FLOW[
+                (start + offset) % len(self.PROACTIVE_FLOW)
+            ]
+            if availability.get(topic):
+                return topic
+
+        return "product_recap"
 
     def _plan_proactive(self, decision: dict, guard, memory) -> dict:
         topic = decision.get("topic")
-        fact = guard.fact_for_topic(topic)
 
-        if topic in {"cta", "scarcity"}:
+        topic_to_fact = {
+            "description": "description",
+            "benefits": "benefits",
+            "usage": "usage",
+            "differentials": "differentials",
+            "bundle_value": "included_items",
+            "compatibility": "compatibility",
+            "size": "size",
+            "battery": "battery",
+            "pain_solution": "problems_solved",
+            "trust": "limitations",
+        }
+        fact = guard.fact_for_topic(
+            topic_to_fact.get(topic, topic)
+        )
+
+        if topic == "price_value":
+            fact = guard.fact_for_topic("price")
+        elif topic == "scarcity":
             fact = guard.live_offer() or guard.grounded_urgency()
-
-        if topic == "social_proof":
+        elif topic == "social_proof":
             fact = memory.recent_purchase_count(within=180)
+        elif topic == "newcomer_recap":
+            fact = guard.get("description") or guard.get("benefits")
 
         return {
             **decision,
@@ -134,8 +184,20 @@ class SpeechPlanner:
             return "soft_close"
 
         if decision.get("type") == "proactive":
-            if not memory.recently_used_cta("buy_now", within=25):
+            topic = decision.get("topic")
+            if (
+                topic in {
+                    "price_value",
+                    "scarcity",
+                    "social_proof",
+                }
+                and not memory.recently_used_cta(
+                    "buy_now",
+                    within=45,
+                )
+            ):
                 return "buy_now"
+            return None
 
         if guard.live_offer() and not memory.recently_used_cta(
             "live_offer",
