@@ -134,6 +134,30 @@ class AGCNVoiceRuntime:
             ),
         }
 
+    def test_presenter_comment(
+        self,
+        user: str,
+        text: str,
+    ) -> dict:
+        with self.lock:
+            self._sync_active_product_locked()
+            if not self.presenter.product.get("name"):
+                return {
+                    "ok": False,
+                    "message": "Cadastre e ative um produto antes do teste.",
+                }
+            return self.presenter.test_comment(user, text)
+
+    def test_presenter_proactive(self) -> dict:
+        with self.lock:
+            self._sync_active_product_locked()
+            if not self.presenter.product.get("name"):
+                return {
+                    "ok": False,
+                    "message": "Cadastre e ative um produto antes do teste.",
+                }
+            return self.presenter.test_proactive()
+
     def start(self, username: str) -> dict:
         if not self.store.active():
             return {
