@@ -12,8 +12,11 @@ class MemoryManager:
         self.responded_users = deque(maxlen=40)
         self.topics = deque(maxlen=30)
         self.ctas = deque(maxlen=20)
+        self.tactics = deque(maxlen=40)
+        self.purchase_confirmations = deque(maxlen=30)
         self.last_speech_at = 0.0
         self.current_topic = None
+        self.current_pitch_topic = None
         self.interrupted_topic = None
 
     def remember_speech(self, item: dict) -> None:
@@ -43,11 +46,24 @@ class MemoryManager:
             })
             self.current_topic = record["topic"]
 
+            if record["type"] == "proactive":
+                self.current_pitch_topic = record["topic"]
+
         if record["cta"]:
             self.ctas.append({
                 "cta": record["cta"],
                 "at": now,
             })
+
+        if record["intent"] == "purchase_confirmation":
+            self.purchase_confirmations.append({
+                "user": record["user"],
+                "at": now,
+            })
+
+        resume_topic = item.get("resume_topic")
+        if record["type"] == "reactive" and resume_topic:
+            self.interrupted_topic = resume_topic
 
     def seconds_since_speech(self) -> float:
         if not self.last_speech_at:
@@ -67,6 +83,41 @@ class MemoryManager:
             x.get("cta") == cta and now - x.get("at", 0) <= within
             for x in self.ctas
         )
+
+    def remember_tactic(self, tactic: str) -> None:
+        tactic = str(tactic or "").strip()
+        if not tactic:
+            return
+        self.tactics.append({
+            "tactic": tactic,
+            "at": time.time(),
+        })
+
+    def recently_used_tactic(
+        self,
+        tactic: str,
+        within: float = 35.0,
+    ) -> bool:
+        now = time.time()
+        target = str(tactic or "")
+        return any(
+            x.get("tactic") == target
+            and now - x.get("at", 0) <= within
+            for x in self.tactics
+        )
+
+    def recent_purchase_count(self, within: float = 180.0) -> int:
+        now = time.time()
+        return sum(
+            1
+            for x in self.purchase_confirmations
+            if now - x.get("at", 0) <= within
+        )
+
+    def consume_interrupted_topic(self) -> str | None:
+        topic = self.interrupted_topic
+        self.interrupted_topic = None
+        return topic
 
     def recently_answered_user(self, user: str, within: float = 20.0) -> bool:
         now = time.time()
@@ -95,7 +146,14 @@ class MemoryManager:
         return {
             "seconds_since_speech": round(self.seconds_since_speech(), 1),
             "current_topic": self.current_topic,
+            "current_pitch_topic": self.current_pitch_topic,
             "interrupted_topic": self.interrupted_topic,
             "recent_topics": self.last_topics(),
             "recent_speeches": self.last_speeches(),
+            "recent_purchase_count": self.recent_purchase_count(),
+            "recent_tactics": [
+                x.get("tactic")
+                for x in list(self.tactics)[-8:]
+                if x.get("tactic")
+            ],
         }
