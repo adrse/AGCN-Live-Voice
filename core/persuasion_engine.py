@@ -77,7 +77,7 @@ class PersuasionEngine:
         else:
             raw = [
                 text(x)
-                for x in re.split(r"[\n;|]+", text(value))
+                for x in re.split(r"[\n;|]+", str(value or ""))
             ]
 
         out = []
@@ -549,9 +549,9 @@ class PersuasionEngine:
             if anchor:
                 memory.remember_tactic("price_anchor")
                 return random.choice([
-                    f"Olha o preço: {anchor}",
-                    f"E o valor dele agora, ó: {anchor}",
-                    f"Agora presta atenção no preço: {anchor}",
+                    anchor,
+                    f"Ó, {anchor}",
+                    f"Gente, {anchor}",
                 ])
 
         if topic == "scarcity":
