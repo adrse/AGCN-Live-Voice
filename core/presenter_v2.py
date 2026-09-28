@@ -251,11 +251,18 @@ class PresenterV2:
             speech = self._proactive_text(plan, name)
         elif intent == "brand":
             brand = as_text(self.guard.get("brand"))
-            speech = (
-                f"{user}, a marca é {brand}."
-                if brand
-                else f"{user}, a marca não está cadastrada aqui pra eu te confirmar com segurança."
-            )
+            if brand:
+                speech = (
+                    f"{user}, é {brand}."
+                    if user
+                    else f"É {brand}."
+                )
+            else:
+                speech = (
+                    f"{user}, essa marca eu não tenho confirmada aqui."
+                    if user
+                    else "Essa marca eu não tenho confirmada aqui."
+                )
         elif intent == "price":
             anchor = self.persuasion.price_anchor()
             if anchor:
@@ -267,26 +274,28 @@ class PresenterV2:
                     else "O preço não está cadastrado aqui pra eu confirmar agora."
                 )
         elif intent == "buying_intent":
-            prefix = f"{user}, boa! " if user else ""
-            speech = prefix + self.persuasion.cta(
-                "buy_now",
+            speech = self.persuasion.buying_intent_response(
+                user,
+                plan.get("comment") or "",
                 memory=self.memory,
-                allow_urgency=True,
             )
             # O CTA já foi aplicado diretamente.
             cta = None
         elif intent == "purchase_confirmation":
             speech = self.persuasion.purchase_celebration(user)
         elif intent == "engagement":
-            speech = random.choice([
-                f"Valeu, {user}! Esse {name} tá chamando atenção mesmo.",
-                f"{user}, bom demais! Vou continuar mostrando os detalhes dele.",
-            ])
+            options = [
+                f"Valeu, {user}! Bora continuar.",
+                f"Boa, {user}! Fica aí que eu vou mostrando.",
+                f"Tamo junto, {user}! Olha só esse produto aqui.",
+            ]
+            speech = random.choice(options) if user else "Valeu! Bora continuar."
         elif intent == "objection":
             speech = self.persuasion.objection_response(
                 user,
                 name,
                 memory=self.memory,
+                comment=plan.get("comment") or "",
             )
         else:
             speech = self._fact_answer(
@@ -372,15 +381,15 @@ class PresenterV2:
             return speech
 
         phrases = {
-            "benefits": "E voltando no ponto que eu estava mostrando: olha os benefícios dele.",
-            "pain_solution": "E voltando ao que eu estava explicando: é justamente aí que esse produto resolve o problema.",
-            "differentials": "E voltando ao diferencial que eu estava mostrando.",
-            "price_value": "E voltando ao valor da oferta, presta atenção nessa diferença de preço.",
-            "bundle_value": "E voltando ao kit, olha tudo que acompanha.",
-            "usage": "E voltando ao uso no dia a dia.",
-            "scarcity": "E voltando à condição da LIVE, presta atenção no estoque e na oferta cadastrada.",
-            "trust": "E voltando ao que eu estava explicando sobre o produto.",
-            "product_recap": f"E voltando ao {name}, deixa eu resumir o principal.",
+            "benefits": "Mas ó, voltando aqui: olha o que ele entrega.",
+            "pain_solution": "Mas ó, voltando: é justamente aí que ele ajuda.",
+            "differentials": "Mas voltando aqui, olha esse diferencial.",
+            "price_value": "Mas ó, voltando no preço, presta atenção nisso.",
+            "bundle_value": "Mas voltando no kit, olha tudo que vem.",
+            "usage": "Mas ó, no dia a dia funciona assim.",
+            "scarcity": "Mas voltando aqui, olha o estoque e a oferta agora.",
+            "trust": "Mas ó, voltando no produto.",
+            "product_recap": f"Mas voltando no {name}, deixa eu te mostrar o principal.",
         }
 
         line = phrases.get(str(resume))
@@ -400,51 +409,55 @@ class PresenterV2:
         fact_label=None,
         comment=None,
     ):
-        text = as_text(fact)
-        labels = {
-            "availability": "disponibilidade",
-            "compatibility": "compatibilidade",
-            "technical_question": "essa especificação",
-            "shipping": "frete e entrega",
-            "warranty": "garantia",
-            "included_items": "o que acompanha",
-            "size": "tamanho e medidas",
-            "battery": "bateria",
-            "usage": "modo de uso",
-            "safety_or_critical": "essa informação",
-        }
-        label = as_text(fact_label) or labels.get(intent, "esse detalhe")
+        value = as_text(fact)
+        label = as_text(fact_label)
         address = f"{user}, " if user else ""
-        question = str(comment or "").casefold()
+        question = str(comment or "").casefold().strip()
 
-        if text:
+        if value:
             negative = any(
-                marker in text.casefold()
+                marker in value.casefold()
                 for marker in ("não ", "nao ", "sem ")
             )
-            yes_no_question = any(
-                question.startswith(prefix)
-                for prefix in (
-                    "tem ", "vem ", "possui ", "é ", "e ",
-                    "serve ", "funciona ",
-                )
-            )
 
-            if yes_no_question and not negative:
-                return f"{address}tem sim. {label}: {text}."
+            if question.startswith(("tem ", "vem ", "possui ")):
+                if negative:
+                    return f"{address}não. {value}."
+                return f"{address}tem sim. {value}."
 
-            return f"{address}{label}: {text}."
+            if question.startswith(("serve ", "funciona ")):
+                if negative:
+                    return f"{address}não. {value}."
+                return f"{address}serve sim. {value}."
+
+            if "qual" in question or "quanto" in question or "quantos" in question:
+                if label:
+                    return random.choice([
+                        f"{address}{value}.",
+                        f"{address}é {value}.",
+                        f"{address}{label}: {value}.",
+                    ])
+                return f"{address}{value}."
+
+            if label:
+                return random.choice([
+                    f"{address}{value}.",
+                    f"{address}{label}: {value}.",
+                ])
+
+            return f"{address}{value}."
 
         if intent in {"direct_question", "technical_question"}:
-            return (
-                f"{address}esse detalhe não está cadastrado na ficha do {name}. "
-                "Prefiro não te passar informação no chute."
-            )
+            return random.choice([
+                f"{address}isso aí eu não tenho confirmado aqui, então não vou te falar no chute.",
+                f"{address}esse detalhe eu não tenho aqui certinho. Melhor não inventar.",
+                f"{address}isso eu não tenho confirmado na ficha, então prefiro não arriscar.",
+            ])
 
-        return (
-            f"{address}eu ainda não tenho {label} cadastrado "
-            "pra te responder com segurança."
-        )
+        return random.choice([
+            f"{address}essa informação eu não tenho aqui confirmada.",
+            f"{address}isso aí eu não tenho na ficha ainda.",
+        ])
 
     def _objection_text(self, user, name):
         return self.persuasion.objection_response(
@@ -514,7 +527,11 @@ class PresenterV2:
         if topic == "benefits":
             value = as_text(self.guard.get("benefits"))
             if value:
-                return f"Pra quem tá chegando agora, olha o principal do {name}: {value}."
+                return random.choice([
+                    f"Pra quem chegou agora, olha só: {value}.",
+                    f"Ó, pra quem caiu aqui agora: {value}.",
+                    f"Quem chegou agora, presta atenção nisso: {value}.",
+                ])
 
         if topic in {"problems_solved", "pain_solution"}:
             problems = as_text(self.guard.get("problems_solved"))
@@ -527,25 +544,45 @@ class PresenterV2:
         if topic == "differentials":
             value = as_text(self.guard.get("differentials"))
             if value:
-                return f"Um diferencial importante desse {name} é {value}."
+                return random.choice([
+                    f"Ó, uma coisa legal dele é {value}.",
+                    f"E olha esse detalhe: {value}.",
+                    f"O diferencial aqui é {value}.",
+                ])
 
         if topic in {"included_items", "bundle_value"}:
             value = as_text(self.guard.get("included_items"))
             if value:
-                return f"E presta atenção no que você recebe com o {name}: {value}."
+                return random.choice([
+                    f"E olha o que já vem junto: {value}.",
+                    f"Fora que já vem {value}.",
+                    f"No kit já vai {value}.",
+                ])
 
         if topic == "usage":
             value = as_text(self.guard.get("usage"))
             if value:
-                return f"No uso do dia a dia, o {name} funciona assim: {value}."
+                return random.choice([
+                    f"No dia a dia é simples: {value}.",
+                    f"Pra usar, é assim: {value}.",
+                    f"Na prática funciona assim: {value}.",
+                ])
 
         if topic in {"price", "price_value"}:
             current = self.product.get("current_price")
             regular = self.product.get("regular_price")
             if current is not None and regular is not None:
-                return f"Olha o valor agora do {name}: {brl(current)}, de {brl(regular)}."
+                return random.choice([
+                    f"Olha o preço: de {brl(regular)} por {brl(current)}.",
+                    f"Tá {brl(current)} só, e era {brl(regular)}.",
+                    f"Agora tá saindo por {brl(current)}. Antes tava {brl(regular)}.",
+                ])
             if current is not None:
-                return f"O {name} está por {brl(current)} agora."
+                return random.choice([
+                    f"Tá {brl(current)} agora.",
+                    f"Hoje tá saindo por {brl(current)}.",
+                    f"Ó, o preço agora é {brl(current)}.",
+                ])
 
         if topic == "cta":
             offer = self.guard.live_offer()
@@ -555,13 +592,14 @@ class PresenterV2:
         desc = as_text(self.product.get("description"))
         if desc:
             options = [
-                f"Pra quem chegou agora, o {name} é o produto que estamos mostrando. {desc}",
-                f"Se você acabou de entrar na LIVE, presta atenção no {name}: {desc}",
-                f"Rapidinho pra quem chegou agora: estamos com o {name}. {desc}",
+                f"Pra quem chegou agora, ó: {desc}",
+                f"Se você acabou de entrar, presta atenção nisso aqui: {desc}",
+                f"Rapidinho pra quem caiu na LIVE agora: {desc}",
             ]
             return random.choice(options)
 
         return random.choice([
-            f"Pra quem chegou agora, o produto que está na tela é o {name}.",
-            f"Se você acabou de entrar, estamos mostrando o {name}.",
+            f"Pra quem chegou agora, a gente tá com o {name} aqui.",
+            f"Se você acabou de entrar, olha só o {name} aqui.",
+            f"Quem caiu agora na LIVE, presta atenção no {name}.",
         ])
