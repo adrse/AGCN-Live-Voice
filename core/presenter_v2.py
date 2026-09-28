@@ -489,6 +489,7 @@ class PresenterV2:
 
         if plan.get("intent") in {
             "brand",
+            "benefits",
             "price",
             "purchase_confirmation",
             "engagement",
