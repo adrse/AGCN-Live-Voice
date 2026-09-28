@@ -30,10 +30,7 @@ class DecisionEngine:
             "topics": group.get("topics", []),
             "interrupt": interrupt,
             "speech_length": speech_length,
-            "resume_topic": (
-                memory_snapshot.get("current_pitch_topic")
-                or memory_snapshot.get("current_topic")
-            ),
+            "resume_topic": memory_snapshot.get("current_pitch_topic"),
         }
 
     def proactive(self, topic: str, priority: int = 30) -> dict:
