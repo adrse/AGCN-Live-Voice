@@ -1,8 +1,7 @@
 """Contratos neutros para a camada desktop/providers do AGCN Live Voice.
 
-Este arquivo não altera o runtime atual. Ele define interfaces estáveis para que
-providers locais/API e a UI PySide6 possam ser implementados sem acoplar o core
-a um fornecedor específico.
+O objetivo é desacoplar o core dos fornecedores. Qwen local e providers por API
+implementam a mesma interface e recebem a mesma PresenterPolicy.
 """
 
 from __future__ import annotations
@@ -24,6 +23,7 @@ class BrainContext:
     product: dict[str, Any] = field(default_factory=dict)
     live_conditions: dict[str, Any] = field(default_factory=dict)
     comment: CommentPayload | None = None
+    decision: dict[str, Any] = field(default_factory=dict)
     recent_comments: list[CommentPayload] = field(default_factory=list)
     recent_speeches: list[str] = field(default_factory=list)
     recent_facts: list[str] = field(default_factory=list)
@@ -49,16 +49,6 @@ class AudioChunk:
     channels: int = 1
     sample_width: int = 2
     format: str = "pcm_s16le"
-
-
-@dataclass(slots=True)
-class MediaClip:
-    path: str
-    title: str = ""
-    enabled: bool = True
-    loop: bool = True
-    muted: bool = True
-    tags: list[str] = field(default_factory=list)
 
 
 class BrainProvider(Protocol):
@@ -102,26 +92,4 @@ class AudioSink(Protocol):
         ...
 
     def stop(self) -> None:
-        ...
-
-
-class MediaController(Protocol):
-    """Controla a playlist da janela 9:16."""
-
-    def set_playlist(self, clips: Sequence[MediaClip]) -> None:
-        ...
-
-    def play(self) -> None:
-        ...
-
-    def pause(self) -> None:
-        ...
-
-    def next(self) -> None:
-        ...
-
-    def previous(self) -> None:
-        ...
-
-    def current(self) -> MediaClip | None:
         ...
