@@ -8,11 +8,13 @@ class SpeechPlanner:
 
     PROACTIVE_TOPICS = [
         "benefits",
-        "problems_solved",
+        "pain_solution",
         "differentials",
-        "price",
-        "included_items",
+        "price_value",
+        "bundle_value",
         "usage",
+        "scarcity",
+        "social_proof",
         "trust",
         "cta",
         "product_recap",
@@ -61,16 +63,33 @@ class SpeechPlanner:
 
         mapping = {
             "benefits": guard.get("benefits"),
-            "problems_solved": guard.get("problems_solved"),
+            "pain_solution": (
+                guard.get("problems_solved")
+                and guard.get("benefits")
+            ),
             "differentials": guard.get("differentials"),
-            "price": guard.fact_for_topic("price"),
-            "included_items": guard.get("included_items"),
+            "price_value": guard.fact_for_topic("price"),
+            "bundle_value": guard.get("included_items"),
             "usage": guard.get("usage"),
+            "trust": (
+                guard.get("limitations")
+                or guard.get("warranty")
+            ),
         }
 
         for topic, fact in mapping.items():
             if fact not in (None, "", [], {}) and topic not in recent:
                 available.append(topic)
+
+        urgency = guard.grounded_urgency()
+        if urgency and "scarcity" not in recent:
+            available.append("scarcity")
+
+        if (
+            memory.recent_purchase_count(within=180) > 0
+            and "social_proof" not in recent
+        ):
+            available.append("social_proof")
 
         if guard.live_offer() and "cta" not in recent:
             available.append("cta")
@@ -87,8 +106,11 @@ class SpeechPlanner:
         topic = decision.get("topic")
         fact = guard.fact_for_topic(topic)
 
-        if topic == "cta":
+        if topic in {"cta", "scarcity"}:
             fact = guard.live_offer() or guard.grounded_urgency()
+
+        if topic == "social_proof":
+            fact = memory.recent_purchase_count(within=180)
 
         return {
             **decision,
