@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -27,14 +27,14 @@ jobs:
         run: |
           mkdir -p .ci
           PYTHONPATH=. pytest -q tests/test_visual_product_discovery.py tests/test_reliable_identity.py tests/test_presenter_knowledge.py tests/test_persuasion_engine.py > .ci/visual-product-test.txt 2>&1
-      - name: Persist diagnostics
-        if: steps.focused.outcome == 'failure'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .ci/visual-product-test.txt
-          git commit -m "[skip ci] Salva diagnóstico do teste visual" || true
-          git push
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: presenter-brain-test-diagnostics
+          path: .ci/visual-product-test.txt
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Fail when focused tests fail
         if: steps.focused.outcome == 'failure'
         run: exit 1
