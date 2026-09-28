@@ -1,7 +1,7 @@
 """Contratos neutros para a camada desktop/providers do AGCN Live Voice.
 
-O objetivo é desacoplar o core dos fornecedores. Qwen local e providers por API
-implementam a mesma interface e recebem a mesma PresenterPolicy.
+A regra importante é separar PresenterBrain de TextModelTransport.
+Assim nenhum provider pode esquecer as instruções comerciais do AGCN.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ class CommentPayload:
 
 @dataclass(slots=True)
 class BrainContext:
-    mode: str  # "comment_reply" | "proactive"
+    mode: str
     product: dict[str, Any] = field(default_factory=dict)
     live_conditions: dict[str, Any] = field(default_factory=dict)
     comment: CommentPayload | None = None
@@ -51,8 +51,22 @@ class AudioChunk:
     format: str = "pcm_s16le"
 
 
+class TextModelTransport(Protocol):
+    """Camada fina do fornecedor. Nao contem a politica comercial."""
+
+    @property
+    def name(self) -> str:
+        ...
+
+    def healthcheck(self) -> tuple[bool, str]:
+        ...
+
+    def complete(self, *, system_instruction: str, user_payload: str) -> str:
+        ...
+
+
 class BrainProvider(Protocol):
-    """Gera fala natural usando somente o contexto/fatos autorizados."""
+    """Interface de alto nivel consumida pelo runtime."""
 
     @property
     def name(self) -> str:
@@ -66,8 +80,6 @@ class BrainProvider(Protocol):
 
 
 class TTSProvider(Protocol):
-    """Converte uma fala pronta em áudio reproduzível."""
-
     @property
     def name(self) -> str:
         ...
@@ -80,8 +92,6 @@ class TTSProvider(Protocol):
 
 
 class AudioSink(Protocol):
-    """Reproduz áudio no dispositivo de saída selecionado."""
-
     def list_devices(self) -> Sequence[str]:
         ...
 
