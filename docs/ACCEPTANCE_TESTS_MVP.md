@@ -1,80 +1,60 @@
 # Critérios de aceitação — AGCN Live Voice MVP
 
-## Teste A — sem internet de IA
-- Qwen/Ollama local configurado.
-- TTS local configurado.
-- Produto cadastrado.
-- Sem chave de API.
-Resultado: presenter gera e toca fala normalmente.
+## A — Qwen sem API
+Produto cadastrado + Ollama/Qwen + TTS local, sem chave.
+Resultado: fala normalmente.
 
-## Teste B — silêncio
-- LIVE sem comentário relevante por 30 s.
-Resultado: sistema continua falando sobre o produto e não repete a mesma frase em loop.
+## B — fala contínua
+Sem comentário relevante por 30 s.
+Resultado: continua vendendo, variando assunto, sem repetir a mesma frase.
 
-## Teste C — pergunta factual
-Comentário: "quantos litros?" / "pega internet?" / "quais benefícios?"
-Resultado:
-- entende variação natural;
-- responde primeiro;
-- usa apenas dado cadastrado;
-- se dado não existe, não inventa;
-- depois retoma venda.
+## C — benefícios
+Comentário: "quais benefícios?" / "benefícios quais?".
+Resultado: entende, responde com 1–2 fatos reais e continua a venda.
 
-## Teste D — compra
-Comentário/evento de compra simulado.
-Resultado: celebra brevemente e usa como prova social sem repetir excessivamente.
+## D — pergunta técnica sem fato
+Comentário: "pega internet?" sem informação cadastrada.
+Resultado: entende a pergunta, não inventa, responde de forma humana e `needs_fact=true`.
 
-## Teste E — prioridade
-Há uma fala proativa pronta e chega pergunta de compra/preço.
-Resultado: pergunta entra antes das próximas falas proativas.
+## E — prioridade
+Fila contém saudação, emoji, preço e "como compra?".
+Resultado: intenção de compra/preço passam na frente; chat inútil não domina.
 
-## Teste F — retomada
-Presenter estava falando de bateria; recebe pergunta de compatibilidade.
-Resultado: responde compatibilidade e depois consegue continuar a venda sem resetar sempre para introdução.
+## F — objeção
+Comentário relevante contesta preço/frete/uso.
+Resultado: responde objeção com fato real e reancora valor sem fabricar promessa.
 
-## Teste G — mídia
-Produto tem 3 vídeos.
-Resultado:
-- janela 9:16 abre;
-- vídeos rodam em ordem e loop;
-- áudio dos vídeos fica mudo por padrão;
-- usuário pode próximo/anterior;
-- janela não exibe controles.
+## G — confirmação de compra
+Resultado: celebra brevemente e usa prova social real sem ficar repetindo.
 
-## Teste H — áudio
-Resultado:
-- lista devices Windows;
-- device selecionado persiste;
-- botão Testar Voz toca no device;
-- presenter usa o mesmo device.
+## H — retomada
+Presenter falava de bateria; chega pergunta de compatibilidade.
+Resultado: responde e depois continua de modo coerente, sem reiniciar a apresentação.
 
-## Teste I — falha API
-Provider premium retorna erro/timeout.
-Resultado: UI informa falha sem travar e usa fallback local se habilitado.
+## I — anti-repetição
+Rodar 10 falas proativas.
+Resultado: não abre toda hora com recém-chegado, não repete CTA/preço/fato em sequência.
 
-## Teste J — segurança factual
-Produto não tem informação de waterproof.
-Comentário: "é à prova d'água?"
-Resultado: presenter não afirma resistência à água.
+## J — mesma política em Qwen e API
+Testar ambos providers com o mesmo BrainContext.
+Resultado: ambos recebem `build_system_instruction()` + `build_turn_payload()` e retornam o mesmo schema.
 
-## Teste K — TikTok real
-Conectar username de uma LIVE ativa.
-Resultado:
-- status conectado;
-- viewers/likes atualizam quando disponíveis;
-- comentários chegam;
-- presenter responde itens relevantes.
+## K — segurança factual
+Perguntar waterproof sem fato.
+Resultado: não afirma resistência à água.
 
-## Teste L — TikTok Studio
-- Capturar janela AGCN Live Output.
-- Selecionar cabo virtual como microfone.
-Resultado: vídeo e voz entram na transmissão sem precisar de integração API com TikTok Studio.
+## L — áudio
+Lista devices; escolha persiste; Testar Voz toca no device; presenter usa mesmo device.
 
-## Teste M — persistência
-Fechar e reabrir.
-Resultado:
-- produto salvo;
-- playlist salva;
-- voz/provider/config preservados;
-- chaves não aparecem em log ou repositório.
+## M — falha API
+API falha/timeout.
+Resultado: UI não trava e usa fallback local se ativado.
+
+## N — TikTok real
+Conecta username de LIVE ativa.
+Resultado: status/métricas/comentários entram e comentários relevantes chegam à fila.
+
+## O — persistência
+Fechar e abrir.
+Resultado: produto, provider, voz e device permanecem; secrets não aparecem em logs/repo.
 
