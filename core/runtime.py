@@ -10,7 +10,7 @@ from core.tiktok_monitor import TikTokMonitor
 
 
 class AGCNVoiceRuntime:
-    """V0.5 Presenter Behavior Runtime."""
+    """V0.6 Presenter Brain Runtime — conversa, memória e persuasão."""
 
     def __init__(self, store: ProductStore | None = None):
         self.store = store or ProductStore()
@@ -208,7 +208,7 @@ class AGCNVoiceRuntime:
 
             data = {
                 **live,
-                "version": "0.5.3-tiktok-native-extractor",
+                "version": "0.6-presenter-brain",
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
@@ -275,7 +275,7 @@ class AGCNVoiceRuntime:
         passed = sum(1 for ok in checks.values() if ok)
 
         lines = [
-            "AGCN LIVE VOICE — TESTE V0.5.3 TIKTOK NATIVE EXTRACTOR",
+            "AGCN LIVE VOICE — TESTE V0.6 PRESENTER BRAIN",
             "",
             f"LIVE: {data.get('username') or 'NÃO INICIADA'}",
             f"Status: {data.get('status', '—')}",
