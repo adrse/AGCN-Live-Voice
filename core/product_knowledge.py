@@ -169,7 +169,7 @@ class ProductKnowledge:
         else:
             raw = [
                 clean(x)
-                for x in re.split(r"[\n;|]+", clean(value))
+                for x in re.split(r"[\n;|]+", str(value or ""))
             ]
 
         out = []
@@ -194,18 +194,18 @@ class ProductKnowledge:
         ]
 
         for source in sources:
-            text = clean(source)
-            if not text:
+            raw_text = str(source or "")
+            if not clean(raw_text):
                 continue
 
-            text = re.sub(
+            raw_text = re.sub(
                 r"^especifica(?:c|ç)(?:ao|ões|oes) tecnicas?\s*:\s*",
                 "",
-                text,
+                raw_text,
                 flags=re.I,
             )
 
-            for part in re.split(r"[;\n|]+", text):
+            for part in re.split(r"[;\n|]+", raw_text):
                 part = clean(part)
                 if not part or ":" not in part:
                     continue
@@ -329,14 +329,16 @@ class ProductKnowledge:
 
         for field in fields:
             value = self.product.get(field)
-            text = clean(value)
+            raw_text = str(value or "")
+            text = clean(raw_text)
             if not text:
                 continue
 
-            # Divide textos grandes em pedaços naturais, preservando fatos.
+            # Divide os itens cadastrados separadamente sem perder quebras
+            # de linha usadas pela interface.
             parts = [
                 clean(x)
-                for x in re.split(r"[;\n]+", text)
+                for x in re.split(r"[;\n|]+", raw_text)
                 if clean(x)
             ] or [text]
 
