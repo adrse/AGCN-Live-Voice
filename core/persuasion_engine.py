@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import random
 import re
 
@@ -26,37 +25,40 @@ def brl(value):
 
 
 class PersuasionEngine:
-    """Persuasão comercial forte, mas sempre presa aos fatos da LIVE.
+    """Persuasão de LIVE com linguagem brasileira natural.
 
-    O objetivo é reproduzir os comportamentos que funcionaram nos benchmarks:
-    resposta imediata, ancoragem, urgência, escassez real, prova social real,
-    dor -> solução -> benefício e CTA claro. Nenhum gatilho é inventado.
+    Regra central: vender forte sem soar como script e sem inventar urgência,
+    estoque, compra, preço, benefício ou condição comercial.
     """
 
     CTA_VARIANTS = {
         "buy_now": [
-            "Se você já decidiu, clica no produto fixado e garante o seu.",
-            "Gostou e quer levar? Vai no produto fixado e finaliza enquanto essa condição estiver valendo.",
-            "Pra garantir o seu, é só abrir o produto fixado aqui na LIVE e finalizar.",
-            "Se era isso que você estava procurando, aproveita e garante pelo produto fixado.",
+            "Não perde tempo não, garante o seu.",
+            "Se você quer mesmo, já garante o seu.",
+            "Aproveita e garante o seu agora.",
+            "Gostou? Então já garante o seu.",
+            "Se era isso que você queria, já pega o seu.",
         ],
         "soft_close": [
-            "Olha a condição no produto fixado e compara com o que você estava procurando.",
-            "Dá uma conferida no produto fixado porque, pelo que você falou, ele pode encaixar bem no que você precisa.",
-            "Confere a oferta no produto fixado e vê se faz sentido pra você.",
+            "Dá uma olhada ali no produto, acho que vale a pena conferir.",
+            "Confere ali a oferta e vê se é o que você tava procurando.",
+            "Olha ali no produto porque pode compensar bastante pra você.",
+            "Dá uma conferida ali e vê se te atende.",
         ],
         "after_answer": [
-            "Se isso era o que faltava pra decidir, o produto está fixado aqui na LIVE.",
-            "Se essa era sua dúvida, já dá pra conferir a oferta no produto fixado.",
-            "Agora que ficou claro, dá uma olhada no produto fixado aqui embaixo.",
+            "Se era essa a dúvida, já dá uma olhada ali no produto.",
+            "Pronto, agora já dá pra decidir mais tranquilo.",
+            "Era isso que você queria saber, né? Confere ali o produto.",
+            "Aí ó, se era isso que faltava, já dá uma olhada na oferta.",
         ],
     }
 
     PURCHASE_VARIANTS = [
-        "Aí sim, {user}! Compra garantida. Parabéns!",
-        "Boa, {user}! Você garantiu o seu. Parabéns pela compra!",
-        "Fechou, {user}! Parabéns pela compra!",
-        "{user}, boa demais! Pedido garantido, parabéns!",
+        "Aí sim, {user}! Boa compra!",
+        "Boa, {user}! Garantiu o seu!",
+        "Fechou, {user}! Parabéns!",
+        "{user}, boa! Já garantiu o seu!",
+        "Aí sim, {user}! Valeu, boa compra!",
     ]
 
     def __init__(self, product: dict | None):
@@ -95,61 +97,72 @@ class PersuasionEngine:
         current = s["current_price"]
         regular = s["regular_price"]
         savings = s["savings"]
-        discount = s["discount"]
 
         if current is not None and regular is not None and regular > current:
-            parts = [
-                f"Ele está por {brl(current)}, e o valor de referência cadastrado é {brl(regular)}."
+            variants = [
+                f"Tá {brl(current)} só. Ele era {brl(regular)}.",
+                f"Olha o preço: de {brl(regular)} por {brl(current)}.",
+                f"Tá saindo por {brl(current)}. O preço anterior era {brl(regular)}.",
             ]
-            if savings is not None and savings > 0:
-                parts.append(f"São {brl(savings)} de diferença.")
-            if discount is not None and discount > 0:
-                parts.append(f"Isso dá cerca de {int(round(discount))}% a menos.")
-            return " ".join(parts)
+            base = random.choice(variants)
+
+            if savings is not None and savings >= 10:
+                saving = brl(savings)
+                if random.random() < 0.55:
+                    base += f" Dá {saving} de diferença."
+
+            return base
 
         if current is not None:
-            return f"O valor cadastrado agora é {brl(current)}."
+            return random.choice([
+                f"Tá {brl(current)} agora.",
+                f"Hoje tá saindo por {brl(current)}.",
+                f"O preço agora tá {brl(current)}.",
+            ])
 
         if regular is not None:
-            return f"O valor cadastrado é {brl(regular)}."
+            return f"Tá {brl(regular)}."
 
         return ""
 
     def grounded_urgency(self, memory=None, *, strong=False) -> str:
         s = self.signals()
         pieces = []
-
-        # Estoque só vira escassez se o número realmente existir.
         stock = s["stock"]
+
         if stock is not None:
+            noun = "unidade" if stock == 1 else "unidades"
             if stock <= 3:
-                pieces.append(
-                    f"Atenção porque o estoque informado está em só {stock} unidade"
-                    + ("" if stock == 1 else "s")
-                    + "."
-                )
+                pieces.append(random.choice([
+                    f"Tem {stock} {noun} só agora.",
+                    f"Ó, só {stock} {noun} agora.",
+                    f"Restam {stock} {noun} só.",
+                ]))
             elif stock <= 10:
-                pieces.append(
-                    f"O estoque informado está em {stock} unidades agora."
-                )
+                pieces.append(random.choice([
+                    f"Tem {stock} {noun} só.",
+                    f"Ó, tá em {stock} {noun} agora.",
+                    f"Agora tem {stock} {noun}.",
+                ]))
             elif strong:
-                pieces.append(
-                    f"O estoque informado agora é de {stock} unidades."
-                )
+                pieces.append(f"Tem {stock} {noun} disponíveis agora.")
 
         if s["live_offer"] and s["live_offer_text"]:
             pieces.append(s["live_offer_text"])
         elif s["live_offer"]:
-            pieces.append("Tem uma condição de oferta cadastrada para esta LIVE.")
+            pieces.append(random.choice([
+                "Tem oferta rolando na LIVE agora.",
+                "A oferta da LIVE tá ativa agora.",
+            ]))
 
         if s["coupon"]:
-            pieces.append(f"Tem cupom cadastrado: {s['coupon']}.")
+            pieces.append(random.choice([
+                f"E tem cupom também: {s['coupon']}.",
+                f"Tem cupom rolando também: {s['coupon']}.",
+            ]))
 
         if s["promotion_note"]:
             pieces.append(s["promotion_note"])
-
-        if not pieces:
-            return ""
 
         return " ".join(pieces[:2])
 
@@ -162,37 +175,109 @@ class PersuasionEngine:
             return ""
 
         if count == 1:
-            return "Já teve compra confirmada aqui no chat."
-        return f"Já tivemos {count} compras confirmadas pelo chat nos últimos minutos."
+            return random.choice([
+                "Ó, já teve gente garantindo aqui.",
+                "Já saiu compra aqui no chat.",
+                "Já teve gente levando agora há pouco.",
+            ])
 
-    def objection_response(self, user: str, name: str, memory=None) -> str:
+        return random.choice([
+            f"Ó, já foram {count} compras confirmadas aqui no chat nos últimos minutos.",
+            f"Já teve {count} pessoas confirmando compra aqui nos últimos minutos.",
+            f"Enquanto a gente tá falando, já apareceram {count} compras confirmadas no chat.",
+        ])
+
+    def buying_intent_response(
+        self,
+        user: str,
+        comment: str,
+        memory=None,
+    ) -> str:
         address = f"{user}, " if user else ""
+        q = text(comment).casefold()
+
+        asks_how = any(
+            token in q
+            for token in (
+                "como compra",
+                "como comprar",
+                "onde compra",
+                "onde comprar",
+                "manda o link",
+                "cadê o link",
+                "cade o link",
+                "qual link",
+            )
+        )
+
+        if asks_how:
+            base = random.choice([
+                "é só clicar no produto fixado aí e finalizar.",
+                "clica no produto fixado aí embaixo e já finaliza por lá.",
+                "vai no produto fixado da LIVE e finaliza por ali.",
+            ])
+        else:
+            base = random.choice(self.CTA_VARIANTS["buy_now"])
+
+        urgency = self.grounded_urgency(memory)
+        if urgency:
+            base = f"{base} {urgency}"
+
+        return address + base
+
+    def objection_response(
+        self,
+        user: str,
+        name: str,
+        memory=None,
+        comment: str = "",
+    ) -> str:
+        address = f"{user}, " if user else ""
+        q = text(comment).casefold()
         benefits = text(self.product.get("key_benefits"))
         problems = text(self.product.get("problems_solved"))
         differentials = text(self.product.get("differentials"))
+        shipping = text(self.product.get("shipping_info"))
 
-        parts = [f"{address}eu entendo a sua dúvida."]
+        parts = []
 
-        # Primeiro reancora no valor real, como nos vendedores humanos mais
-        # fortes do benchmark.
-        anchor = self.price_anchor()
-        if anchor:
-            parts.append(anchor)
+        if any(x in q for x in ("caro", "cara", "preço", "preco", "valor")):
+            anchor = self.price_anchor()
+            if anchor:
+                parts.append(f"{address}{anchor}")
+            else:
+                parts.append(f"{address}olha só.")
+        elif any(x in q for x in ("frete", "entrega")) and shipping:
+            parts.append(f"{address}{shipping}.")
+        else:
+            parts.append(random.choice([
+                f"{address}olha só.",
+                f"{address}presta atenção nisso.",
+                f"{address}vou te falar.",
+            ]))
 
         if problems and benefits:
-            parts.append(
-                f"O ponto é que ele foi pensado pra {problems}, e entrega {benefits}."
-            )
+            parts.append(random.choice([
+                f"O legal é que ele resolve {problems} e ainda {benefits}.",
+                f"Pra quem quer {problems}, ele ajuda porque {benefits}.",
+            ]))
         elif benefits:
-            parts.append(f"O que pesa a favor dele é {benefits}.")
+            parts.append(random.choice([
+                f"E o bom dele é {benefits}.",
+                f"O ponto forte dele é {benefits}.",
+                f"E tem isso aqui que pesa muito: {benefits}.",
+            ]))
         elif differentials:
-            parts.append(f"O diferencial dele é {differentials}.")
+            parts.append(random.choice([
+                f"E o diferencial dele é {differentials}.",
+                f"O que muda nele é {differentials}.",
+            ]))
 
         urgency = self.grounded_urgency(memory)
         if urgency:
             parts.append(urgency)
 
-        return " ".join(parts)
+        return " ".join(x for x in parts if x).strip()
 
     def value_bridge(
         self,
@@ -201,7 +286,6 @@ class PersuasionEngine:
         memory,
         name: str,
     ) -> str:
-        """Expansão curta depois de responder a pergunta."""
         candidates = []
 
         benefits = text(self.product.get("key_benefits"))
@@ -210,28 +294,34 @@ class PersuasionEngine:
         included = text(self.product.get("included_items"))
 
         if problems and benefits:
-            candidates.append((
-                "pain_solution",
-                f"Na prática, isso ajuda principalmente quem quer {problems}, porque {benefits}.",
-            ))
+            candidates.extend([
+                (
+                    "pain_solution",
+                    f"E pra quem quer {problems}, isso ajuda bastante porque {benefits}.",
+                ),
+                (
+                    "pain_solution",
+                    f"Na prática, isso ajuda muito em {problems}, porque {benefits}.",
+                ),
+            ])
 
         if benefits:
-            candidates.append((
-                "benefit",
-                f"E o ponto forte do {name} é {benefits}.",
-            ))
+            candidates.extend([
+                ("benefit", f"E o bom dele é {benefits}."),
+                ("benefit", f"Ó, um ponto forte dele é {benefits}."),
+            ])
 
         if differentials:
-            candidates.append((
-                "differential",
-                f"O diferencial aqui é {differentials}.",
-            ))
+            candidates.extend([
+                ("differential", f"E o diferencial aqui é {differentials}."),
+                ("differential", f"Agora, uma coisa legal nele é {differentials}."),
+            ])
 
         if included:
-            candidates.append((
-                "bundle",
-                f"E já olha o conjunto completo: {included}.",
-            ))
+            candidates.extend([
+                ("bundle", f"E já vem com {included}."),
+                ("bundle", f"Fora que no kit já vem {included}."),
+            ])
 
         anchor = self.price_anchor()
         if anchor:
@@ -241,7 +331,8 @@ class PersuasionEngine:
         if social:
             candidates.append(("social_proof", social))
 
-        # Em perguntas técnicas, evita transformar toda resposta em um pitch.
+        # Pergunta técnica: responde primeiro e não transforma tudo num
+        # discurso enorme de venda.
         if intent in {
             "safety_or_critical",
             "technical_question",
@@ -268,60 +359,63 @@ class PersuasionEngine:
         return phrase
 
     def proactive_pitch(self, topic: str, name: str, memory) -> str:
-        s = self.signals()
-
         if topic == "scarcity":
             urgency = self.grounded_urgency(memory, strong=True)
             if urgency:
                 memory.remember_tactic("scarcity")
-                return (
-                    f"Quem já estava de olho no {name}, presta atenção: {urgency} "
-                    "Se você quer levar, não deixa pra decidir depois."
-                )
+                return random.choice([
+                    f"Ó, quem tava de olho no {name}: {urgency} Não deixa pra depois não.",
+                    f"Gente, presta atenção no {name}: {urgency} Se quiser, já garante.",
+                    f"Quem queria o {name}, é agora: {urgency}",
+                ])
 
         if topic == "price_value":
             anchor = self.price_anchor()
             if anchor:
                 memory.remember_tactic("price_anchor")
-                return (
-                    f"Olha a relação de valor do {name}: {anchor} "
-                    "É justamente aí que a oferta fica interessante."
-                )
+                return random.choice([
+                    f"Olha o preço do {name}: {anchor}",
+                    f"Gente, olha isso no {name}: {anchor}",
+                    f"Pra quem tava esperando preço, ó: {anchor}",
+                ])
 
         if topic == "social_proof":
             proof = self.social_proof(memory)
             if proof:
                 memory.remember_tactic("social_proof")
-                return f"{proof} O {name} está chamando atenção aqui na LIVE."
+                return f"{proof} O {name} tá saindo."
 
         if topic == "pain_solution":
             problems = text(self.product.get("problems_solved"))
             benefits = text(self.product.get("key_benefits"))
             if problems and benefits:
                 memory.remember_tactic("pain_solution")
-                return (
-                    f"Se você sofre com {problems}, presta atenção no {name}: "
-                    f"{benefits}."
-                )
+                return random.choice([
+                    f"Se o seu problema é {problems}, olha esse {name}: {benefits}.",
+                    f"Pra quem quer resolver {problems}, presta atenção: {benefits}.",
+                ])
 
         if topic == "bundle_value":
             included = text(self.product.get("included_items"))
             if included:
                 memory.remember_tactic("bundle")
-                return f"Olha o que já vem no {name}: {included}."
+                return random.choice([
+                    f"E olha o que já vem junto: {included}.",
+                    f"Fora que você já leva {included}.",
+                ])
 
         if topic == "trust":
             limitation = text(self.product.get("limitations"))
             warranty = text(self.product.get("warranty"))
             if limitation:
                 memory.remember_tactic("trust")
-                return (
-                    f"E eu prefiro ser claro sobre o {name}: {limitation}. "
-                    "Assim você compra sabendo exatamente o que está levando."
-                )
+                return random.choice([
+                    f"Agora, sendo bem claro: {limitation}. Melhor você saber certinho antes de comprar.",
+                    f"E tem um detalhe importante: {limitation}. Tô falando pra você saber exatamente o que tá levando.",
+                ])
             if warranty:
                 memory.remember_tactic("trust")
-                return f"Pra quem perguntou de segurança na compra: {warranty}."
+                return f"Pra quem perguntou de garantia: {warranty}."
 
         return ""
 
