@@ -23,11 +23,7 @@ from core.speech_planner import SpeechPlanner
 
 
 class PresenterV3:
-    def __init__(
-        self,
-        product: dict | None,
-        brain: BrainProvider,
-    ) -> None:
+    def __init__(self, product: dict | None, brain: BrainProvider) -> None:
         self.product = dict(product or {})
         self.brain = brain
         self.guard = SalesGuard(self.product)
@@ -36,10 +32,7 @@ class PresenterV3:
         self.fusion = CommentFusion(window_seconds=0.9)
         self.decision_engine = DecisionEngine()
         self.planner = SpeechPlanner()
-        self.watchdog = SilenceWatchdog(
-            target_seconds=8.0,
-            hard_seconds=10.0,
-        )
+        self.watchdog = SilenceWatchdog(target_seconds=8.0, hard_seconds=10.0)
         self.queue = []
         self.counter = itertools.count()
         self.recent_keys = {}
@@ -68,11 +61,8 @@ class PresenterV3:
 
         self.recent_keys[key] = now
         self.recent_keys = {
-            k: ts
-            for k, ts in self.recent_keys.items()
-            if now - ts <= 90
+            k: ts for k, ts in self.recent_keys.items() if now - ts <= 90
         }
-
         self.recent_comments.append(
             CommentPayload(
                 username=analyzed.get("user") or "",
@@ -86,14 +76,9 @@ class PresenterV3:
         created = []
         for group in self.fusion.ready_groups():
             decision = self.decision_engine.decide(
-                group,
-                self.memory.snapshot(),
+                group, self.memory.snapshot()
             )
-            plan = self.planner.plan(
-                decision,
-                self.guard,
-                self.memory,
-            )
+            plan = self.planner.plan(decision, self.guard, self.memory)
             item = self._generate_item(plan)
             if item:
                 heapq.heappush(
@@ -106,24 +91,20 @@ class PresenterV3:
     def maybe_proactive(self) -> dict | None:
         seconds = self.memory.seconds_since_speech()
         if not self.watchdog.should_trigger(
-            seconds,
-            queue_empty=not self.queue,
+            seconds, queue_empty=not self.queue
         ):
             return None
 
         topic = self.planner.choose_proactive_topic(
-            self.guard,
-            self.memory,
+            self.guard, self.memory
         )
         decision = self.decision_engine.proactive(
             topic,
-            priority=35 if self.watchdog.urgency(seconds) == "hard" else 30,
+            priority=35
+            if self.watchdog.urgency(seconds) == "hard"
+            else 30,
         )
-        plan = self.planner.plan(
-            decision,
-            self.guard,
-            self.memory,
-        )
+        plan = self.planner.plan(decision, self.guard, self.memory)
         item = self._generate_item(plan)
         if item:
             heapq.heappush(
@@ -170,14 +151,9 @@ class PresenterV3:
             "topics": [analyzed.get("topic")] if analyzed.get("topic") else [],
         }
         decision = self.decision_engine.decide(
-            group,
-            self.memory.snapshot(),
+            group, self.memory.snapshot()
         )
-        plan = self.planner.plan(
-            decision,
-            self.guard,
-            self.memory,
-        )
+        plan = self.planner.plan(decision, self.guard, self.memory)
         item = self._generate_item(plan)
         if item:
             self.memory.remember_speech(item)
@@ -196,18 +172,10 @@ class PresenterV3:
 
     def test_proactive(self) -> dict:
         topic = self.planner.choose_proactive_topic(
-            self.guard,
-            self.memory,
+            self.guard, self.memory
         )
-        decision = self.decision_engine.proactive(
-            topic,
-            priority=30,
-        )
-        plan = self.planner.plan(
-            decision,
-            self.guard,
-            self.memory,
-        )
+        decision = self.decision_engine.proactive(topic, priority=30)
+        plan = self.planner.plan(decision, self.guard, self.memory)
         item = self._generate_item(plan)
         if item:
             self.memory.remember_speech(item)
@@ -226,13 +194,10 @@ class PresenterV3:
         return [item for _, _, item in sorted(self.queue)]
 
     def snapshot(self) -> dict:
-        ok, health = self.brain.healthcheck()
         return {
             "memory": self.memory.snapshot(),
             "brain": {
                 "name": self.brain.name,
-                "healthy": ok,
-                "health": health,
                 "last_error": self.last_brain_error or None,
             },
             "recent_facts": list(self.recent_facts)[-12:],
@@ -281,8 +246,7 @@ class PresenterV3:
             "cta": plan.get("cta"),
             "plan": plan.get("steps", []),
             "resume_topic": (
-                result.next_sales_thread
-                or plan.get("resume_topic")
+                result.next_sales_thread or plan.get("resume_topic")
             ),
             "next_sales_thread": result.next_sales_thread,
             "used_facts": list(result.used_facts),
