@@ -76,29 +76,22 @@ def _build_local(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
         or cfg.get("ollama_url")
         or "http://127.0.0.1:11434"
     )
-    model = (
-        ollama.get("model")
-        or cfg.get("model")
-        or "qwen3:4b"
-    )
+    model = ollama.get("model") or cfg.get("model") or "qwen3:4b"
     timeout = (
         ollama.get("timeout_seconds")
         or cfg.get("timeout_seconds")
         or 45
     )
-    temperature = ollama.get("temperature", 0.25)
-    keep_alive = ollama.get("keep_alive", "10m")
 
-    transport = OllamaTransport(
-        base_url=base_url,
-        model=model,
-        timeout_seconds=timeout,
-        temperature=temperature,
-        keep_alive=keep_alive,
-        session=session,
-    )
     return PresenterBrain(
-        transport,
+        OllamaTransport(
+            base_url=base_url,
+            model=model,
+            timeout_seconds=timeout,
+            temperature=ollama.get("temperature", 0.25),
+            keep_alive=ollama.get("keep_alive", "10m"),
+            session=session,
+        ),
         max_retries=int(cfg.get("max_retries", 1)),
     )
 
@@ -107,27 +100,23 @@ def _build_openai(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
     api = dict(cfg.get("api") or {})
     key_env = str(api.get("api_key_env") or "OPENAI_API_KEY")
     api_key = str(os.getenv(key_env) or "")
-    model = str(api.get("model") or "gpt-6-luna")
-    base_url = str(
-        api.get("base_url")
-        or "https://api.openai.com/v1"
-    )
-    timeout = float(
-        api.get("timeout_seconds")
-        or cfg.get("timeout_seconds")
-        or 45
-    )
 
-    transport = OpenAIResponsesTransport(
-        api_key=api_key,
-        model=model,
-        base_url=base_url,
-        timeout_seconds=timeout,
-        max_output_tokens=int(api.get("max_output_tokens", 500)),
-        session=session,
-    )
     return PresenterBrain(
-        transport,
+        OpenAIResponsesTransport(
+            api_key=api_key,
+            model=str(api.get("model") or "gpt-6-luna"),
+            base_url=str(
+                api.get("base_url")
+                or "https://api.openai.com/v1"
+            ),
+            timeout_seconds=float(
+                api.get("timeout_seconds")
+                or cfg.get("timeout_seconds")
+                or 45
+            ),
+            max_output_tokens=int(api.get("max_output_tokens", 500)),
+            session=session,
+        ),
         max_retries=int(cfg.get("max_retries", 1)),
     )
 
@@ -135,24 +124,20 @@ def _build_openai(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
 def _build_compatible(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
     api = dict(cfg.get("api") or {})
     key_env = str(api.get("api_key_env") or "AGCN_LLM_API_KEY")
-    api_key = str(os.getenv(key_env) or "")
-    model = str(api.get("model") or "").strip()
-    base_url = str(api.get("base_url") or "").strip()
 
-    transport = OpenAICompatibleChatTransport(
-        api_key=api_key,
-        model=model,
-        base_url=base_url,
-        timeout_seconds=float(
-            api.get("timeout_seconds")
-            or cfg.get("timeout_seconds")
-            or 45
-        ),
-        temperature=float(api.get("temperature", 0.25)),
-        session=session,
-    )
     return PresenterBrain(
-        transport,
+        OpenAICompatibleChatTransport(
+            api_key=str(os.getenv(key_env) or ""),
+            model=str(api.get("model") or "").strip(),
+            base_url=str(api.get("base_url") or "").strip(),
+            timeout_seconds=float(
+                api.get("timeout_seconds")
+                or cfg.get("timeout_seconds")
+                or 45
+            ),
+            temperature=float(api.get("temperature", 0.25)),
+            session=session,
+        ),
         max_retries=int(cfg.get("max_retries", 1)),
     )
 
@@ -164,18 +149,24 @@ def build_brain_provider(
 ) -> BrainProvider:
     cfg = _brain_cfg(config)
     provider = str(cfg.get("provider") or "qwen_local").casefold()
+    fallback_enabled = bool(cfg.get("fallback_local", True))
 
     if provider in {"qwen_local", "ollama", "local"}:
         return _build_local(cfg, session=session)
 
-    if provider in {"openai", "openai_responses"}:
-        primary = _build_openai(cfg, session=session)
-    elif provider in {"openai_compatible", "compatible", "api"}:
-        primary = _build_compatible(cfg, session=session)
-    else:
-        raise ValueError(f"brain provider desconhecido: {provider}")
+    try:
+        if provider in {"openai", "openai_responses"}:
+            primary = _build_openai(cfg, session=session)
+        elif provider in {"openai_compatible", "compatible", "api"}:
+            primary = _build_compatible(cfg, session=session)
+        else:
+            raise ValueError(f"brain provider desconhecido: {provider}")
+    except Exception:
+        if fallback_enabled:
+            return _build_local(cfg, session=session)
+        raise
 
-    if bool(cfg.get("fallback_local", True)):
+    if fallback_enabled:
         return FallbackBrainProvider(
             primary,
             _build_local(cfg, session=session),
