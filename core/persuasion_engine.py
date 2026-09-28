@@ -240,9 +240,9 @@ class PersuasionEngine:
         shipping = text(self.product.get("shipping_info"))
 
         parts = []
+        anchor = self.price_anchor()
 
         if any(x in q for x in ("caro", "cara", "preço", "preco", "valor")):
-            anchor = self.price_anchor()
             if anchor:
                 parts.append(f"{address}{anchor}")
             else:
@@ -250,11 +250,14 @@ class PersuasionEngine:
         elif any(x in q for x in ("frete", "entrega")) and shipping:
             parts.append(f"{address}{shipping}.")
         else:
-            parts.append(random.choice([
-                f"{address}olha só.",
-                f"{address}presta atenção nisso.",
-                f"{address}vou te falar.",
-            ]))
+            if anchor:
+                parts.append(f"{address}{anchor}")
+            else:
+                parts.append(random.choice([
+                    f"{address}olha só.",
+                    f"{address}presta atenção nisso.",
+                    f"{address}vou te falar.",
+                ]))
 
         if problems and benefits:
             parts.append(random.choice([
