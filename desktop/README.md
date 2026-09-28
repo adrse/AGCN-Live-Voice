@@ -1,11 +1,14 @@
 # Desktop
 
-Esta pasta é reservada à versão Windows final do AGCN Live Voice.
+Versão Windows do AGCN Live Voice.
 
-Leia `docs/ASTRA_HANDOFF_2026-09-29.md` e `docs/DESKTOP_MVP_SPEC.md` antes de implementar.
+Leia:
+- `docs/ASTRA_HANDOFF_2026-09-29.md`
+- `docs/PRESENTER_BRAIN_SPEC.md`
+- `docs/DESKTOP_MVP_SPEC.md`
 
 Stack: Python + PySide6.
 
-O MVP usa uma janela de controle e uma segunda janela limpa 9:16 chamada **AGCN Live Output**. O TikTok LIVE Studio captura a segunda janela. O áudio sai por um device selecionável (ex.: VB-CABLE).
+O MVP cuida de TikTok Monitor + Presenter Brain + TTS + saída de áudio. O vídeo do produto é configurado separadamente no TikTok LIVE Studio/OBS e não é gerenciado pelo AGCN nesta fase.
 
-Não implementar MuseTalk/avatar nesta fase.
+Não implementar MuseTalk/avatar/player de vídeo no MVP.
