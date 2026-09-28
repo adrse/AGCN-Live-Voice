@@ -1,0 +1,32 @@
+# Fluxo visual resumido
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AGCN Live Voice                     TikTok●  Qwen●  Voz●  Áudio●          │
+├───────────────┬─────────────────────────────────────────────────────────────┤
+│ Dashboard     │ TikTok LIVE        │ Produto ativo                         │
+│ Produto       │ @username [Conectar]│ Smart Band ... R$ ...                │
+│ Configurações │ viewers likes       │ [Editar produto]                     │
+│               ├─────────────────────┴───────────────────────────────────────┤
+│               │ Apresentadora [ON]     Falando agora                      │
+│               │ Brain: Qwen             “Pessoal, olha...”                │
+│               │ Voz: Local              tópico: benefícios                │
+│               ├─────────────────────────────────────────────────────────────┤
+│               │ Comentários                    │ Fila de decisão            │
+│               │ Maria: pega internet?         │ PRIORIDADE Maria           │
+│               │ João: qual preço?             │ Próximo: preço             │
+│               ├─────────────────────────────────────────────────────────────┤
+│               │ [Abrir saída 9:16] [◀ Vídeo] [Próximo vídeo ▶]            │
+└───────────────┴─────────────────────────────────────────────────────────────┘
+
+                 janela separada para captura
+                 ┌──────────────────────┐
+                 │                      │
+                 │                      │
+                 │   VÍDEO DO PRODUTO  │
+                 │      EM LOOP         │
+                 │                      │
+                 │                      │
+                 └──────────────────────┘
+                    AGCN Live Output
+```
