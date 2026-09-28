@@ -75,6 +75,7 @@ class ProductKnowledge:
         "controle": ("Controle", ("controle remoto", "controle")),
         "programas": ("Programas / funções", ("programa", "programas", "funcao", "funcoes", "modo")),
         "resistencia_agua": ("Resistência à água", ("agua", "molhar", "impermeavel", "atm", "ip67", "ip68")),
+        "internet": ("Internet / conexão", ("internet", "wifi", "wi-fi", "4g", "5g", "chip", "sim card")),
     }
 
     def __init__(self, product: dict | None):
