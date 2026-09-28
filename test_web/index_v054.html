@@ -151,6 +151,14 @@ details{margin-top:10px}summary{cursor:pointer;font-weight:850;color:#1e64b7;fon
 .field{display:grid;gap:5px}
 .field-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .field-label{font-size:10px;font-weight:800;color:#58677d}
+.fact-list-editor{display:flex;flex-direction:column;gap:8px}
+.fact-add-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.fact-items{display:flex;flex-direction:column;gap:7px}
+.fact-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid #dbe4f0;border-radius:12px;background:#f8fbff;color:#263850;font-size:10px;line-height:1.35}
+.fact-item button{border:0;background:transparent;color:#8b98aa;font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.fact-item button:hover{color:#d14343}
+.fact-empty{font-size:9px;color:#8895a8;padding:4px 0}
+.fact-hidden{display:none!important}
 .meta-badge{font-size:8px;border-radius:999px;padding:3px 6px;background:#eef2f7;color:#6c7889;white-space:nowrap}
 .meta-badge.user{background:#eaf7ef;color:#18834a}
 .meta-badge.research{background:#eaf3ff;color:#246cc3}
@@ -350,18 +358,128 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
           <div class="helper" style="margin-top:6px">Você pode escolher uma foto da galeria do celular/computador ou colar um link.</div>
         </div>
 
-        <div class="field full"><div class="field-head"><span class="field-label">Descrição geral</span><span id="meta-description" class="meta-badge">Não informado</span></div><textarea id="pDescription" placeholder="O que é o produto e para que serve"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Principais benefícios</span><span id="meta-key_benefits" class="meta-badge">Não informado</span></div><textarea id="pBenefits" placeholder="Benefícios reais para o cliente"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Problemas / dores que resolve</span><span id="meta-problems_solved" class="meta-badge">Não informado</span></div><textarea id="pProblems" placeholder="Problemas que o produto ajuda a resolver"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Diferenciais</span><span id="meta-differentials" class="meta-badge">Não informado</span></div><textarea id="pDifferentials" placeholder="O que diferencia este produto"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Itens inclusos</span><span id="meta-included_items" class="meta-badge">Não informado</span></div><textarea id="pIncluded" placeholder="Tudo que acompanha o produto"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Compatibilidade</span><span id="meta-compatibility" class="meta-badge">Não informado</span></div><textarea id="pCompatibility" placeholder="Compatibilidade, aparelhos, sistemas, superfícies etc."></textarea></div>
-        <div class="field"><div class="field-head"><span class="field-label">Tamanho / medidas</span><span id="meta-size_info" class="meta-badge">Não informado</span></div><textarea id="pSize" placeholder="Medidas"></textarea></div>
-        <div class="field"><div class="field-head"><span class="field-label">Bateria / autonomia</span><span id="meta-battery_info" class="meta-badge">Não informado</span></div><textarea id="pBattery" placeholder="Bateria, carga, autonomia"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Como usar</span><span id="meta-usage_info" class="meta-badge">Não informado</span></div><textarea id="pUsage" placeholder="Modo de uso"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Garantia</span><span id="meta-warranty" class="meta-badge">Não informado</span></div><textarea id="pWarranty" placeholder="Garantia confirmada"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Limitações conhecidas</span><span id="meta-limitations" class="meta-badge">Não informado</span></div><textarea id="pLimitations" placeholder="O que o produto não faz / restrições"></textarea></div>
-        <div class="field full"><div class="field-head"><span class="field-label">Informações adicionais</span><span id="meta-additional_info" class="meta-badge">Não informado</span></div><textarea id="pInfo" placeholder="Outros fatos úteis para o Presenter"></textarea></div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Descrição geral</span><span id="meta-description" class="meta-badge">Não informado</span></div>
+          <input id="pDescription" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pDescriptionList" class="fact-items" data-fact-list-for="pDescription"></div>
+            <div class="fact-add-row">
+              <input id="pDescriptionAdd" placeholder="Ex.: smartwatch com chamadas Bluetooth e monitoramento esportivo">
+              <button class="btn secondary" type="button" data-add-fact="pDescription" data-input="pDescriptionAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Principais benefícios</span><span id="meta-key_benefits" class="meta-badge">Não informado</span></div>
+          <input id="pBenefits" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pBenefitsList" class="fact-items" data-fact-list-for="pBenefits"></div>
+            <div class="fact-add-row">
+              <input id="pBenefitsAdd" placeholder="Ex.: bateria dura até 18 dias">
+              <button class="btn secondary" type="button" data-add-fact="pBenefits" data-input="pBenefitsAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Problemas / dores que resolve</span><span id="meta-problems_solved" class="meta-badge">Não informado</span></div>
+          <input id="pProblems" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pProblemsList" class="fact-items" data-fact-list-for="pProblems"></div>
+            <div class="fact-add-row">
+              <input id="pProblemsAdd" placeholder="Ex.: evita pegar o celular para ver notificações">
+              <button class="btn secondary" type="button" data-add-fact="pProblems" data-input="pProblemsAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Diferenciais</span><span id="meta-differentials" class="meta-badge">Não informado</span></div>
+          <input id="pDifferentials" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pDifferentialsList" class="fact-items" data-fact-list-for="pDifferentials"></div>
+            <div class="fact-add-row">
+              <input id="pDifferentialsAdd" placeholder="Ex.: GPS integrado">
+              <button class="btn secondary" type="button" data-add-fact="pDifferentials" data-input="pDifferentialsAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Itens inclusos</span><span id="meta-included_items" class="meta-badge">Não informado</span></div>
+          <input id="pIncluded" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pIncludedList" class="fact-items" data-fact-list-for="pIncluded"></div>
+            <div class="fact-add-row">
+              <input id="pIncludedAdd" placeholder="Ex.: relógio + carregador">
+              <button class="btn secondary" type="button" data-add-fact="pIncluded" data-input="pIncludedAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Compatibilidade</span><span id="meta-compatibility" class="meta-badge">Não informado</span></div>
+          <input id="pCompatibility" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pCompatibilityList" class="fact-items" data-fact-list-for="pCompatibility"></div>
+            <div class="fact-add-row">
+              <input id="pCompatibilityAdd" placeholder="Ex.: Android e iPhone">
+              <button class="btn secondary" type="button" data-add-fact="pCompatibility" data-input="pCompatibilityAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-head"><span class="field-label">Tamanho / medidas</span><span id="meta-size_info" class="meta-badge">Não informado</span></div>
+          <input id="pSize" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pSizeList" class="fact-items" data-fact-list-for="pSize"></div>
+            <div class="fact-add-row">
+              <input id="pSizeAdd" placeholder="Ex.: tela 2,09 polegadas">
+              <button class="btn secondary" type="button" data-add-fact="pSize" data-input="pSizeAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-head"><span class="field-label">Bateria / autonomia</span><span id="meta-battery_info" class="meta-badge">Não informado</span></div>
+          <input id="pBattery" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pBatteryList" class="fact-items" data-fact-list-for="pBattery"></div>
+            <div class="fact-add-row">
+              <input id="pBatteryAdd" placeholder="Ex.: autonomia de até 18 dias">
+              <button class="btn secondary" type="button" data-add-fact="pBattery" data-input="pBatteryAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Como usar</span><span id="meta-usage_info" class="meta-badge">Não informado</span></div>
+          <input id="pUsage" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pUsageList" class="fact-items" data-fact-list-for="pUsage"></div>
+            <div class="fact-add-row">
+              <input id="pUsageAdd" placeholder="Ex.: conecta ao celular pelo aplicativo">
+              <button class="btn secondary" type="button" data-add-fact="pUsage" data-input="pUsageAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Limitações conhecidas</span><span id="meta-limitations" class="meta-badge">Não informado</span></div>
+          <input id="pLimitations" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pLimitationsList" class="fact-items" data-fact-list-for="pLimitations"></div>
+            <div class="fact-add-row">
+              <input id="pLimitationsAdd" placeholder="Ex.: não possui NFC para pagamentos">
+              <button class="btn secondary" type="button" data-add-fact="pLimitations" data-input="pLimitationsAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="field-head"><span class="field-label">Informações adicionais</span><span id="meta-additional_info" class="meta-badge">Não informado</span></div>
+          <input id="pInfo" class="fact-hidden" type="hidden">
+          <div class="fact-list-editor">
+            <div id="pInfoList" class="fact-items" data-fact-list-for="pInfo"></div>
+            <div class="fact-add-row">
+              <input id="pInfoAdd" placeholder="Ex.: resistência 5ATM">
+              <button class="btn secondary" type="button" data-add-fact="pInfo" data-input="pInfoAdd">＋ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <div class="field full"><div class="field-head"><span class="field-label">Garantia</span><span id="meta-warranty" class="meta-badge">Não informado</span></div><textarea id="pWarranty" placeholder="Ex.: 12 meses de garantia"></textarea></div>
       </div>
 
       <div class="section-label">CONDIÇÃO DESTA LIVE <span style="font-weight:500;color:var(--muted)">— temporária</span></div>
@@ -836,6 +954,97 @@ async function compressProductImage(file){
   return canvas.toDataURL("image/jpeg",0.82);
 }
 
+const factListFieldIds=[
+  "pDescription","pBenefits","pProblems","pDifferentials","pIncluded",
+  "pCompatibility","pSize","pBattery","pUsage","pLimitations","pInfo"
+];
+
+function splitFactItems(value){
+  return String(value||"")
+    .split(/\n|;|\|/)
+    .map(x=>x.trim())
+    .filter(Boolean)
+    .filter((item,index,array)=>array.findIndex(x=>x.toLowerCase()===item.toLowerCase())===index);
+}
+
+function renderFactList(hiddenId){
+  const hidden=$("#"+hiddenId);
+  const container=document.querySelector('[data-fact-list-for="'+hiddenId+'"]');
+  if(!hidden||!container) return;
+
+  const items=splitFactItems(hidden.value);
+  if(!items.length){
+    container.innerHTML='<div class="fact-empty">Nenhuma informação adicionada.</div>';
+    return;
+  }
+
+  container.innerHTML=items.map((item,index)=>
+    '<div class="fact-item"><span>'+esc(item)+'</span>'+
+    '<button type="button" aria-label="Excluir" data-remove-fact="'+hiddenId+'" data-index="'+index+'">×</button></div>'
+  ).join("");
+}
+
+function renderAllFactLists(){
+  factListFieldIds.forEach(renderFactList);
+}
+
+function addFactItem(hiddenId,inputId){
+  const hidden=$("#"+hiddenId);
+  const input=$("#"+inputId);
+  if(!hidden||!input) return;
+
+  const value=input.value.trim();
+  if(!value) return;
+
+  const items=splitFactItems(hidden.value);
+  if(!items.some(x=>x.toLowerCase()===value.toLowerCase())){
+    items.push(value);
+  }
+
+  hidden.value=items.join("\n");
+  input.value="";
+  renderFactList(hiddenId);
+  input.focus();
+}
+
+document.addEventListener("click",event=>{
+  const addButton=event.target.closest("[data-add-fact]");
+  if(addButton){
+    addFactItem(
+      addButton.getAttribute("data-add-fact"),
+      addButton.getAttribute("data-input")
+    );
+    return;
+  }
+
+  const removeButton=event.target.closest("[data-remove-fact]");
+  if(removeButton){
+    const hiddenId=removeButton.getAttribute("data-remove-fact");
+    const index=Number(removeButton.getAttribute("data-index"));
+    const hidden=$("#"+hiddenId);
+    const items=splitFactItems(hidden.value);
+
+    if(Number.isInteger(index) && index>=0 && index<items.length){
+      items.splice(index,1);
+      hidden.value=items.join("\n");
+      renderFactList(hiddenId);
+    }
+  }
+});
+
+document.addEventListener("keydown",event=>{
+  const input=event.target;
+  if(!(input instanceof HTMLInputElement)) return;
+  const addButton=document.querySelector('[data-input="'+input.id+'"]');
+  if(addButton && event.key==="Enter"){
+    event.preventDefault();
+    addFactItem(
+      addButton.getAttribute("data-add-fact"),
+      input.id
+    );
+  }
+});
+
 const editorMap={
   product_url:"#pUrl",name:"#pName",brand:"#pBrand",model:"#pModel",category:"#pCategory",
   image_url:"#pImage",description:"#pDescription",key_benefits:"#pBenefits",
@@ -866,6 +1075,7 @@ function resetEditor(){
   preResearchManualFields=new Set();
   lastResearchInputUrl="";
   Object.values(editorMap).forEach(selector=>{$(selector).value=""});
+  renderAllFactLists();
   if($("#pImageFile")) $("#pImageFile").value="";
   setProductImagePreview("");
   $("#pLiveOffer").checked=false;
@@ -902,6 +1112,7 @@ function loadEditor(product){
   for(const [key,selector] of Object.entries(editorMap)){
     $(selector).value=values[key]??"";
   }
+  renderAllFactLists();
   $("#pLiveOffer").checked=values.live_offer;
   setProductImagePreview(values.image_url);
   if($("#pImageFile")) $("#pImageFile").value="";
@@ -1052,6 +1263,7 @@ function applyResearchResult(result,manualBefore){
     };
   }
 
+  renderAllFactLists();
   researchDraftSummary=result.research_summary||{};
   preResearchManualFields=new Set([
     ...preResearchManualFields,
