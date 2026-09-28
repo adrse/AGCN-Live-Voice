@@ -23,7 +23,8 @@ def test_grounded_stock_scarcity():
     memory = MemoryManager()
     text = engine.grounded_urgency(memory)
     assert "3" in text
-    assert "estoque" in text.casefold()
+    assert any(word in text.casefold() for word in ("unidade", "restam", "tem 3"))
+    assert "estoque informado" not in text.casefold()
 
 
 def test_price_anchor_uses_real_difference():
@@ -34,7 +35,7 @@ def test_price_anchor_uses_real_difference():
     text = engine.price_anchor()
     assert "59,90" in text
     assert "129,90" in text
-    assert "diferença" in text.casefold()
+    assert "valor de referência cadastrado" not in text.casefold()
 
 
 def test_purchase_confirmation_becomes_real_social_proof():
@@ -49,7 +50,7 @@ def test_purchase_confirmation_becomes_real_social_proof():
     })
     engine = PersuasionEngine({"name": "Produto X"})
     proof = engine.social_proof(memory)
-    assert "compra" in proof.casefold()
+    assert any(word in proof.casefold() for word in ("compra", "levando", "garantindo"))
     assert memory.recent_purchase_count() == 1
 
 
@@ -109,3 +110,37 @@ def test_objection_reframes_value_without_inventing():
     assert "129,90" in speech
     assert "antiaderente" in speech
     assert "estoque" not in speech.casefold()
+
+
+def test_human_buying_intent_avoids_corporate_language():
+    presenter = PresenterV2({
+        "name": "Produto X",
+        "stock": 5,
+    })
+    result = presenter.test_comment(
+        "Joana",
+        "eu quero",
+    )
+    speech = result["speech"]["speech"].casefold()
+    assert "joana" in speech
+    assert "5" in speech
+    assert "condição cadastrada" not in speech
+    assert "estoque informado" not in speech
+    assert "se fizer sentido" not in speech
+
+
+def test_price_objection_sounds_short_and_oral():
+    presenter = PresenterV2({
+        "name": "Produto X",
+        "current_price": 59.90,
+        "regular_price": 129.90,
+    })
+    result = presenter.test_comment(
+        "Maria",
+        "tá caro",
+    )
+    speech = result["speech"]["speech"].casefold()
+    assert "59,90" in speech
+    assert "129,90" in speech
+    assert "eu entendo a sua dúvida" not in speech
+    assert "valor de referência cadastrado" not in speech
