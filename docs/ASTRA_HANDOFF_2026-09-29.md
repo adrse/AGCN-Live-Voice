@@ -2,57 +2,140 @@
 
 ## Decisão de produto congelada para o MVP
 
-O MVP NÃO terá avatar/rosto IA. MuseTalk fica fora da rota crítica. A transmissão visual será um ou mais vídeos reais do produto, preferencialmente mãos demonstrando o produto, reproduzidos em loop/playlist. A inteligência e a voz continuam automáticas.
+O AGCN Live Voice é o cérebro e a voz da LIVE.
 
-Objetivo: entregar um programa Windows que consiga acompanhar uma TikTok LIVE, receber comentários e métricas, falar continuamente sobre um produto cadastrado manualmente, responder comentários relevantes e retomar a venda sem silêncio longo.
+O MVP NÃO terá:
+- avatar/rosto IA;
+- MuseTalk/lip-sync;
+- player/playlist/loop de vídeo dentro do programa;
+- janela 9:16 própria;
+- pesquisa automática de produto;
+- câmera virtual própria.
+
+O vídeo do produto será preparado e exibido manualmente no TikTok LIVE Studio/OBS ou por outra fonte externa. O AGCN não gerencia vídeo nesta fase.
+
+Objetivo: entregar um programa Windows que acompanhe uma TikTok LIVE, receba comentários/métricas, conduza a venda continuamente, escolha comentários relevantes, responda com naturalidade e envie a voz para o dispositivo de áudio selecionado.
 
 ## Arquitetura alvo
 
-TikTok LIVE -> TikTokMonitor -> contexto da LIVE + produto -> memória -> inteligência de comentários -> Decision Engine -> Presenter Brain -> fila de falas -> TTS -> dispositivo de áudio selecionado -> microfone virtual -> TikTok LIVE Studio
+TikTok LIVE
+-> TikTokMonitor
+-> Comment Intelligence / Fusion
+-> Decision Engine
+-> Speech Planner
+-> BrainContext factual
+-> PresenterPolicy compartilhada
+-> Qwen local OU provider API
+-> validação factual
+-> fila de fala
+-> TTS local OU premium
+-> dispositivo de áudio / cabo virtual
+-> TikTok LIVE Studio
 
-Em paralelo:
-
-Cadastro manual do produto -> ProductStore/ProductKnowledge
-Vídeos do produto -> Media Playlist -> janela limpa 9:16 "AGCN Live Output" -> Captura de Janela no TikTok LIVE Studio
-
-MVP não precisa criar driver de câmera virtual. O TikTok LIVE Studio captura a janela 9:16 do AGCN. O áudio sai para um dispositivo virtual selecionável (ex.: VB-CABLE). No TikTok LIVE Studio o usuário escolhe o dispositivo correspondente como microfone.
+Produto manual -> ProductStore/ProductKnowledge -> fatos permitidos ao Brain
 
 ## O que já existe e deve ser reaproveitado
 
-Branch base: `v0.5.2-product-research`, commit de referência `608f840f96d00f0160910b1629ac30ccf13691c2`.
+Branch base histórica: `v0.5.2-product-research`
+Commit de referência: `608f840f96d00f0160910b1629ac30ccf13691c2`.
 
-Core funcional já disponível:
-- `core/tiktok_monitor.py`: monitoramento TikTok LIVE.
-- `core/product_store.py`: cadastro/persistência de produto.
-- `core/product_knowledge.py`: resolução factual do produto.
-- `core/comment_intelligence.py`: classificação inicial de comentários.
-- `core/comment_fusion.py`: fusão de comentários.
-- `core/decision_engine.py`: prioridade/decisão.
-- `core/memory_manager.py`: memória de fala, fatos e cadência.
-- `core/silence_watchdog.py`: evita silêncio prolongado.
-- `core/speech_planner.py`: planejamento de fala.
-- `core/persuasion_engine.py`: realização atual baseada em regras.
-- `core/presenter_v2.py`: orquestração do presenter.
-- `core/runtime.py`: integração monitor + presenter.
-- `backend/app_v054.py` e `test_web/index_v054.html`: ambiente web temporário de teste.
+Core funcional:
+- `core/tiktok_monitor.py`
+- `core/product_store.py`
+- `core/product_knowledge.py`
+- `core/comment_intelligence.py`
+- `core/comment_fusion.py`
+- `core/decision_engine.py`
+- `core/memory_manager.py`
+- `core/silence_watchdog.py`
+- `core/speech_planner.py`
+- `core/persuasion_engine.py`
+- `core/presenter_v2.py`
+- `core/runtime.py`
 
-O monitor TikTok e o fluxo de produto já foram validados em LIVE real. Não reescrever do zero sem necessidade.
+Novo contrato para desktop/providers:
+- `core/integration_contracts.py`
+- `core/presenter_policy.py`
+- `docs/PRESENTER_BRAIN_SPEC.md`
 
-## O que NÃO deve consumir tempo agora
+O monitor TikTok e o fluxo de produto já foram testados em LIVE real. Não reescrever do zero.
 
-- MuseTalk, lip-sync, avatar, face animation ou talking head.
-- Pesquisa automática de produto por URL/Lens/TikTok Shop.
-- Driver próprio de câmera virtual.
-- App mobile.
-- Sistema de pagamento/licenciamento.
-- Refazer o monitor TikTok que já funciona.
-- Refazer o ProductStore sem necessidade.
+## Parte mais importante: Presenter Brain
 
-Arquivos antigos de pesquisa automática de produto podem permanecer no repositório, mas não fazem parte do MVP.
+A inteligência de fala NÃO é simplesmente "mandar comentário para uma IA".
+
+Qwen local e qualquer provider por API devem receber a MESMA `PresenterPolicy`. O provider só troca o motor; as regras de condução da LIVE pertencem ao AGCN.
+
+Ler obrigatoriamente:
+- `docs/PRESENTER_BRAIN_SPEC.md`
+- `data/presenter_dataset/behavior_v3.json`
+- `core/presenter_policy.py`
+
+A PresenterPolicy define:
+- como falar;
+- o que nunca inventar;
+- como responder comentário;
+- quais comentários têm prioridade;
+- como falar proativamente;
+- como evitar repetição;
+- como retomar o assunto depois de interrupção;
+- como usar memória;
+- formato JSON de saída.
+
+O Decision Engine continua responsável por escolher a fila/prioridade. O LLM é responsável por interpretação natural e realização da fala, não por criar fatos.
+
+## Prioridade comercial de comentários
+
+Ordem geral:
+1. intenção clara de compra / como comprar;
+2. preço, desconto, cupom, frete, disponibilidade/estoque;
+3. objeção que pode impedir a compra;
+4. pergunta técnica, compatibilidade e uso;
+5. benefícios/diferenciais;
+6. confirmação de compra;
+7. comentário geral relevante;
+8. saudação/emoji/conversa paralela: normalmente ignorar.
+
+## Comportamento da fala
+
+Pergunta:
+**resposta direta -> expansão curta -> ponte para venda**
+
+Sem comentários:
+- continuar falando;
+- variar fatos/tópicos;
+- não repetir CTA;
+- não repetir "pra quem chegou agora";
+- usar normalmente um fato principal por segmento;
+- respeitar memória e cooldowns.
+
+Depois de responder:
+- preservar `sales_thread`;
+- continuar de onde fazia sentido;
+- não reiniciar a apresentação.
+
+## Fatos e segurança
+
+Somente `ProductKnowledge`, `LIVE_CONDITIONS` e `ALLOWED_FACTS` são fonte da verdade.
+
+Nunca inventar:
+- função;
+- compatibilidade;
+- especificação;
+- preço;
+- desconto;
+- estoque;
+- frete;
+- cupom;
+- garantia;
+- promoção;
+- prazo.
+
+Se faltar informação: assumir de forma natural que o dado não está confirmado.
 
 ## Cadastro de produto
 
-Produto é cadastrado manualmente. Preservar os campos existentes:
+Preservar os campos já existentes:
 - product_url opcional
 - name, brand, model, category
 - description
@@ -69,7 +152,7 @@ Produto é cadastrado manualmente. Preservar os campos existentes:
 - additional_info
 - image_url
 
-Condição de LIVE:
+Condição da LIVE:
 - regular_price
 - current_price
 - discount
@@ -80,151 +163,60 @@ Condição de LIVE:
 - live_offer_text
 - promotion_note
 
-Adicionar ao desktop uma lista de arquivos de mídia do produto:
-- 1..N vídeos locais
-- ordem
-- ativo/inativo
-- loop
-- duração opcional/trim futuro
-
-## Brain
-
-Primeira opção: Qwen local via Ollama. O programa deve funcionar sem API paga.
-
-Segunda opção opcional: provider por API para maior qualidade. Deve ser configurável e desacoplado. Nunca embutir chave secreta no código/exe.
-
-O Brain recebe:
-- ficha factual do produto
-- condição atual da LIVE
-- comentário atual ou missão proativa
-- últimos comentários relevantes
-- últimas falas
-- fatos usados recentemente
-- último CTA
-- compras/estoque/eventos recentes
-- tópico de venda ativo
-
-Saída ideal estruturada:
-- speech: texto pronto para TTS
-- topic
-- used_facts
-- answered_comment_id opcional
-- needs_fact boolean
-- next_sales_thread opcional
-
-Regras invioláveis:
-- não inventar informação técnica, preço, estoque, promoção, frete, garantia ou compatibilidade;
-- escassez só se houver dado real;
-- se não houver informação, assumir que não sabe;
-- responder primeiro, depois expandir;
-- português brasileiro natural e de live commerce;
-- evitar frases robóticas;
-- não repetir o mesmo benefício/CTA em sequência;
-- não fazer recap de "quem chegou agora" repetidamente.
+Não adicionar gerenciamento de vídeo ao cadastro do MVP.
 
 ## Voz/TTS
 
 Dois providers:
-1. Local/offline: usar uma opção Windows simples e estável (Piper é aceitável para MVP).
-2. Premium/API: adapter configurável para TTS externo/OpenAI.
+1. Local/offline para funcionar sem API paga.
+2. Premium/API opcional.
 
 Requisitos:
 - fila de áudio;
-- prefetch da próxima fala enquanto a atual toca;
-- saída para dispositivo de áudio selecionável;
+- prefetch;
+- dispositivo de saída selecionável;
 - botão testar voz;
 - volume;
-- velocidade se suportada;
-- se provider premium falhar, cair para local quando configurado.
-
-## Fala contínua e interrupção por comentário
-
-O sistema não deve esperar comentário para falar.
-
-Cadência:
-- watchdog atual: alvo ~8 s, hard limit ~10 s sem nova fala;
-- gerar segmentos curtos para manter naturalidade;
-- enquanto TTS toca, Brain já pode preparar o próximo segmento;
-- comentário prioritário entra na frente das falas proativas ainda não reproduzidas;
-- de preferência terminar a frase/segmento atual e responder em seguida;
-- depois retomar o tópico de venda anterior.
-
-## Vídeo do produto
-
-Criar janela separada e limpa, 9:16, sem controles, destinada a captura pelo TikTok LIVE Studio.
-
-Comportamento MVP:
-- reproduzir MP4/H.264 locais;
-- loop contínuo;
-- playlist de vários clipes;
-- transição simples/corte;
-- botão próximo/anterior;
-- selecionar clipe ativo;
-- mutar áudio original dos vídeos por padrão;
-- manter reprodução mesmo quando a IA estiver respondendo comentários.
-
-Fase posterior: o Brain pode escolher o clipe por tag (ex.: bateria, tamanho, acessórios, uso).
+- fallback local;
+- nenhuma chave embutida no exe.
 
 ## Desktop
 
-Framework definido: Python + PySide6. Evitar Electron.
+Framework: Python + PySide6.
 
-Estrutura sugerida:
-- `desktop/main.py`
-- `desktop/main_window.py`
-- `desktop/output_window.py`
-- `desktop/pages/dashboard.py`
-- `desktop/pages/product.py`
-- `desktop/pages/settings.py`
-- `desktop/widgets/live_status.py`
-- `desktop/widgets/comment_feed.py`
-- `desktop/widgets/speech_now.py`
-- `desktop/services/audio_output.py`
-- `desktop/services/media_playlist.py`
-- `desktop/services/brain_service.py`
-- `desktop/services/tts_service.py`
+Telas:
+- Dashboard
+- Produto
+- Configurações
 
-UI:
-- identidade AGCN Live Voice;
-- azul #0061FF, preto #0A0A0B, grafite #6B7280, cinza claro #F3F5F9;
-- Dashboard;
-- Produto;
-- Configurações;
+Dashboard:
 - status TikTok;
 - produto ativo;
 - presenter ON/OFF;
 - comentários;
-- "Falando agora";
 - fila/decisão;
-- seletor Brain;
-- seletor voz;
-- seletor dispositivo de saída;
-- controle de playlist;
-- botão abrir janela 9:16.
+- "Falando agora";
+- Brain escolhido;
+- voz escolhida;
+- dispositivo de áudio.
 
-## Segurança e dados
+Não implementar player de vídeo.
 
-- API keys apenas em config local segura/.env fora do Git.
-- Nunca commitar chaves.
-- Produto e configurações persistidos localmente.
-- Logs sem tokens/chaves.
-- Exe final deve poder funcionar com Qwen local + TTS local sem custo de API.
+## Definição de pronto
 
-## Definição de pronto do MVP
-
-O MVP está pronto quando, em um PC Windows:
+Em Windows:
 1. abre sem terminal para uso normal;
-2. cadastra produto e vídeos;
-3. conecta a uma LIVE TikTok pelo username;
-4. mostra viewers/likes/comentários;
-5. inicia apresentação automática;
-6. Qwen produz fala usando apenas fatos cadastrados;
-7. TTS toca no dispositivo escolhido;
-8. comentário relevante interrompe a fila proativa e é respondido;
-9. após resposta, a venda continua;
-10. janela 9:16 reproduz vídeos em loop;
-11. TikTok LIVE Studio consegue capturar essa janela e usar o áudio pelo dispositivo virtual;
-12. se não houver comentários, a IA continua falando;
-13. se uma informação não existir, a IA não inventa;
-14. existe fallback local sem API.
+2. cadastra produto;
+3. conecta a LIVE pelo username;
+4. mostra métricas/comentários;
+5. inicia presenter automático;
+6. Qwen local usa PresenterPolicy e fatos reais;
+7. provider API opcional usa EXATAMENTE a mesma política;
+8. TTS toca no device escolhido;
+9. comentário prioritário é respondido;
+10. após resposta a venda continua;
+11. sem comentários a IA continua falando;
+12. não inventa informação ausente;
+13. fallback local funciona sem API;
+14. build do exe fica pronto.
 
