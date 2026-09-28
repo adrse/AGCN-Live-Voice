@@ -1,0 +1,6 @@
+# Dependências exclusivas do programa Windows.
+# Mantidas separadas do backend web temporário para não quebrar Railway.
+PySide6>=6.7,<7
+sounddevice>=0.5,<1
+numpy>=1.24,<3
+requests>=2.31,<3
