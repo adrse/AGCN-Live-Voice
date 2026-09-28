@@ -1,58 +1,69 @@
 # Especificação técnica — MVP Desktop AGCN Live Voice
 
-## Estados principais
+## Estados
 
 Presenter: STOPPED | STARTING | RUNNING | PAUSED | ERROR
 TikTok: DISCONNECTED | CONNECTING | LIVE | ENDED | ERROR
 Brain: LOCAL_QWEN | API
 TTS: LOCAL | PREMIUM_API
-Media: STOPPED | PLAYING | PAUSED
 
-## Pipeline de fala
+## Pipeline
 
-1. Evento TikTok entra no monitor.
-2. Comentário é normalizado/deduplicado.
-3. Inteligência classifica relevância e prioridade.
-4. Decision Engine decide COMMENT_REPLY ou PROACTIVE.
-5. Speech Planner cria missão e pacote factual.
-6. Brain gera texto natural.
-7. Validador confere afirmações sensíveis contra ProductKnowledge.
-8. Speech Queue agenda o segmento.
-9. TTS renderiza.
-10. Audio Output reproduz no device configurado.
-11. Memory registra tópico, fatos e CTA usados.
-12. Se era resposta, retoma sales_thread anterior.
+1. TikTok Monitor recebe eventos.
+2. Comentários são deduplicados/normalizados.
+3. Comment Intelligence estima intenção/relevância.
+4. Comment Fusion agrupa quando necessário.
+5. Decision Engine escolhe prioridade.
+6. Speech Planner cria missão e tópico.
+7. ProductKnowledge/SalesGuard monta fatos permitidos.
+8. BrainContext é criado.
+9. `PresenterPolicy` + BrainContext vão para Qwen ou API.
+10. Saída JSON é parseada.
+11. Validator/SalesGuard confere alegações sensíveis.
+12. Speech Queue agenda fala.
+13. TTS gera áudio.
+14. AudioSink toca no device escolhido.
+15. Memory registra fala/fatos/tópico/CTA.
+16. Após resposta, retoma `sales_thread`.
 
-## Scheduler recomendado
+## Regra arquitetural crítica
 
-Não bloquear a UI. Usar workers/asyncio para:
-- TikTok monitor;
-- brain generation;
-- TTS generation;
-- playback;
-- media playback.
+Nenhum provider pode ter comportamento próprio solto.
 
-A UI só observa estados e envia comandos.
+Qwen e API devem usar:
+- `core/presenter_policy.build_system_instruction()`
+- `core/presenter_policy.build_turn_payload(context)`
+- o mesmo schema de `BrainResult`
 
-Manter duas filas:
-- priority_queue: comentários relevantes/compra/objeção/pergunta;
-- proactive_queue: fala preparada para evitar silêncio.
+Assim, trocar provider NÃO muda a forma como a LIVE é conduzida.
 
-Ao chegar item prioritário:
-- cancelar falas proativas ainda não iniciadas;
-- não cortar áudio no meio da palavra;
-- responder após o segmento atual;
-- retomar contexto.
+## Scheduler
 
-## Contrato Brain
+Workers/async:
+- TikTok;
+- Brain;
+- TTS;
+- playback.
 
-Entrada mínima:
+Duas filas:
+- `priority_queue`: compra/preço/objeção/pergunta relevante;
+- `proactive_queue`: fala preparada para evitar silêncio.
+
+Quando chega prioridade:
+- descartar/cancelar proativos ainda não iniciados;
+- terminar o segmento atual;
+- responder;
+- retomar `sales_thread`.
+
+## BrainContext
+
 ```json
 {
   "mode": "comment_reply|proactive",
   "product": {},
   "live_conditions": {},
   "comment": {"id":"","username":"","text":""},
+  "decision": {"intent":"","priority":0},
   "recent_comments": [],
   "recent_speeches": [],
   "recent_facts": [],
@@ -62,7 +73,8 @@ Entrada mínima:
 }
 ```
 
-Saída:
+## BrainResult
+
 ```json
 {
   "speech": "...",
@@ -73,92 +85,72 @@ Saída:
 }
 ```
 
-O provider local Qwen e o provider API implementam o mesmo contrato.
-
-## Prompt comportamental do Brain
-
-Você é uma pessoa apresentadora brasileira de live commerce. Fale como alguém ao vivo, de forma rápida, natural, comercial e sem linguagem de sistema. Quando houver pergunta, responda a dúvida logo no começo e depois conecte a resposta a um benefício ou uso real do produto. Quando não houver pergunta, continue vendendo o produto variando benefícios, uso, diferenciais, itens inclusos, preço/valor, confiança e CTA. Não repita a mesma ideia continuamente. Só use fatos presentes em ALLOWED_FACTS/LIVE_CONDITIONS. Nunca invente função, compatibilidade, estoque, preço, desconto, frete, garantia ou promoção. Se faltar uma informação, diga naturalmente que essa informação não está cadastrada. Escassez somente com estoque/oferta real fornecida. Entregue somente o JSON solicitado.
+Texto livre direto do LLM para o TTS é proibido.
 
 ## Validação factual
 
-Antes do TTS:
-- números e preço devem existir no pacote;
-- palavras de escassez ("últimas", "acabando", "só restam") exigem stock;
-- promoção/desconto exigem current_price/discount/live_offer;
+Regras reforçadas:
+- números/preço devem existir no contexto;
+- escassez exige estoque real;
+- desconto/promoção exige condição real;
 - garantia exige warranty;
-- compatibilidade técnica exige compatibility ou additional_info correspondente.
+- compatibilidade exige dado correspondente;
+- se faltou fato: responder sem inventar e marcar `needs_fact=true`.
 
-Em caso de saída inválida:
-1. retry curto com motivo;
-2. se falhar, usar resposta segura/determinística do ProductKnowledge.
+Falha:
+1. retry curto;
+2. fallback seguro/determinístico.
 
 ## Qwen local
 
-Provider recomendado para MVP: Ollama local.
-- endpoint configurável, default localhost;
-- nome do modelo configurável;
-- não assumir modelo instalado;
-- botão "Testar Qwen";
-- timeout e fallback;
-- streaming opcional, não obrigatório para primeira versão.
-
-## TTS local
-
-Provider offline deve:
-- aceitar texto;
-- gerar WAV/PCM;
-- funcionar sem internet;
-- permitir escolher voz instalada/modelo;
-- expor erro claro se voz não estiver instalada.
-
-## TTS premium
-
-Provider API deve ser opcional.
-- chave fora do repo;
-- modelo/voz configuráveis;
-- teste de voz;
+- Ollama local;
+- endpoint/modelo configurável;
+- botão Testar Qwen;
 - timeout;
-- fallback opcional para local.
+- mesma PresenterPolicy;
+- streaming opcional.
 
-## Saída de áudio
+## API
 
-Windows:
-- listar devices de saída;
-- permitir escolher device;
-- salvar seleção;
-- recomendado usar VB-CABLE no MVP;
-- não exigir driver criado pelo AGCN.
+- provider/modelo configurável;
+- chave fora do Git;
+- mesma PresenterPolicy;
+- saída estruturada;
+- timeout/fallback;
+- nenhuma chave no exe.
 
-## Media player
+## TTS
 
-Para reduzir dependências, usar Qt Multimedia/QMediaPlayer quando estável no ambiente final. Se codec gerar problema, usar mpv/ffmpeg backend.
+Local:
+- offline;
+- WAV/PCM;
+- voz configurável.
 
-OutputWindow:
-- frameless;
-- sempre 9:16;
-- background preto;
-- vídeo com aspect fill/fit configurável;
-- sem botões;
-- tecla Esc fecha;
-- janela nomeada de modo estável para captura no TikTok Studio.
+Premium:
+- opcional;
+- provider/voz configurável;
+- fallback local.
+
+## Áudio Windows
+
+- listar devices;
+- selecionar;
+- persistir escolha;
+- botão teste;
+- pensado para VB-CABLE/virtual cable;
+- AGCN não precisa criar driver.
 
 ## Persistência
 
-Config local sugerida:
 `%APPDATA%/AGCN Live Voice/config.json`
-
-Dados:
 `%APPDATA%/AGCN Live Voice/data/`
-
-Mídia pode permanecer na origem e ser referenciada por path; oferecer opção futura de copiar para biblioteca interna.
 
 ## Empacotamento
 
-MVP: PyInstaller.
-- build Windows;
-- ícone AGCN;
+PyInstaller:
+- Windows;
 - sem console;
-- incluir assets;
-- não incluir API keys;
-- documentação simples de instalação de Ollama e VB-CABLE como dependências externas opcionais/recomendadas.
+- ícone/assets;
+- sem secrets;
+- script de build no repositório.
 
