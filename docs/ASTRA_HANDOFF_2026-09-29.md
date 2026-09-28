@@ -56,6 +56,8 @@ Core funcional:
 Novo contrato para desktop/providers:
 - `core/integration_contracts.py`
 - `core/presenter_policy.py`
+- `core/comment_selection_policy.py`
+- `core/brain_orchestrator.py`
 - `docs/PRESENTER_BRAIN_SPEC.md`
 
 O monitor TikTok e o fluxo de produto já foram testados em LIVE real. Não reescrever do zero.
