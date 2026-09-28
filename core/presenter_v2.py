@@ -303,6 +303,7 @@ class PresenterV2:
                 intent,
                 name,
                 fact,
+                fact_items=plan.get("fact_items") or [],
                 fact_label=plan.get("fact_label"),
                 comment=plan.get("comment"),
             )
@@ -406,11 +407,27 @@ class PresenterV2:
         name,
         fact,
         *,
+        fact_items=None,
         fact_label=None,
         comment=None,
     ):
+        items = [
+            as_text(x)
+            for x in (fact_items or [])
+            if as_text(x)
+        ]
         value = as_text(fact)
         label = as_text(fact_label)
+
+        if intent == "benefits" and items:
+            chosen = random.sample(
+                items,
+                k=min(2, len(items)),
+            )
+            if len(chosen) == 1:
+                value = chosen[0]
+            else:
+                value = f"{chosen[0]}. E também {chosen[1]}"
         address = f"{user}, " if user else ""
         question = str(comment or "").casefold().strip()
 
