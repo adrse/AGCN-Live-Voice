@@ -120,7 +120,8 @@ class CommentIntelligence:
         elif any(k in t for k in (
             "potência", "potencia", "watts", "watt",
             "material", "feito de", "fabricado em",
-            "qual a cor", "que cor", "cores",
+            "qual a cor", "qual cor", "que cor", "cor disponível", "cor disponivel", "cores",
+            "internet", "wi-fi", "wifi", "4g", "5g", "chip", "sim card",
             "temperatura", "graus",
             "peso", "quantos kg", "quantos quilos",
             "dimensões", "dimensoes", "comprimento",
