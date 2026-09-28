@@ -67,6 +67,65 @@ class PersuasionEngine:
     def set_product(self, product: dict | None) -> None:
         self.product = dict(product or {})
 
+    @staticmethod
+    def entries(value) -> list[str]:
+        if value in (None, "", [], {}):
+            return []
+
+        if isinstance(value, (list, tuple, set)):
+            raw = [text(x) for x in value]
+        else:
+            raw = [
+                text(x)
+                for x in re.split(r"[\n;|]+", text(value))
+            ]
+
+        out = []
+        seen = set()
+        for item in raw:
+            if not item:
+                continue
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(item)
+        return out
+
+    def pick_item(
+        self,
+        field: str,
+        memory=None,
+        *,
+        count: int = 1,
+    ) -> list[str]:
+        items = self.entries(self.product.get(field))
+        if not items:
+            return []
+
+        if memory is not None:
+            fresh = [
+                item
+                for item in items
+                if not memory.recently_used_tactic(
+                    "fact:" + field + ":" + item.casefold(),
+                    within=120,
+                )
+            ]
+            if fresh:
+                items = fresh
+
+        random.shuffle(items)
+        chosen = items[:max(1, min(count, len(items)))]
+
+        if memory is not None:
+            for item in chosen:
+                memory.remember_tactic(
+                    "fact:" + field + ":" + item.casefold()
+                )
+
+        return chosen
+
     def signals(self) -> dict:
         current = self._number(self.product.get("current_price"))
         regular = self._number(self.product.get("regular_price"))
@@ -362,14 +421,127 @@ class PersuasionEngine:
         return phrase
 
     def proactive_pitch(self, topic: str, name: str, memory) -> str:
-        if topic == "scarcity":
-            urgency = self.grounded_urgency(memory, strong=True)
-            if urgency:
-                memory.remember_tactic("scarcity")
+        if topic == "description":
+            item = self.pick_item(
+                "description",
+                memory,
+                count=1,
+            )
+            if item:
                 return random.choice([
-                    f"Ó, quem tava de olho no {name}: {urgency} Não deixa pra depois não.",
-                    f"Gente, presta atenção no {name}: {urgency} Se quiser, já garante.",
-                    f"Quem queria o {name}, é agora: {urgency}",
+                    f"Ó, esse {name} aqui: {item[0]}.",
+                    f"Esse aqui é o {name}. {item[0]}.",
+                    f"Olha só esse {name}: {item[0]}.",
+                ])
+
+        if topic == "benefits":
+            items = self.pick_item(
+                "key_benefits",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"Ó, uma coisa boa dele: {items[0]}.",
+                    f"E olha isso aqui: {items[0]}.",
+                    f"Esse aqui tem um ponto muito bom: {items[0]}.",
+                    f"O bom dele é isso: {items[0]}.",
+                ])
+
+        if topic == "usage":
+            items = self.pick_item(
+                "usage_info",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"Pra usar é bem tranquilo: {items[0]}.",
+                    f"No dia a dia funciona assim: {items[0]}.",
+                    f"Ó, na prática você usa assim: {items[0]}.",
+                ])
+
+        if topic == "differentials":
+            items = self.pick_item(
+                "differentials",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"E presta atenção nesse detalhe: {items[0]}.",
+                    f"Agora, o diferencial dele é esse aqui: {items[0]}.",
+                    f"Uma coisa que eu achei legal nele: {items[0]}.",
+                ])
+
+        if topic == "bundle_value":
+            items = self.pick_item(
+                "included_items",
+                memory,
+                count=2,
+            )
+            if items:
+                joined = " e ".join(items)
+                return random.choice([
+                    f"E já vem com {joined}.",
+                    f"No kit você já leva {joined}.",
+                    f"Fora o produto, já vem {joined}.",
+                ])
+
+        if topic == "compatibility":
+            items = self.pick_item(
+                "compatibility",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"E uma coisa importante: {items[0]}.",
+                    f"Ó, sobre compatibilidade: {items[0]}.",
+                    f"Pra não ter dúvida depois: {items[0]}.",
+                ])
+
+        if topic == "size":
+            items = self.pick_item(
+                "size_info",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"Ó, o tamanho dele é {items[0]}.",
+                    f"Pra vocês terem noção do tamanho: {items[0]}.",
+                    f"Medida dele: {items[0]}.",
+                ])
+
+        if topic == "battery":
+            items = self.pick_item(
+                "battery_info",
+                memory,
+                count=1,
+            )
+            if items:
+                return random.choice([
+                    f"E de bateria, ó: {items[0]}.",
+                    f"Sobre a bateria: {items[0]}.",
+                    f"Uma coisa boa pra saber da bateria: {items[0]}.",
+                ])
+
+        if topic == "pain_solution":
+            problems = self.pick_item(
+                "problems_solved",
+                memory,
+                count=1,
+            )
+            benefits = self.pick_item(
+                "key_benefits",
+                memory,
+                count=1,
+            )
+            if problems and benefits:
+                return random.choice([
+                    f"Se você sofre com {problems[0]}, esse aqui ajuda porque {benefits[0]}.",
+                    f"Pra quem quer resolver {problems[0]}, olha isso: {benefits[0]}.",
                 ])
 
         if topic == "price_value":
@@ -377,48 +549,84 @@ class PersuasionEngine:
             if anchor:
                 memory.remember_tactic("price_anchor")
                 return random.choice([
-                    f"Olha o preço do {name}: {anchor}",
-                    f"Gente, olha isso no {name}: {anchor}",
-                    f"Pra quem tava esperando preço, ó: {anchor}",
+                    f"Olha o preço: {anchor}",
+                    f"E o valor dele agora, ó: {anchor}",
+                    f"Agora presta atenção no preço: {anchor}",
+                ])
+
+        if topic == "scarcity":
+            urgency = self.grounded_urgency(memory, strong=True)
+            if urgency:
+                memory.remember_tactic("scarcity")
+                return random.choice([
+                    f"Ó, presta atenção nisso: {urgency} Não enrola muito não.",
+                    f"Agora é bom ficar ligado: {urgency}",
+                    f"E olha a quantidade agora: {urgency}",
                 ])
 
         if topic == "social_proof":
             proof = self.social_proof(memory)
             if proof:
                 memory.remember_tactic("social_proof")
-                return f"{proof} O {name} tá saindo."
-
-        if topic == "pain_solution":
-            problems = text(self.product.get("problems_solved"))
-            benefits = text(self.product.get("key_benefits"))
-            if problems and benefits:
-                memory.remember_tactic("pain_solution")
-                return random.choice([
-                    f"Se o seu problema é {problems}, olha esse {name}: {benefits}.",
-                    f"Pra quem quer resolver {problems}, presta atenção: {benefits}.",
-                ])
-
-        if topic == "bundle_value":
-            included = text(self.product.get("included_items"))
-            if included:
-                memory.remember_tactic("bundle")
-                return random.choice([
-                    f"E olha o que já vem junto: {included}.",
-                    f"Fora que você já leva {included}.",
-                ])
+                return proof
 
         if topic == "trust":
-            limitation = text(self.product.get("limitations"))
-            warranty = text(self.product.get("warranty"))
-            if limitation:
-                memory.remember_tactic("trust")
+            limitations = self.pick_item(
+                "limitations",
+                memory,
+                count=1,
+            )
+            warranty = self.pick_item(
+                "warranty",
+                memory,
+                count=1,
+            )
+            if limitations:
                 return random.choice([
-                    f"Agora, sendo bem claro: {limitation}. Melhor você saber certinho antes de comprar.",
-                    f"E tem um detalhe importante: {limitation}. Tô falando pra você saber exatamente o que tá levando.",
+                    f"Agora, um detalhe pra você saber certinho: {limitations[0]}.",
+                    f"E eu vou falar isso aqui também: {limitations[0]}.",
                 ])
             if warranty:
-                memory.remember_tactic("trust")
-                return f"Pra quem perguntou de garantia: {warranty}."
+                return random.choice([
+                    f"E de garantia: {warranty[0]}.",
+                    f"Sobre garantia, ó: {warranty[0]}.",
+                ])
+
+        if topic == "newcomer_recap":
+            benefit = self.pick_item(
+                "key_benefits",
+                memory,
+                count=1,
+            )
+            desc = self.pick_item(
+                "description",
+                memory,
+                count=1,
+            )
+            detail = benefit[0] if benefit else (desc[0] if desc else "")
+            if detail:
+                return random.choice([
+                    f"Pra quem chegou agora, a gente tá mostrando o {name}. {detail}.",
+                    f"Ó, só recapitulando pra quem entrou agora: esse é o {name}. {detail}.",
+                ])
+            return f"Pra quem chegou agora, esse aqui é o {name}."
+
+        if topic == "product_recap":
+            benefit = self.pick_item(
+                "key_benefits",
+                memory,
+                count=1,
+            )
+            if benefit:
+                return f"Ó, resumindo esse {name}: {benefit[0]}."
+            desc = self.pick_item(
+                "description",
+                memory,
+                count=1,
+            )
+            if desc:
+                return f"Ó, esse {name} aqui: {desc[0]}."
+            return f"Ó, esse aqui é o {name}."
 
         return ""
 
