@@ -25,12 +25,9 @@ class SpeechPlanner:
         if kind == "proactive":
             return self._plan_proactive(decision, guard, memory)
 
-        fact = guard.fact_for_topic(topic)
-        has_fact = fact not in (None, "", [], {}, {
-            "current_price": None,
-            "regular_price": None,
-            "discount": None,
-        })
+        fact_packet = guard.fact_for_decision(decision)
+        fact = fact_packet.get("value")
+        has_fact = bool(fact_packet.get("found"))
 
         steps = ["answer_directly"]
         if has_fact and decision.get("intent") not in {
@@ -50,6 +47,8 @@ class SpeechPlanner:
         return {
             **decision,
             "fact": fact,
+            "fact_label": fact_packet.get("label"),
+            "fact_field": fact_packet.get("field"),
             "has_fact": has_fact,
             "steps": steps,
             "cta": cta,
