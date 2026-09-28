@@ -49,6 +49,7 @@ class SpeechPlanner:
         return {
             **decision,
             "fact": fact,
+            "fact_items": fact_packet.get("items") or [],
             "fact_label": fact_packet.get("label"),
             "fact_field": fact_packet.get("field"),
             "has_fact": has_fact,
