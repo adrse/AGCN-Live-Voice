@@ -80,6 +80,11 @@ class ProductResearchRequest(BaseModel):
     hint: str = ""
 
 
+class PresenterTestRequest(BaseModel):
+    user: str = "Cliente"
+    text: str
+
+
 @app.get("/")
 def root():
     return FileResponse(WEB_FILE)
@@ -135,6 +140,31 @@ def analyze_product(req: ProductResearchRequest):
                 + str(exc)[:180]
             ),
         ) from exc
+
+
+@app.post("/api/presenter/test-comment")
+def presenter_test_comment(req: PresenterTestRequest):
+    result = runtime.test_presenter_comment(
+        req.user,
+        req.text,
+    )
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("message") or "Não foi possível gerar a resposta.",
+        )
+    return result
+
+
+@app.post("/api/presenter/test-proactive")
+def presenter_test_proactive():
+    result = runtime.test_presenter_proactive()
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("message") or "Não foi possível gerar a fala.",
+        )
+    return result
 
 
 @app.get("/api/products")
