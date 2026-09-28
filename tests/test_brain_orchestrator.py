@@ -76,3 +76,73 @@ def test_brain_rejects_reported_unapproved_fact():
         pass
     else:
         raise AssertionError("deveria rejeitar fato não autorizado")
+
+
+def test_brain_rejects_price_claim_without_price_fact():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Está por R$ 99,90 agora.",
+            "topic": "price",
+            "used_facts": [],
+            "needs_fact": False,
+            "next_sales_thread": "",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+
+    try:
+        brain.generate(
+            BrainContext(
+                mode="comment_reply",
+                allowed_facts=["nome: Produto X"],
+            )
+        )
+    except BrainOutputError:
+        pass
+    else:
+        raise AssertionError("deveria rejeitar preço inventado")
+
+
+def test_brain_accepts_price_when_exact_fact_is_reported():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Está por R$ 99,90 agora.",
+            "topic": "price",
+            "used_facts": ["preço atual: R$ 99,90"],
+            "needs_fact": False,
+            "next_sales_thread": "benefits",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+    result = brain.generate(
+        BrainContext(
+            mode="comment_reply",
+            allowed_facts=["preço atual: R$ 99,90"],
+        )
+    )
+    assert result.speech == "Está por R$ 99,90 agora."
+
+
+def test_brain_rejects_unregistered_numeric_specification():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "A bateria dura 10 dias.",
+            "topic": "battery",
+            "used_facts": ["bateria/autonomia: até 7 dias"],
+            "needs_fact": False,
+            "next_sales_thread": "",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+
+    try:
+        brain.generate(
+            BrainContext(
+                mode="comment_reply",
+                allowed_facts=["bateria/autonomia: até 7 dias"],
+            )
+        )
+    except BrainOutputError:
+        pass
+    else:
+        raise AssertionError("deveria rejeitar número não autorizado")
