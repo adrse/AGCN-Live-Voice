@@ -156,6 +156,74 @@ class PresenterV2:
         self.memory.remember_speech(item)
         return item
 
+    def test_comment(self, user: str, text: str) -> dict:
+        """Laboratório síncrono da conversa, sem precisar iniciar uma LIVE."""
+        analyzed = self.intelligence.analyze(user, text)
+        if not analyzed:
+            return {
+                "ok": False,
+                "message": "Comentário sem intenção comercial reconhecida.",
+                "analyzed": None,
+                "speech": None,
+            }
+
+        group = {
+            "primary": analyzed,
+            "items": [analyzed],
+            "priority": analyzed.get("priority", 0),
+            "users": [analyzed.get("user")] if analyzed.get("user") else [],
+            "topics": [analyzed.get("topic")] if analyzed.get("topic") else [],
+        }
+        decision = self.decision_engine.decide(
+            group,
+            self.memory.snapshot(),
+        )
+        plan = self.planner.plan(
+            decision,
+            self.guard,
+            self.memory,
+        )
+        item = self._render_plan(plan)
+
+        if item:
+            self.memory.remember_speech(item)
+
+        return {
+            "ok": bool(item),
+            "analyzed": analyzed,
+            "decision": decision,
+            "plan": plan,
+            "speech": item,
+            "memory": self.memory.snapshot(),
+        }
+
+    def test_proactive(self) -> dict:
+        """Gera uma fala comercial proativa para o laboratório."""
+        topic = self.planner.choose_proactive_topic(
+            self.guard,
+            self.memory,
+        )
+        decision = self.decision_engine.proactive(
+            topic,
+            priority=30,
+        )
+        plan = self.planner.plan(
+            decision,
+            self.guard,
+            self.memory,
+        )
+        item = self._render_plan(plan)
+
+        if item:
+            self.memory.remember_speech(item)
+
+        return {
+            "ok": bool(item),
+            "topic": topic,
+            "speech": item,
+            "memory": self.memory.snapshot(),
+        }
+
     def queue_snapshot(self) -> list[dict]:
         return [item for _, _, item in sorted(self.queue)]
 
