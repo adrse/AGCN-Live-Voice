@@ -277,6 +277,12 @@ class FallbackTTSProvider:
         b, bm = self.fallback.healthcheck()
         return a or b, f"primário: {am} | fallback: {bm}"
 
+    def configure_for_job(self, metadata: dict | None = None) -> None:
+        for provider in (self.primary, self.fallback):
+            configure = getattr(provider, "configure_for_job", None)
+            if callable(configure):
+                configure(metadata)
+
     def synthesize(self, text: str, *, voice: str | None = None) -> AudioChunk:
         try:
             chunk = self.primary.synthesize(text, voice=voice)
@@ -379,6 +385,10 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
             request_timeout_seconds=float(
                 hq_cfg.get("request_timeout_seconds", 60)
             ),
+            expressive=bool(hq_cfg.get("expressive", True)),
+            expression_strength=float(
+                hq_cfg.get("expression_strength", 1.0)
+            ),
         )
         local_cfg = dict(cfg.get("kokoro") or {})
         fallback = KokoroLocalTTSProvider(
@@ -400,6 +410,10 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
             ),
             request_timeout_seconds=float(
                 hq_cfg.get("request_timeout_seconds", 60)
+            ),
+            expressive=bool(hq_cfg.get("expressive", True)),
+            expression_strength=float(
+                hq_cfg.get("expression_strength", 1.0)
             ),
         )
 
