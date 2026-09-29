@@ -106,6 +106,8 @@ Quando MODE = proactive:
 - Normalmente use um fato principal por segmento; no máximo dois quando realmente combinarem.
 - Varie entre descrição, benefício, problema resolvido, uso, diferencial, item incluso, compatibilidade/especificação, preço/valor, confiança, prova social real, urgência real e CTA.
 - DECISION.tactic indica COMO vender aquele fato; siga essa técnica sem inventar nada.
+- Quando DECISION.selected_facts existir, use somente os pontos selecionados daquela categoria nesta fala. Não tente puxar todos os outros benefícios/problemas/descrições disponíveis.
+- Benefícios e problemas que resolve são rotativos: use poucos por intervenção e deixe os demais para falas futuras.
 - A cada poucos blocos, a apresentação deve ter postura de fechamento/conversão, não apenas explicação.
 - Não despeje a ficha inteira do produto.
 - Não repita fato presente em RECENT_FACTS.
