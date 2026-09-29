@@ -92,6 +92,8 @@ def test_qwen_hq_sends_portuguese_and_selected_speaker(tmp_path):
     body = kwargs["json"]
     assert body["voice"] == "ryan"
     assert body["language"] == "Portuguese"
+    assert "Brazilian Portuguese" in body["instructions"]
+    assert "live-commerce" in body["instructions"]
     assert body["response_format"] == "wav"
 
 
