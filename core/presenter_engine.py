@@ -24,11 +24,27 @@ def money(value) -> str | None:
         return str(value)
 
 
-class PresenterEngine:
-    """Presenter determinístico da baseline V0.4.1.
+def _sentences(text: str) -> list[str]:
+    text = clean(text)
+    if not text:
+        return []
+    parts = re.split(r"(?<=[.!?;])\s+|\n+", text)
+    return [clean(part).rstrip(" ;") for part in parts if clean(part)]
 
-    Será evoluído na V0.5 pelo Presenter Behavior V1.
+
+class PresenterEngine:
+    """Comportamento do apresentador da LIVE.
+
+    A regra central é simples: a LIVE é uma apresentação de produto, não um
+    chatbot. Comentários entram numa fila e podem interromper a apresentação
+    por pouco tempo; depois de um pequeno bloco de respostas, o apresentador
+    volta obrigatoriamente ao produto antes de responder novamente.
     """
+
+    MAX_REACTIVE_BURST = 3
+    FORCED_SALES_SECONDS = 30.0
+    MAX_REACTIVE_QUEUE = 40
+    DUPLICATE_WINDOW_SECONDS = 45.0
 
     PRIORITY = {
         "direct_question": 100,
@@ -54,15 +70,56 @@ class PresenterEngine:
         "proactive": "Fala proativa",
     }
 
+    TOPIC_KEYWORDS = {
+        "garantia": ("garantia", "garantido"),
+        "bateria": (
+            "bateria", "autonomia", "carga", "carrega", "carregamento",
+            "horas", "dias"
+        ),
+        "compatibilidade": (
+            "compatível", "compativel", "android", "iphone", "ios",
+            "bluetooth", "aplicativo", "app"
+        ),
+        "água": (
+            "água", "agua", "impermeável", "impermeavel",
+            "resistente", "ip67", "ip68"
+        ),
+        "tamanho": (
+            "tamanho", "medida", "medidas", "dimensão", "dimensao",
+            "dimensões", "dimensoes", "numeração", "numeracao"
+        ),
+        "cor": ("cor", "cores"),
+        "entrega": ("frete", "entrega", "envio", "prazo", "chega"),
+    }
+
+    STOPWORDS = {
+        "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e",
+        "é", "eh", "em", "um", "uma", "pra", "para", "por", "que",
+        "qual", "quais", "como", "tem", "ele", "ela", "isso", "esse",
+        "essa", "este", "esta", "me", "eu", "você", "voce"
+    }
+
     def __init__(self, product: dict | None):
         self.product = dict(product or {})
         self.queue = []
         self.counter = itertools.count()
         self.recent_keys = {}
+
         self.last_proactive_at = 0.0
+        self.reactive_streak = 0
+        self.forced_sales_until = 0.0
+        self.proactive_step = 0
+        self.response_step = 0
 
     def product_name(self) -> str:
-        return clean(self.product.get("name")) or "este produto"
+        return clean(self.product.get("name")) or "produto"
+
+    @staticmethod
+    def _friendly_user(user: str) -> str:
+        value = clean(user).lstrip("@")
+        if not value:
+            return ""
+        return value.split()[0]
 
     def known(self, key: str) -> str | None:
         value = self.product.get(key)
@@ -71,25 +128,35 @@ class PresenterEngine:
         value = clean(value)
         return value or None
 
+    def _short(self, text: str | None, limit: int = 190) -> str | None:
+        if not text:
+            return None
+        pieces = _sentences(text)
+        value = pieces[0] if pieces else clean(text)
+        if len(value) <= limit:
+            return value
+        clipped = value[:limit].rsplit(" ", 1)[0].rstrip(" ,.;:")
+        return clipped + "."
+
     def price_text(self) -> str | None:
         current = self.product.get("current_price")
         regular = self.product.get("regular_price")
         discount = self.product.get("discount")
 
-        if current is not None and regular is not None:
-            text = f"Hoje ele está por {money(current)}, de {money(regular)}."
-        elif current is not None:
-            text = f"Hoje ele está por {money(current)}."
-        elif regular is not None:
-            text = f"O preço cadastrado é {money(regular)}."
+        if current not in (None, "") and regular not in (None, ""):
+            text = f"Hoje ele tá por {money(current)}, de {money(regular)}."
+        elif current not in (None, ""):
+            text = f"Hoje ele tá por {money(current)}."
+        elif regular not in (None, ""):
+            text = f"Ele tá por {money(regular)}."
         else:
             return None
 
         if discount not in (None, ""):
             try:
-                text += f" Desconto de {float(discount):g}%."
+                text += f" Dá {float(discount):g}% de desconto."
             except Exception:
-                text += f" Desconto cadastrado: {discount}."
+                text += f" E tem {clean(discount)} de desconto."
 
         return text
 
@@ -106,12 +173,12 @@ class PresenterEngine:
             return "price"
 
         if any(k in t for k in (
-            "tem cor", "cor ", "tamanho", "numeração", "numeracao",
+            "tem cor", "cor ", "cores", "tamanho", "numeração", "numeracao",
             "estoque", "disponível", "disponivel"
         )):
             return "availability"
 
-        if any(k in t for k in ("frete", "entrega", "chega", "envio")):
+        if any(k in t for k in ("frete", "entrega", "chega", "envio", "prazo")):
             return "shipping"
 
         if any(k in t for k in (
@@ -136,8 +203,9 @@ class PresenterEngine:
             or any(
                 t.startswith(x)
                 for x in (
-                    "tem ", "qual ", "quanto ", "como ",
-                    "serve ", "funciona ", "pode ", "vem ", "é "
+                    "tem ", "qual ", "quanto ", "como ", "quando ",
+                    "serve ", "funciona ", "pode ", "vem ", "é ", "e ",
+                    "possui ", "aceita ", "dura "
                 )
             )
         )
@@ -152,12 +220,68 @@ class PresenterEngine:
 
         return None
 
-    def unknown(self, user: str, topic: str) -> str:
+    def _question_topic(self, text: str) -> str | None:
+        t = clean(text).casefold()
+        for topic, keywords in self.TOPIC_KEYWORDS.items():
+            if any(k in t for k in keywords):
+                return topic
+        return None
+
+    def _fact_for_question(self, text: str) -> str | None:
+        description = self.known("description") or ""
+        additional = self.known("additional_info") or ""
+        candidates = _sentences(" ".join(x for x in (description, additional) if x))
+        if not candidates:
+            return None
+
+        t = clean(text).casefold()
+        topic = self._question_topic(text)
+        query_words = {
+            word for word in re.findall(r"[a-záàâãéêíóôõúç0-9]+", t)
+            if len(word) >= 3 and word not in self.STOPWORDS
+        }
+
+        best = None
+        best_score = 0
+        for sentence in candidates:
+            s = sentence.casefold()
+            score = sum(1 for word in query_words if word in s)
+
+            if topic:
+                score += 4 * sum(
+                    1 for keyword in self.TOPIC_KEYWORDS[topic] if keyword in s
+                )
+
+            if score > best_score:
+                best = sentence
+                best_score = score
+
+        return self._short(best) if best_score > 0 else None
+
+    def unknown(self, user: str, topic: str | None = None) -> str:
+        person = self._friendly_user(user)
+        prefix = f"{person}, " if person else ""
+        if topic:
+            return (
+                f"{prefix}sobre {topic}, eu não tenho certeza dessa informação "
+                "agora e prefiro não te passar errado, tá?"
+            )
         return (
-            f"{user}, vi sua pergunta sobre {topic}. "
-            "Essa informação não está cadastrada no produto ainda, "
-            "então prefiro não te passar algo errado."
+            f"{prefix}essa informação eu não tenho certeza agora, "
+            "então prefiro não te passar errado, tá?"
         )
+
+    def _natural_reply(self, user: str, fact: str, lead: str | None = None) -> str:
+        person = self._friendly_user(user)
+        prefix = f"{person}, " if person else ""
+        variants = (
+            f"{prefix}{lead + ' ' if lead else ''}{fact}",
+            f"{prefix}olha, {lead + ' ' if lead else ''}{fact}",
+            f"{prefix}sim — {fact}" if lead is None else f"{prefix}{lead} {fact}",
+        )
+        value = variants[self.response_step % len(variants)]
+        self.response_step += 1
+        return clean(value)
 
     def build_response(
         self,
@@ -166,78 +290,70 @@ class PresenterEngine:
         category: str,
     ) -> str | None:
         name = self.product_name()
-        description = self.known("description")
-        additional = self.known("additional_info")
+        description = self._short(self.known("description"))
+        additional = self._short(self.known("additional_info"))
         price = self.price_text()
+        matched_fact = self._fact_for_question(text)
 
         if category == "price":
-            return (
-                f"{user}, sobre o preço do {name}: {price}"
-                if price
-                else self.unknown(user, "preço")
-            )
+            if not price:
+                return self.unknown(user, "o preço")
+            person = self._friendly_user(user)
+            prefix = f"{person}, " if person else ""
+            return f"{prefix}{price}"
 
         if category == "availability":
-            searchable = " ".join(
-                x for x in (description, additional) if x
-            ).casefold()
-
-            if any(k in searchable for k in (
-                "cor", "tamanho", "estoque", "dispon"
-            )):
-                return (
-                    f"{user}, sobre disponibilidade do {name}: "
-                    f"{additional or description}"
-                )
+            if matched_fact:
+                return self._natural_reply(user, matched_fact)
             return self.unknown(user, "cor, tamanho ou disponibilidade")
 
         if category == "shipping":
-            searchable = " ".join(
-                x for x in (description, additional) if x
-            ).casefold()
-
-            if any(k in searchable for k in (
-                "frete", "envio", "entrega"
-            )):
-                return f"{user}, sobre entrega: {additional or description}"
-            return self.unknown(user, "frete ou entrega")
+            if matched_fact:
+                return self._natural_reply(user, matched_fact)
+            return self.unknown(user, "a entrega")
 
         if category == "usage":
-            return (
-                f"{user}, sobre como usar o {name}: {description}"
-                if description
-                else self.unknown(user, "uso do produto")
-            )
+            fact = matched_fact or description
+            if fact:
+                return self._natural_reply(user, fact, "funciona assim:")
+            return self.unknown(user, "como ele funciona")
 
         if category == "buying_intent":
-            parts = [f"{user}, boa! O produto é o {name}."]
+            person = self._friendly_user(user)
+            prefix = f"{person}, " if person else ""
             if price:
-                parts.append(price)
-            if additional:
-                parts.append(additional)
-            return " ".join(parts)
+                return (
+                    f"{prefix}boa! É esse {name} mesmo. {price} "
+                    "Dá uma olhada nos detalhes do produto aí."
+                )
+            return (
+                f"{prefix}boa! É esse {name} que eu tô mostrando. "
+                "Dá uma olhada nos detalhes aí."
+            )
 
         if category == "objection":
-            parts = [f"{user}, entendo sua dúvida sobre o {name}."]
-            if description:
-                parts.append(description)
+            person = self._friendly_user(user)
+            prefix = f"{person}, " if person else ""
+            fact = matched_fact or description or additional
+            if fact and price:
+                return f"{prefix}entendo. {fact} {price}"
+            if fact:
+                return f"{prefix}entendo. {fact}"
             if price:
-                parts.append(price)
-            return " ".join(parts)
+                return f"{prefix}entendo. {price}"
+            return self.unknown(user)
 
         if category == "direct_question":
-            if description or additional:
-                info = " ".join(
-                    x for x in (description, additional) if x
-                )
-                return (
-                    f"{user}, vi sua pergunta. "
-                    f"Sobre o {name}, o que tenho cadastrado é: {info}"
-                )
-            return self.unknown(user, "esse detalhe")
+            if matched_fact:
+                return self._natural_reply(user, matched_fact)
+            topic = self._question_topic(text)
+            return self.unknown(user, topic)
 
         if category == "engagement":
-            return f"{user}, valeu! Estamos mostrando o {name} agora."
+            person = self._friendly_user(user)
+            if person:
+                return f"Boa, {person}! Esse {name} tá bem legal mesmo."
+            return f"Esse {name} tá bem legal mesmo."
 
         return None
 
@@ -253,14 +369,14 @@ class PresenterEngine:
             category,
         )
 
-        if now - self.recent_keys.get(key, -999) < 30:
+        if now - self.recent_keys.get(key, -999) < self.DUPLICATE_WINDOW_SECONDS:
             return None
 
         self.recent_keys[key] = now
         self.recent_keys = {
             k: ts
             for k, ts in self.recent_keys.items()
-            if now - ts <= 120
+            if now - ts <= 180
         }
 
         speech = self.build_response(user, text, category)
@@ -282,51 +398,112 @@ class PresenterEngine:
             self.queue,
             (-item["priority"], next(self.counter), item),
         )
+
+        if len(self.queue) > self.MAX_REACTIVE_QUEUE:
+            kept = sorted(self.queue)[:self.MAX_REACTIVE_QUEUE]
+            self.queue = kept
+            heapq.heapify(self.queue)
+
         return item
 
-    def maybe_enqueue_proactive(self, interval: float = 25.0) -> dict | None:
-        now = time.time()
-
-        if self.queue or now - self.last_proactive_at < interval:
-            return None
-
-        name = self.product_name()
+    def _sales_fact(self) -> str | None:
         description = self.known("description")
         additional = self.known("additional_info")
+        facts = _sentences(" ".join(x for x in (description, additional) if x))
+        if not facts:
+            return None
+        index = self.proactive_step % len(facts)
+        return self._short(facts[index])
+
+    def build_proactive(self, now: float | None = None) -> dict:
+        now = time.time() if now is None else now
+        name = self.product_name()
+        fact = self._sales_fact()
         price = self.price_text()
 
-        if price:
-            speech = f"Pra quem chegou agora, estamos mostrando o {name}. {price}"
-        elif description:
-            speech = f"Pra quem chegou agora, olha só o {name}: {description}"
-        elif additional:
-            speech = f"Uma informação importante sobre o {name}: {additional}"
-        else:
-            speech = f"Pra quem chegou agora, o produto ativo é o {name}."
+        templates = []
 
-        item = {
+        if fact:
+            templates.extend([
+                f"Olha só esse {name}, gente. {fact}",
+                f"Pra quem acabou de entrar, eu tô mostrando o {name}. {fact}",
+                f"Uma coisa legal desse {name}: {fact}",
+            ])
+
+        if price:
+            templates.extend([
+                f"E presta atenção no valor: {price}",
+                f"Pra quem perguntou de preço, {price}",
+            ])
+
+        if fact and price:
+            templates.append(
+                f"Resumindo pra quem chegou agora: {fact} {price}"
+            )
+
+        templates.extend([
+            f"Se você tá de olho nesse {name}, dá uma conferida nos detalhes do produto aí.",
+            f"Vou continuar mostrando o {name} porque tem bastante coisa interessante nele.",
+        ])
+
+        speech = templates[self.proactive_step % len(templates)]
+        self.proactive_step += 1
+        self.last_proactive_at = now
+
+        return {
             "type": "proactive",
             "category": "proactive",
             "label": self.LABELS["proactive"],
             "priority": self.PRIORITY["proactive"],
             "user": None,
             "comment": None,
-            "speech": speech,
+            "speech": clean(speech),
             "created_at": now,
         }
 
-        heapq.heappush(
-            self.queue,
-            (-item["priority"], next(self.counter), item),
-        )
-        self.last_proactive_at = now
-        return item
+    def in_forced_sales_window(self, now: float | None = None) -> bool:
+        now = time.time() if now is None else now
+        if self.forced_sales_until and now >= self.forced_sales_until:
+            self.forced_sales_until = 0.0
+            self.reactive_streak = 0
+            return False
+        return now < self.forced_sales_until
 
-    def next_speech(self) -> dict | None:
+    def seconds_until_reactive(self, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        if not self.in_forced_sales_window(now):
+            return 0
+        return max(0, int(round(self.forced_sales_until - now)))
+
+    def can_take_reactive(self, now: float | None = None) -> bool:
+        if self.in_forced_sales_window(now):
+            return False
+        return self.reactive_streak < self.MAX_REACTIVE_BURST
+
+    def next_reactive(self) -> dict | None:
         if not self.queue:
             return None
         _, _, item = heapq.heappop(self.queue)
         return item
+
+    def mark_spoken(
+        self,
+        item: dict,
+        now: float | None = None,
+        speech_until: float | None = None,
+    ) -> None:
+        now = time.time() if now is None else now
+
+        if item.get("type") == "reactive":
+            self.reactive_streak += 1
+            if self.reactive_streak >= self.MAX_REACTIVE_BURST:
+                start = max(now, speech_until or now)
+                self.forced_sales_until = start + self.FORCED_SALES_SECONDS
+        else:
+            # Fala de produto fora da janela forçada quebra uma sequência curta
+            # de respostas e impede que a LIVE vire um tira-dúvidas contínuo.
+            if not self.in_forced_sales_window(now):
+                self.reactive_streak = 0
 
     def queue_snapshot(self) -> list[dict]:
         return [item for _, _, item in sorted(self.queue)]
