@@ -24,6 +24,22 @@ class FakeBrain:
         )
 
 
+class UnavailableBrain:
+    name = "unavailable-brain"
+
+    def __init__(self):
+        self.health_calls = 0
+        self.generate_calls = 0
+
+    def healthcheck(self):
+        self.health_calls += 1
+        return False, "Ollama indisponível para teste."
+
+    def generate(self, context):
+        self.generate_calls += 1
+        raise AssertionError("Brain indisponível não deve gerar fala")
+
+
 class FakeMonitor:
     def __init__(self, active=True):
         self.active = active
@@ -85,4 +101,29 @@ def test_presenter_tick_calls_brain_when_live(tmp_path):
         runtime._tick_presenter_locked()
 
     assert brain.calls >= 1
+    runtime.close()
+
+
+
+def test_brain_preflight_degrades_to_deterministic_presenter(tmp_path):
+    brain = UnavailableBrain()
+    runtime = AGCNVoiceRuntime(
+        make_store(tmp_path),
+        brain_provider=brain,
+    )
+    runtime.monitor = FakeMonitor(active=True)
+
+    runtime._preflight_brain()
+
+    assert brain.health_calls == 1
+    assert brain.generate_calls == 0
+    assert runtime.brain_provider is None
+    assert runtime.brain_status == "fallback"
+    assert "Ollama indisponível" in runtime.brain_degraded_reason
+    assert runtime.presenter.__class__.__name__ == "PresenterV2"
+
+    with runtime.lock:
+        runtime._tick_presenter_locked()
+
+    assert runtime.speeches_generated >= 1
     runtime.close()
