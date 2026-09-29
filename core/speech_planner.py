@@ -151,6 +151,13 @@ class SpeechPlanner:
             topic_to_fact.get(topic, topic)
         )
 
+        if topic == "description" and fact:
+            items = guard.knowledge.entries(fact)
+            if items:
+                fact = items[
+                    memory.proactive_cursor() % len(items)
+                ]
+
         if topic == "price_value":
             fact = guard.fact_for_topic("price")
         elif topic == "scarcity":
