@@ -85,3 +85,17 @@ def test_voice_queue_prioritizes_reactive_over_proactive():
 
     first = service.queue.get_nowait()
     assert first.text == "resposta de compra"
+
+
+def test_voice_service_can_restart_after_stop():
+    service = VoiceService(FakeTTS(), FakeSink())
+    service.start()
+    assert service.stop_event.is_set() is False
+
+    service.stop()
+    assert service.stop_event.is_set() is True
+
+    service.start()
+    assert service.stop_event.is_set() is False
+
+    service.stop()
