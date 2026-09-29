@@ -717,7 +717,7 @@ class SettingsPage(QWidget):
             "qwen3_hq_auto",
         )
         self.voice_engine.addItem(
-            "Gemini Premium TTS — em breve",
+            "Gemini Premium TTS",
             "gemini_premium",
         )
         self.voice_engine.addItem(
@@ -726,7 +726,7 @@ class SettingsPage(QWidget):
         )
         voice_model = self.voice_engine.model()
         item_getter = getattr(voice_model, "item", None)
-        for index in (1, 2):
+        for index in (2,):
             item = item_getter(index) if callable(item_getter) else None
             if item is not None:
                 item.setEnabled(False)
@@ -734,6 +734,23 @@ class SettingsPage(QWidget):
                     "A opção já está prevista na interface e será ativada "
                     "quando a integração por API estiver pronta."
                 )
+
+        self.gemini_model = QComboBox()
+        self.gemini_model.addItem(
+            "Gemini 3.8 Flash-Lite — rápido/econômico",
+            "gemini-3.8-flash-lite-tts",
+        )
+        self.gemini_model.addItem(
+            "Gemini 3.8 Flash — máxima qualidade",
+            "gemini-3.8-flash-tts",
+        )
+        self.gemini_key = QLineEdit()
+        self.gemini_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_key.setPlaceholderText(
+            "Deixe vazio para manter a chave Gemini já salva"
+        )
+        self.gemini_status = QLabel("")
+        self.gemini_status.setStyleSheet("color:#6B7280;font-size:12px;")
 
         self.voice_profile = QComboBox()
         for profile in list_voice_profiles():
@@ -786,6 +803,9 @@ class SettingsPage(QWidget):
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
         self.test_voice_btn = QPushButton("Testar voz")
         voice_form.addRow("Motor", self.voice_engine)
+        voice_form.addRow("Modelo Gemini", self.gemini_model)
+        voice_form.addRow("Chave Gemini", self.gemini_key)
+        voice_form.addRow("", self.gemini_status)
         voice_form.addRow("Perfil de voz", self.voice_profile)
         voice_form.addRow("Velocidade", speed_row)
         voice_form.addRow("Expressividade", expression_row)
@@ -814,6 +834,9 @@ class SettingsPage(QWidget):
         self.test_brain_btn.clicked.connect(self._test_brain)
         self.doctor_btn.clicked.connect(self._doctor)
         self.test_voice_btn.clicked.connect(self._test_voice)
+        self.voice_engine.currentIndexChanged.connect(
+            self._update_voice_provider_controls
+        )
 
         self.load()
 
@@ -823,6 +846,7 @@ class SettingsPage(QWidget):
         ollama = brain.get("ollama") or {}
         api = brain.get("api") or {}
         tts = config.get("tts") or {}
+        gemini = tts.get("gemini") or {}
         audio = config.get("audio") or {}
 
         self.brain_provider.setCurrentText(
@@ -845,6 +869,13 @@ class SettingsPage(QWidget):
         if provider_index >= 0:
             self.voice_engine.setCurrentIndex(provider_index)
 
+        gemini_model = str(
+            gemini.get("model") or "gemini-3.8-flash-lite-tts"
+        )
+        gemini_index = self.gemini_model.findData(gemini_model)
+        if gemini_index >= 0:
+            self.gemini_model.setCurrentIndex(gemini_index)
+
         profile_id = str(tts.get("profile") or "female_fast")
         profile_index = self.voice_profile.findData(profile_id)
         if profile_index >= 0:
@@ -855,11 +886,20 @@ class SettingsPage(QWidget):
         )
 
         hq_cfg = dict(tts.get("qwen3_hq") or {})
-        strength = float(hq_cfg.get("expression_strength", 1.0))
+        strength = float(
+            tts.get(
+                "expression_strength",
+                hq_cfg.get("expression_strength", 1.0),
+            )
+        )
         self.expression_slider.setValue(
             max(0, min(150, int(round(strength * 100))))
         )
-        style = str(hq_cfg.get("voice_style") or "auto")
+        style = str(
+            tts.get("voice_style")
+            or hq_cfg.get("voice_style")
+            or "auto"
+        )
         style_index = self.voice_style_combo.findData(style)
         self.voice_style_combo.setCurrentIndex(
             style_index if style_index >= 0 else 0
@@ -873,6 +913,12 @@ class SettingsPage(QWidget):
             if self.controller.api_key_saved()
             else "API da inteligência opcional"
         )
+        self.gemini_status.setText(
+            "Chave Gemini salva com segurança"
+            if self.controller.gemini_key_saved()
+            else "Chave Gemini ainda não configurada"
+        )
+        self._update_voice_provider_controls()
 
     def _patch(self) -> dict:
         return {
@@ -900,6 +946,13 @@ class SettingsPage(QWidget):
                 ),
                 "speed": self.speed_slider.value() / 100.0,
                 "voice_override": "",
+                "expressive": self.expression_slider.value() > 0,
+                "expression_strength": (
+                    self.expression_slider.value() / 100.0
+                ),
+                "voice_style": (
+                    self.voice_style_combo.currentData() or "auto"
+                ),
                 "qwen3_hq": {
                     "pack_dir": "",
                     "port": 18765,
@@ -916,6 +969,18 @@ class SettingsPage(QWidget):
                 "kokoro": {
                     "model_dir": "",
                 },
+                "gemini": {
+                    "model": (
+                        self.gemini_model.currentData()
+                        or "gemini-3.8-flash-lite-tts"
+                    ),
+                    "base_url": (
+                        "https://generativelanguage.googleapis.com"
+                    ),
+                    "api_key_env": "GEMINI_API_KEY",
+                    "timeout_seconds": 45,
+                    "voice_override": "",
+                },
             },
             "audio": {
                 "output_device": self.device.currentText().strip(),
@@ -925,11 +990,14 @@ class SettingsPage(QWidget):
     def _save(self) -> None:
         try:
             key = self.api_key.text()
+            gemini_key = self.gemini_key.text()
             self.controller.save_settings(
                 self._patch(),
                 openai_key=key if key else None,
+                gemini_key=gemini_key if gemini_key else None,
             )
             self.api_key.clear()
+            self.gemini_key.clear()
             self.load()
             QMessageBox.information(
                 self,
@@ -938,6 +1006,12 @@ class SettingsPage(QWidget):
             )
         except Exception as exc:
             QMessageBox.critical(self, "Erro ao salvar", str(exc))
+
+    def _update_voice_provider_controls(self) -> None:
+        is_gemini = self.voice_engine.currentData() == "gemini_premium"
+        self.gemini_model.setEnabled(is_gemini)
+        self.gemini_key.setEnabled(is_gemini)
+        self.gemini_status.setEnabled(is_gemini)
 
     def _devices(self) -> None:
         try:
@@ -1003,6 +1077,18 @@ class SettingsPage(QWidget):
 
     def _test_voice(self) -> None:
         try:
+            if (
+                self.voice_engine.currentData() == "gemini_premium"
+                and self.gemini_key.text().strip()
+            ):
+                self.controller.set_gemini_key(
+                    self.gemini_key.text().strip()
+                )
+                self.gemini_key.clear()
+                self.gemini_status.setText(
+                    "Chave Gemini salva com segurança"
+                )
+
             ok, message = self.controller.test_voice(
                 config_override=self._patch()
             )
