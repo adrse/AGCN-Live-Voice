@@ -724,8 +724,10 @@ class SettingsPage(QWidget):
             "OpenAI Live — em breve",
             "openai_live",
         )
+        voice_model = self.voice_engine.model()
+        item_getter = getattr(voice_model, "item", None)
         for index in (1, 2):
-            item = self.voice_engine.model().item(index)
+            item = item_getter(index) if callable(item_getter) else None
             if item is not None:
                 item.setEnabled(False)
                 item.setToolTip(
