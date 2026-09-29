@@ -242,3 +242,47 @@ Arquivos principais:
 
 O workflow `Build Windows HQ Voice` já passou integralmente no run `36510038423`.
 Não reimplementar a voz. Amanhã apenas ouvir/avaliar no PC real e medir latência no hardware alvo.
+
+
+## Qwen3-TTS HQ final: SUCCESS
+
+Commit validado: `98509848070e001988eaaa3add6c93b3c5cdc1ab`.
+
+GitHub Actions:
+- `AGCN Full Test Suite`: SUCCESS — 85 passed, 2 warnings;
+- `Build Windows Desktop`: SUCCESS;
+- `Build Windows HQ Voice`: SUCCESS.
+
+O build HQ confirmou no Windows:
+1. qwentts.cpp compilado;
+2. pesos Qwen3-TTS 1.7B CustomVoice Q8 baixados;
+3. Voice Pack detectado;
+4. Vivian sintetizou frase em Português sem API;
+5. Ryan sintetizou frase em Português sem API;
+6. executável AGCN compilado;
+7. Voice Pack HQ copiado para dentro da distribuição;
+8. executável abriu sem crash imediato;
+9. pacote HQ publicado.
+
+Artifact:
+- nome: `AGCN-Live-Voice-Windows-HQ`;
+- tamanho: 2.679.645.484 bytes;
+- SHA-256 do artifact: `d622525b85b5155979d77a6696c18003256a86a799d5b1d2b561c989c11bf816`;
+- workflow run: `36510038423`;
+- expira no GitHub Actions em 13/10/2026.
+
+### Regra para Astra
+
+NÃO reimplementar nem trocar o motor de voz antes de ouvir/testar o pacote já validado.
+
+Voz principal:
+- Qwen3-TTS 1.7B CustomVoice Q8;
+- Vivian = feminina;
+- Ryan = masculina;
+- Português;
+- estilo brasileiro de live commerce passado em `instructions`;
+- velocidade controlada por slider;
+- inferência local sem API.
+
+Fallback:
+- Kokoro Dora/Alex apenas se o Voice Pack HQ estiver indisponível.
