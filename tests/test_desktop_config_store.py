@@ -53,3 +53,6 @@ def test_builtin_defaults_use_local_voice_without_api(tmp_path):
     assert loaded["tts"]["provider"] == "qwen3_hq_auto"
     assert loaded["tts"]["profile"] == "female_fast"
     assert loaded["tts"]["speed"] == 1.28
+    assert loaded["tts"]["qwen3_hq"]["expressive"] is True
+    assert loaded["tts"]["qwen3_hq"]["expression_strength"] == 1.0
+    assert loaded["tts"]["qwen3_hq"]["voice_style"] == "auto"
