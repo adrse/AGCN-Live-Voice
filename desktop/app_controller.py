@@ -98,10 +98,13 @@ class DesktopController:
         patch: dict[str, Any],
         *,
         openai_key: str | None = None,
+        gemini_key: str | None = None,
         elevenlabs_key: str | None = None,
     ) -> dict:
         if openai_key is not None:
             set_secret("OPENAI_API_KEY", openai_key)
+        if gemini_key is not None:
+            set_secret("GEMINI_API_KEY", gemini_key)
         if elevenlabs_key is not None:
             set_secret("ELEVENLABS_API_KEY", elevenlabs_key)
 
@@ -119,6 +122,9 @@ class DesktopController:
 
     def api_key_saved(self) -> bool:
         return has_secret("OPENAI_API_KEY")
+
+    def gemini_key_saved(self) -> bool:
+        return has_secret("GEMINI_API_KEY")
 
     def elevenlabs_key_saved(self) -> bool:
         return has_secret("ELEVENLABS_API_KEY")
