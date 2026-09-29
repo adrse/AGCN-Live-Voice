@@ -29,6 +29,22 @@ from core.voice_profiles import list_voice_profiles
 from desktop.app_controller import DesktopController
 
 
+VOICE_STYLE_OPTIONS = [
+    ("Automático — recomendado", "auto"),
+    ("Vendas — energética", "sales_energy"),
+    ("Animada / empolgada", "excited"),
+    ("Comemorativa", "celebratory"),
+    ("Urgência controlada", "urgent_grounded"),
+    ("Preço — confiante", "price_confident"),
+    ("Tranquila / segura", "reassuring"),
+    ("Empática — dor e solução", "empathetic_solution"),
+    ("Desejo / imaginação de uso", "vivid_desire"),
+    ("Resposta direta", "clear_answer"),
+    ("Acolhedora", "welcoming"),
+    ("Suspense / revelação", "suspense_reveal"),
+]
+
+
 def heading(text: str, subtitle: str = "") -> tuple[QLabel, QLabel]:
     title = QLabel(text)
     title.setStyleSheet("font-size:26px;font-weight:700;color:#111827;")
@@ -81,6 +97,7 @@ class DashboardPage(QWidget):
         self.product = QLabel("Nenhum")
         self.brain = QLabel("—")
         self.voice = QLabel("—")
+        self.voice_style = QLabel("—")
         self.presenter_mode = QLabel("Interativo")
         self.comments_pause = QLabel("0s")
         labels = [
@@ -90,6 +107,7 @@ class DashboardPage(QWidget):
             ("Produto ativo", self.product),
             ("Brain", self.brain),
             ("Voz", self.voice),
+            ("Estilo vocal", self.voice_style),
             ("Modo Presenter", self.presenter_mode),
             ("Comentários pausados", self.comments_pause),
         ]
@@ -109,6 +127,26 @@ class DashboardPage(QWidget):
         self.speech.setPlaceholderText("A fala atual aparecerá aqui.")
         speech_layout.addWidget(self.speech)
         layout.addWidget(speech_box)
+
+        plan_box = group("Andamento da apresentação")
+        plan_grid = QGridLayout(plan_box)
+        self.current_action = QLabel("—")
+        self.next_action = QLabel("—")
+        self.after_action = QLabel("—")
+        for widget in (
+            self.current_action,
+            self.next_action,
+            self.after_action,
+        ):
+            widget.setWordWrap(True)
+            widget.setStyleSheet("font-size:13px;font-weight:600;")
+        plan_grid.addWidget(QLabel("Agora"), 0, 0)
+        plan_grid.addWidget(QLabel("Próximo"), 0, 1)
+        plan_grid.addWidget(QLabel("Depois"), 0, 2)
+        plan_grid.addWidget(self.current_action, 1, 0)
+        plan_grid.addWidget(self.next_action, 1, 1)
+        plan_grid.addWidget(self.after_action, 1, 2)
+        layout.addWidget(plan_box)
 
         columns = QHBoxLayout()
         comments_box = group("Comentários recentes")
@@ -182,6 +220,14 @@ class DashboardPage(QWidget):
             )
         )
 
+        self.voice_style.setText(
+            str(
+                voice.get("current_style")
+                or (data.get("current_speech") or {}).get("voice_style")
+                or "—"
+            )
+        )
+
         self.presenter_mode.setText(
             "Produto"
             if data.get("presenter_mode") == "produto"
@@ -193,6 +239,25 @@ class DashboardPage(QWidget):
 
         current = data.get("current_speech") or {}
         self.speech.setPlainText(current.get("speech") or "")
+        self.current_action.setText(self._action_text(current))
+
+        queued = list(data.get("queue") or [])
+        product_locked = (
+            data.get("presenter_mode") == "produto"
+            and int(data.get("comments_paused_seconds") or 0) > 0
+        )
+        if product_locked:
+            self.next_action.setText("Continuar falando do produto")
+            self.after_action.setText(
+                self._action_text(queued[0]) if queued else "—"
+            )
+        else:
+            self.next_action.setText(
+                self._action_text(queued[0]) if queued else "—"
+            )
+            self.after_action.setText(
+                self._action_text(queued[1]) if len(queued) > 1 else "—"
+            )
 
         self.comments.clear()
         for item in reversed(data.get("comments") or []):
@@ -214,6 +279,25 @@ class DashboardPage(QWidget):
             or ""
         )
         self.diagnostic.setText(str(error))
+
+    @staticmethod
+    def _action_text(item: dict) -> str:
+        if not item:
+            return "—"
+        kind = str(item.get("type") or "")
+        topic = str(item.get("topic") or item.get("intent") or "").replace("_", " ")
+        style = str(item.get("voice_style") or "").replace("_", " ")
+        if kind == "reactive":
+            user = str(item.get("user") or "cliente")
+            comment = str(item.get("comment") or "").strip()
+            base = f"Responder {user}"
+            if comment:
+                base += f": {comment}"
+        else:
+            base = f"Produto: {topic}" if topic else "Continuar apresentação"
+        if style:
+            base += f" · voz: {style}"
+        return base
 
 
 class PointsEditor(QWidget):
@@ -609,10 +693,27 @@ class SettingsPage(QWidget):
         voice_box = group("Voz e áudio")
         voice_form = QFormLayout(voice_box)
 
-        self.voice_engine = QLabel(
-            "AGCN Neural HQ — Qwen3-TTS 1.7B (offline, fallback Kokoro)"
+        self.voice_engine = QComboBox()
+        self.voice_engine.addItem(
+            "Local HQ — Qwen3-TTS (offline)",
+            "qwen3_hq_auto",
         )
-        self.voice_engine.setStyleSheet("font-weight:700;color:#111827;")
+        self.voice_engine.addItem(
+            "Gemini Premium TTS — em breve",
+            "gemini_premium",
+        )
+        self.voice_engine.addItem(
+            "OpenAI Live — em breve",
+            "openai_live",
+        )
+        for index in (1, 2):
+            item = self.voice_engine.model().item(index)
+            if item is not None:
+                item.setEnabled(False)
+                item.setToolTip(
+                    "A opção já está prevista na interface e será ativada "
+                    "quando a integração por API estiver pronta."
+                )
 
         self.voice_profile = QComboBox()
         for profile in list_voice_profiles():
@@ -636,6 +737,30 @@ class SettingsPage(QWidget):
         speed_row.addWidget(self.speed_slider, 1)
         speed_row.addWidget(self.speed_label)
 
+        self.expression_slider = QSlider(Qt.Orientation.Horizontal)
+        self.expression_slider.setMinimum(0)
+        self.expression_slider.setMaximum(150)
+        self.expression_slider.setSingleStep(5)
+        self.expression_slider.setValue(100)
+        self.expression_label = QLabel("100%")
+        self.expression_slider.valueChanged.connect(
+            lambda value: self.expression_label.setText(f"{value}%")
+        )
+        expression_row = QHBoxLayout()
+        expression_row.addWidget(self.expression_slider, 1)
+        expression_row.addWidget(self.expression_label)
+
+        self.voice_style_combo = QComboBox()
+        for label, style_id in VOICE_STYLE_OPTIONS:
+            self.voice_style_combo.addItem(label, style_id)
+
+        self.voice_hint = QLabel(
+            "No modo Automático, o AGCN muda a interpretação conforme "
+            "comentário, preço, compra, objeção, escassez e etapa da venda."
+        )
+        self.voice_hint.setWordWrap(True)
+        self.voice_hint.setStyleSheet("color:#6B7280;font-size:12px;")
+
         self.device = QComboBox()
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
@@ -643,6 +768,9 @@ class SettingsPage(QWidget):
         voice_form.addRow("Motor", self.voice_engine)
         voice_form.addRow("Perfil de voz", self.voice_profile)
         voice_form.addRow("Velocidade", speed_row)
+        voice_form.addRow("Expressividade", expression_row)
+        voice_form.addRow("Estilo", self.voice_style_combo)
+        voice_form.addRow("", self.voice_hint)
         voice_form.addRow("Saída de áudio", self.device)
 
         voice_actions = QHBoxLayout()
@@ -692,6 +820,11 @@ class SettingsPage(QWidget):
         self.api_model.setText(str(api.get("model") or ""))
         self.fallback.setChecked(bool(brain.get("fallback_local", True)))
 
+        provider_id = str(tts.get("provider") or "qwen3_hq_auto")
+        provider_index = self.voice_engine.findData(provider_id)
+        if provider_index >= 0:
+            self.voice_engine.setCurrentIndex(provider_index)
+
         profile_id = str(tts.get("profile") or "female_fast")
         profile_index = self.voice_profile.findData(profile_id)
         if profile_index >= 0:
@@ -700,6 +833,18 @@ class SettingsPage(QWidget):
         self.speed_slider.setValue(
             max(80, min(160, int(round(speed * 100))))
         )
+
+        hq_cfg = dict(tts.get("qwen3_hq") or {})
+        strength = float(hq_cfg.get("expression_strength", 1.0))
+        self.expression_slider.setValue(
+            max(0, min(150, int(round(strength * 100))))
+        )
+        style = str(hq_cfg.get("voice_style") or "auto")
+        style_index = self.voice_style_combo.findData(style)
+        self.voice_style_combo.setCurrentIndex(
+            style_index if style_index >= 0 else 0
+        )
+
         self.device.setCurrentText(
             str(audio.get("output_device") or "")
         )
@@ -725,7 +870,10 @@ class SettingsPage(QWidget):
                 },
             },
             "tts": {
-                "provider": "qwen3_hq_auto",
+                "provider": (
+                    self.voice_engine.currentData()
+                    or "qwen3_hq_auto"
+                ),
                 "profile": (
                     self.voice_profile.currentData()
                     or "female_fast"
@@ -737,6 +885,13 @@ class SettingsPage(QWidget):
                     "port": 18765,
                     "startup_timeout_seconds": 120,
                     "request_timeout_seconds": 60,
+                    "expressive": self.expression_slider.value() > 0,
+                    "expression_strength": (
+                        self.expression_slider.value() / 100.0
+                    ),
+                    "voice_style": (
+                        self.voice_style_combo.currentData() or "auto"
+                    ),
                 },
                 "kokoro": {
                     "model_dir": "",
@@ -829,7 +984,9 @@ class SettingsPage(QWidget):
     def _test_voice(self) -> None:
         try:
             self._apply_settings_before_test()
-            ok, message = self.controller.test_voice()
+            ok, message = self.controller.test_voice(
+                config_override=self._patch()
+            )
             QMessageBox.information(
                 self,
                 "Teste de voz",
