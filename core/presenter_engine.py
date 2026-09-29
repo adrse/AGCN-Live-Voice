@@ -281,9 +281,26 @@ class PresenterEngine:
 
         return self._short(best) if best_score > 0 else None
 
+    def _casual_fact(self, fact: str) -> str:
+        value = self._short(fact) or clean(fact)
+        replacements = (
+            (r"^o produto possui\s+", "ele tem "),
+            (r"^este produto possui\s+", "ele tem "),
+            (r"^possui\s+", "tem "),
+            (r"^o produto é compatível com\s+", "funciona com "),
+            (r"^é compatível com\s+", "funciona com "),
+            (r"^o produto conta com\s+", "ele tem "),
+        )
+        for pattern, repl in replacements:
+            changed = re.sub(pattern, repl, value, flags=re.IGNORECASE)
+            if changed != value:
+                value = changed
+                break
+        return clean(value)
+
     def _natural_reply(self, user: str, fact: str, lead: str | None = None) -> str:
         person = self._friendly_user(user)
-        fact = self._short(fact) or clean(fact)
+        fact = self._casual_fact(fact)
 
         if person:
             variants = (
@@ -422,7 +439,7 @@ class PresenterEngine:
         if not facts:
             return None
         index = self.proactive_step % len(facts)
-        return self._short(facts[index])
+        return self._casual_fact(facts[index])
 
     def build_proactive(self, now: float | None = None) -> dict:
         now = time.time() if now is None else now
