@@ -8,6 +8,7 @@ from typing import Any
 
 from core.audio_output import SoundDeviceAudioSink
 from core.brain_factory import build_brain_provider
+from core.local_qwen3_tts import Qwen3HQLocalTTSProvider
 from core.product_store import ProductStore
 from core.secret_store import has_secret
 from core.tts_providers import build_tts_provider
@@ -76,6 +77,20 @@ def run_diagnostics(
         "Vivian (feminina) + Ryan (masculina) no Qwen3-TTS HQ; Dora/Alex no fallback",
     )
 
+    tts_cfg = dict(config.get("tts") or {})
+    hq_cfg = dict(tts_cfg.get("qwen3_hq") or {})
+    try:
+        hq = Qwen3HQLocalTTSProvider(
+            profile_id=str(tts_cfg.get("profile") or "female_fast"),
+            speed=float(tts_cfg.get("speed") or 1.28),
+            pack_dir=hq_cfg.get("pack_dir") or None,
+            port=int(hq_cfg.get("port", 18765)),
+        )
+        hq_ok, hq_detail = hq.assets_status()
+        add("Voice Pack HQ", hq_ok, hq_detail)
+    except Exception as exc:
+        add("Voice Pack HQ", False, str(exc))
+
     try:
         tts = build_tts_provider(config)
         ok, detail = tts.healthcheck()
@@ -109,6 +124,7 @@ def run_diagnostics(
         "Produto ativo",
         "Presenter Brain",
         "Duas vozes AGCN",
+        "Voice Pack HQ",
         "Motor de voz local",
         "Dispositivos de áudio",
     ]
