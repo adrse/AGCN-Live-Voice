@@ -10,6 +10,7 @@ from core.presenter_v2 import PresenterV2
 from core.presenter_v3 import PresenterV3
 from core.product_store import ProductStore
 from core.tiktok_monitor import TikTokMonitor
+from core.voice_expression import infer_voice_style
 from core.voice_factory import build_voice_service
 from core.voice_service import VoiceService
 
@@ -268,6 +269,9 @@ class AGCNVoiceRuntime:
         if item.get("type") == "reactive":
             self.voice_service.clear_pending(proactive_only=True)
 
+        voice_style = infer_voice_style(item)
+        item["voice_style"] = voice_style
+
         self.voice_service.enqueue(
             item["speech"],
             priority=int(item.get("priority", 30)),
@@ -275,6 +279,9 @@ class AGCNVoiceRuntime:
                 "type": item.get("type"),
                 "intent": item.get("intent"),
                 "topic": item.get("topic"),
+                "tactic": item.get("tactic"),
+                "cta": item.get("cta"),
+                "voice_style": voice_style,
                 "user": item.get("user"),
                 "comment": item.get("comment"),
             },
