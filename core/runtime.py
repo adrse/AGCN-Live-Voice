@@ -10,7 +10,9 @@ from core.tiktok_monitor import TikTokMonitor
 
 
 class AGCNVoiceRuntime:
-    """Runtime integrado da baseline V0.4.1."""
+    """Runtime integrado do AGCN Live Voice."""
+
+    IDLE_PROACTIVE_INTERVAL = 12.0
 
     def __init__(self, store: ProductStore | None = None):
         self.store = store or ProductStore()
@@ -21,6 +23,7 @@ class AGCNVoiceRuntime:
         self.items_queued = 0
         self.speeches_generated = 0
         self.proactive_generated = 0
+        self.reactive_generated = 0
 
         self.last_comment = None
         self.last_decision = None
@@ -143,6 +146,37 @@ class AGCNVoiceRuntime:
     def stop(self) -> dict:
         return self.monitor.stop()
 
+    @staticmethod
+    def _speech_duration(text: str) -> float:
+        # Aproxima a duração da fala para que o planejador não troque de
+        # frase antes de a voz terminar. Mantém a simulação responsiva.
+        return min(13.0, max(4.0, len(text or "") / 15.0))
+
+    def _select_next_speech_locked(self, now: float) -> dict | None:
+        # Depois de um bloco de respostas, comentários ficam temporariamente
+        # pausados. Durante essa janela a prioridade absoluta é vender e
+        # apresentar o produto, mesmo que a fila continue recebendo perguntas.
+        if self.presenter.in_forced_sales_window(now):
+            self.proactive_generated += 1
+            return self.presenter.build_proactive(now)
+
+        # Fora da janela de produto, responde comentários relevantes com limite
+        # de sequência. A própria PresenterEngine abre a janela obrigatória
+        # após o número máximo de respostas consecutivas.
+        if self.presenter.can_take_reactive(now):
+            reactive = self.presenter.next_reactive()
+            if reactive:
+                self.reactive_generated += 1
+                return reactive
+
+        # Sem pergunta para responder, a apresentadora não fica esperando em
+        # silêncio: retoma o produto em ritmo de LIVE.
+        if now - self.presenter.last_proactive_at >= self.IDLE_PROACTIVE_INTERVAL:
+            self.proactive_generated += 1
+            return self.presenter.build_proactive(now)
+
+        return None
+
     def _tick_presenter_locked(self):
         self._sync_active_product_locked()
 
@@ -159,28 +193,23 @@ class AGCNVoiceRuntime:
             return
 
         self.current_speech = None
-
-        proactive = self.presenter.maybe_enqueue_proactive(
-            interval=25
-        )
-
-        if proactive:
-            self.proactive_generated += 1
-            self.items_queued += 1
-
-        item = self.presenter.next_speech()
+        item = self._select_next_speech_locked(now)
 
         if not item:
             return
 
+        duration = self._speech_duration(item["speech"])
+        speech_until = now + duration
+
         self.current_speech = item
+        self.current_speech_until = speech_until
         self.speeches_generated += 1
 
-        duration = min(
-            14,
-            max(4, len(item["speech"]) / 14),
+        self.presenter.mark_spoken(
+            item,
+            now=now,
+            speech_until=speech_until,
         )
-        self.current_speech_until = now + duration
 
     def snapshot(self) -> dict:
         with self.lock:
@@ -188,6 +217,8 @@ class AGCNVoiceRuntime:
 
             live = self.monitor.snapshot()
             active = self.store.active() or {}
+            now = time.time()
+            comments_paused = self.presenter.seconds_until_reactive(now)
 
             data = {
                 **live,
@@ -197,6 +228,13 @@ class AGCNVoiceRuntime:
                 "items_queued": self.items_queued,
                 "speeches_generated": self.speeches_generated,
                 "proactive_generated": self.proactive_generated,
+                "reactive_generated": self.reactive_generated,
+                "presenter_mode": (
+                    "produto" if comments_paused > 0 else "interativo"
+                ),
+                "comments_paused_seconds": comments_paused,
+                "reactive_streak": self.presenter.reactive_streak,
+                "max_reactive_burst": self.presenter.MAX_REACTIVE_BURST,
                 "last_comment": (
                     dict(self.last_comment)
                     if self.last_comment
@@ -252,12 +290,15 @@ class AGCNVoiceRuntime:
         passed = sum(1 for ok in checks.values() if ok)
 
         lines = [
-            "AGCN LIVE VOICE — RESULTADO DO TESTE BASELINE",
+            "AGCN LIVE VOICE — RESULTADO DO TESTE",
             "",
             f"LIVE: {data.get('username') or 'NÃO INICIADA'}",
             f"Status: {data.get('status', '—')}",
             f"Room ID: {data.get('room_id') or 'NÃO RECEBIDO'}",
             f"Produto ativo: {product.get('name') or 'NÃO CARREGADO'}",
+            f"Modo do apresentador: {data.get('presenter_mode', '—')}",
+            f"Respostas consecutivas: {data.get('reactive_streak', 0)}/{data.get('max_reactive_burst', 3)}",
+            f"Pausa de comentários: {data.get('comments_paused_seconds', 0)}s",
             "",
             "CHECKLIST:",
         ]
@@ -273,7 +314,8 @@ class AGCNVoiceRuntime:
             f"Comentários relevantes analisados: {data.get('comments_analyzed', 0)}",
             f"Itens colocados na fila: {data.get('items_queued', 0)}",
             f"Falas sugeridas geradas: {data.get('speeches_generated', 0)}",
-            f"Falas proativas geradas: {data.get('proactive_generated', 0)}",
+            f"Respostas a comentários: {data.get('reactive_generated', 0)}",
+            f"Falas proativas de produto: {data.get('proactive_generated', 0)}",
         ]
 
         decision = data.get("last_decision")

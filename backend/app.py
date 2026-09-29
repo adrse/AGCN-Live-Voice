@@ -15,7 +15,7 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.4.1-baseline",
+    version="0.5.0-presenter-behavior",
 )
 
 runtime = AGCNVoiceRuntime()
@@ -46,7 +46,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.4.1-baseline",
+        "version": "0.5.0-presenter-behavior",
     }
 
 
