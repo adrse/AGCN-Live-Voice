@@ -1,0 +1,152 @@
+"""Controller entre PySide6 e o core do AGCN Live Voice."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from core.audio_output import SoundDeviceAudioSink
+from core.brain_factory import build_brain_provider
+from core.product_store import ProductStore
+from core.runtime import AGCNVoiceRuntime
+from core.secret_store import has_secret, set_secret
+from core.tts_providers import build_tts_provider
+from desktop.config_store import ConfigStore
+
+
+class DesktopController:
+    def __init__(self) -> None:
+        self.config_store = ConfigStore()
+        self.config = self.config_store.load()
+        self.product_store = ProductStore()
+        self.runtime = self._build_runtime()
+
+    def _build_runtime(self) -> AGCNVoiceRuntime:
+        return AGCNVoiceRuntime(
+            self.product_store,
+            brain_config=self.config,
+            voice_config=self.config,
+        )
+
+    def close(self) -> None:
+        self.runtime.close()
+
+    def snapshot(self) -> dict:
+        return self.runtime.snapshot()
+
+    def start_live(self, username: str) -> dict:
+        return self.runtime.start(username)
+
+    def stop_live(self) -> dict:
+        return self.runtime.stop()
+
+    def products(self) -> list[dict]:
+        return self.product_store.list()
+
+    def active_product(self) -> dict | None:
+        return self.product_store.active()
+
+    def save_product(
+        self,
+        payload: dict[str, Any],
+        *,
+        product_id: str | None = None,
+        activate: bool = True,
+    ) -> dict:
+        manual_fields = [
+            key
+            for key, value in payload.items()
+            if value not in (None, "", False)
+        ]
+        if product_id:
+            result = self.runtime.update_product(
+                product_id,
+                {
+                    **payload,
+                    "manual_fields": manual_fields,
+                },
+            )
+        else:
+            result = self.runtime.add_product({
+                **payload,
+                "manual_fields": manual_fields,
+            })
+
+        product = result["product"]
+        if activate and product.get("id"):
+            self.runtime.activate_product(product["id"])
+        return product
+
+    def activate_product(self, product_id: str) -> dict:
+        return self.runtime.activate_product(product_id)
+
+    def delete_product(self, product_id: str) -> dict:
+        return self.runtime.delete_product(product_id)
+
+    def save_settings(
+        self,
+        patch: dict[str, Any],
+        *,
+        openai_key: str | None = None,
+    ) -> dict:
+        if openai_key is not None:
+            set_secret("OPENAI_API_KEY", openai_key)
+
+        was_live = bool(
+            self.runtime.snapshot().get("monitoring")
+        )
+        if was_live:
+            self.runtime.stop()
+
+        self.runtime.close()
+        self.config = self.config_store.update(patch)
+        self.runtime = self._build_runtime()
+        return self.config
+
+    def api_key_saved(self) -> bool:
+        return has_secret("OPENAI_API_KEY")
+
+    def brain_health(self) -> tuple[bool, str]:
+        provider = build_brain_provider(self.config)
+        return provider.healthcheck()
+
+    def list_audio_devices(self) -> list[str]:
+        return list(SoundDeviceAudioSink().list_devices())
+
+    def test_voice(
+        self,
+        *,
+        text: str = "Teste de voz do AGCN Live Voice.",
+    ) -> tuple[bool, str]:
+        try:
+            tts = build_tts_provider(self.config)
+            audio_cfg = dict(self.config.get("audio") or {})
+            sink = SoundDeviceAudioSink(
+                device_name=str(
+                    audio_cfg.get("output_device") or ""
+                ),
+                volume=float(audio_cfg.get("volume", 1.0)),
+            )
+            chunk = tts.synthesize(
+                text,
+                voice=str(
+                    (self.config.get("tts") or {}).get("voice")
+                    or ""
+                ) or None,
+            )
+            sink.play(chunk)
+            return True, f"Voz testada com {tts.name}."
+        except Exception as exc:
+            return False, str(exc)
+
+    def test_presenter(
+        self,
+        *,
+        comment: str = "",
+        user: str = "Cliente",
+    ) -> dict:
+        if comment.strip():
+            return self.runtime.test_presenter_comment(
+                user,
+                comment,
+            )
+        return self.runtime.test_presenter_proactive()
