@@ -478,20 +478,19 @@ class SettingsPage(QWidget):
 
         voice_box = group("Voz e áudio")
         voice_form = QFormLayout(voice_box)
-        self.tts_provider = QComboBox()
-        self.tts_provider.addItem("OpenAI Neural (recomendado)", "openai")
-        self.tts_provider.addItem("ElevenLabs Neural", "elevenlabs")
-        self.tts_provider.addItem("Automático neural", "neural_auto")
+
+        self.voice_engine = QLabel(
+            "AGCN Local Neural — Kokoro PT-BR (offline, sem API)"
+        )
+        self.voice_engine.setStyleSheet("font-weight:700;color:#111827;")
+
         self.voice_profile = QComboBox()
         for profile in list_voice_profiles():
             self.voice_profile.addItem(
                 profile["label"],
                 profile["id"],
             )
-        self.voice_name = QLineEdit()
-        self.voice_name.setPlaceholderText(
-            "Opcional: override técnico da voz neural"
-        )
+
         self.speed_slider = QSlider(Qt.Orientation.Horizontal)
         self.speed_slider.setMinimum(80)
         self.speed_slider.setMaximum(160)
@@ -507,31 +506,13 @@ class SettingsPage(QWidget):
         speed_row.addWidget(self.speed_slider, 1)
         speed_row.addWidget(self.speed_label)
 
-        self.elevenlabs_key = QLineEdit()
-        self.elevenlabs_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.elevenlabs_key.setPlaceholderText(
-            "Opcional: chave ElevenLabs"
-        )
-        self.elevenlabs_female = QLineEdit()
-        self.elevenlabs_female.setPlaceholderText(
-            "Voice ID feminina ElevenLabs"
-        )
-        self.elevenlabs_male = QLineEdit()
-        self.elevenlabs_male.setPlaceholderText(
-            "Voice ID masculina ElevenLabs"
-        )
-
         self.device = QComboBox()
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
         self.test_voice_btn = QPushButton("Testar voz")
-        voice_form.addRow("Motor neural", self.tts_provider)
+        voice_form.addRow("Motor", self.voice_engine)
         voice_form.addRow("Perfil de voz", self.voice_profile)
         voice_form.addRow("Velocidade", speed_row)
-        voice_form.addRow("Override técnico", self.voice_name)
-        voice_form.addRow("Chave ElevenLabs", self.elevenlabs_key)
-        voice_form.addRow("ElevenLabs feminina", self.elevenlabs_female)
-        voice_form.addRow("ElevenLabs masculina", self.elevenlabs_male)
         voice_form.addRow("Saída de áudio", self.device)
 
         voice_actions = QHBoxLayout()
@@ -581,44 +562,22 @@ class SettingsPage(QWidget):
         self.api_model.setText(str(api.get("model") or ""))
         self.fallback.setChecked(bool(brain.get("fallback_local", True)))
 
-        provider = str(tts.get("provider") or "openai")
-        provider_index = self.tts_provider.findData(provider)
-        if provider_index >= 0:
-            self.tts_provider.setCurrentIndex(provider_index)
         profile_id = str(tts.get("profile") or "female_fast")
         profile_index = self.voice_profile.findData(profile_id)
         if profile_index >= 0:
             self.voice_profile.setCurrentIndex(profile_index)
-        self.voice_name.setText(
-            str(tts.get("voice_override") or "")
-        )
         speed = float(tts.get("speed") or 1.28)
         self.speed_slider.setValue(
             max(80, min(160, int(round(speed * 100))))
         )
-        eleven = tts.get("elevenlabs") or {}
-        eleven_ids = eleven.get("voice_ids") or {}
-        self.elevenlabs_female.setText(
-            str(eleven_ids.get("female_fast") or "")
-        )
-        self.elevenlabs_male.setText(
-            str(eleven_ids.get("male_fast") or "")
-        )
         self.device.setCurrentText(
             str(audio.get("output_device") or "")
         )
-        statuses = []
-        statuses.append(
-            "OpenAI ✓"
+        self.key_status.setText(
+            "API da inteligência salva"
             if self.controller.api_key_saved()
-            else "OpenAI sem chave"
+            else "API da inteligência opcional"
         )
-        statuses.append(
-            "ElevenLabs ✓"
-            if self.controller.elevenlabs_key_saved()
-            else "ElevenLabs sem chave"
-        )
-        self.key_status.setText(" | ".join(statuses))
 
     def _patch(self) -> dict:
         return {
@@ -636,25 +595,15 @@ class SettingsPage(QWidget):
                 },
             },
             "tts": {
-                "provider": (
-                    self.tts_provider.currentData()
-                    or "openai"
-                ),
+                "provider": "kokoro_local",
                 "profile": (
                     self.voice_profile.currentData()
                     or "female_fast"
                 ),
                 "speed": self.speed_slider.value() / 100.0,
-                "voice_override": self.voice_name.text().strip(),
-                "openai": {
-                    "api_key_env": "OPENAI_API_KEY",
-                },
-                "elevenlabs": {
-                    "api_key_env": "ELEVENLABS_API_KEY",
-                    "voice_ids": {
-                        "female_fast": self.elevenlabs_female.text().strip(),
-                        "male_fast": self.elevenlabs_male.text().strip(),
-                    },
+                "voice_override": "",
+                "kokoro": {
+                    "model_dir": "",
                 },
             },
             "audio": {
@@ -665,16 +614,11 @@ class SettingsPage(QWidget):
     def _save(self) -> None:
         try:
             key = self.api_key.text()
-            eleven_key = self.elevenlabs_key.text()
             self.controller.save_settings(
                 self._patch(),
                 openai_key=key if key else None,
-                elevenlabs_key=(
-                    eleven_key if eleven_key else None
-                ),
             )
             self.api_key.clear()
-            self.elevenlabs_key.clear()
             self.load()
             QMessageBox.information(
                 self,
@@ -702,18 +646,12 @@ class SettingsPage(QWidget):
 
     def _apply_settings_before_test(self) -> None:
         key = self.api_key.text()
-        eleven_key = self.elevenlabs_key.text()
         self.controller.save_settings(
             self._patch(),
             openai_key=key if key else None,
-            elevenlabs_key=(
-                eleven_key if eleven_key else None
-            ),
         )
         if key:
             self.api_key.clear()
-        if eleven_key:
-            self.elevenlabs_key.clear()
 
     def _test_brain(self) -> None:
         try:
