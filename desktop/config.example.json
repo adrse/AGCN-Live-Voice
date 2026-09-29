@@ -31,7 +31,8 @@
       "startup_timeout_seconds": 120,
       "request_timeout_seconds": 60,
       "expressive": true,
-      "expression_strength": 1.0
+      "expression_strength": 1.0,
+      "voice_style": "auto"
     },
     "kokoro": {
       "model_dir": ""
