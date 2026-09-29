@@ -94,7 +94,11 @@ Regras:
 - resposta curta e volta rápida à venda;
 - nenhuma voz deve soar como conversa casual lenta.
 
-No TTS oficial, as vozes são neurais e independentes das vozes instaladas no Windows. OpenAI Neural é o padrão, com `marin` e `cedar` como vozes-base recomendadas pela documentação oficial para melhor qualidade. ElevenLabs Neural é uma alternativa configurável. A velocidade é controlada por slider na UI.
+As duas vozes oficiais são LOCAIS e ficam dentro do pacote do AGCN:
+- feminina: Kokoro PT-BR `pf_dora`;
+- masculina: Kokoro PT-BR `pm_alex`.
+
+O modelo ONNX e o arquivo de vozes são empacotados no ZIP/instalador. Nenhuma API é usada para gerar voz. A velocidade é controlada por slider na UI.
 
 ## Testes reais que ainda importam
 
@@ -102,9 +106,9 @@ No PC real, validar:
 1. Ollama instalado.
 2. `qwen3:4b` instalado.
 3. Qwen responde com produto cadastrado.
-4. API OpenAI real, se for usada.
-5. OpenAI Neural realmente toca nos dois perfis.
-6. ElevenLabs Neural, se configurado.
+4. API OpenAI real somente se for usada para melhorar a inteligência.
+5. Dora local realmente toca sem API.
+6. Alex local realmente toca sem API.
 7. `CABLE Input` aparece e recebe o áudio.
 8. TikTok LIVE Studio recebe o VB-CABLE.
 9. TikTokMonitor conecta a uma LIVE real.
@@ -153,7 +157,7 @@ Diagnóstico:
 - Qwen local é padrão;
 - API é opcional;
 - mesma PresenterPolicy para todos os Brains;
-- TTS neural é padrão; vozes do Windows não são requisito;
+- TTS Kokoro PT-BR local é obrigatório e vem empacotado; nenhuma API é requisito de voz;
 - resposta prioritária espera a frase atual terminar e entra antes de proativos pendentes;
 - nenhum segredo em JSON/Git/exe;
 - preço/estoque/frete/especificações nunca podem ser inventados.
@@ -165,3 +169,17 @@ Não entregar relatório longo. Entregar:
 - testes reais que passaram;
 - dependências externas necessárias;
 - somente pendências comprovadas.
+
+
+## Separação obrigatória: inteligência x voz
+
+**Inteligência**
+- padrão: Qwen/Ollama local;
+- opcional: API para aumentar qualidade de interpretação/conversação.
+
+**Voz**
+- sempre disponível localmente;
+- Kokoro-82M PT-BR;
+- Dora (feminina) e Alex (masculina);
+- modelo + vozes fazem parte do pacote Windows;
+- API não deve ser exigida nem oferecida como dependência para a voz principal.
