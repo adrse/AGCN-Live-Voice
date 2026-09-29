@@ -287,6 +287,15 @@ class FallbackTTSProvider:
             self.last_provider = self.fallback.name
             return chunk
 
+    def close(self) -> None:
+        for provider in (self.primary, self.fallback):
+            closer = getattr(provider, "close", None)
+            if callable(closer):
+                try:
+                    closer()
+                except Exception:
+                    pass
+
 
 def _selected_speed(cfg: dict, profile: dict) -> float:
     value = cfg.get("speed")
