@@ -11,6 +11,7 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHONPATH: .
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +33,11 @@ jobs:
         run: |
           python -c "import core.runtime, core.presenter_v3, core.tts_providers, core.audio_output, desktop.main_window; print('imports ok')"
 
+      - name: Smoke UI
+        shell: pwsh
+        run: |
+          python -c "from PySide6.QtWidgets import QApplication; from desktop.main_window import MainWindow; app=QApplication([]); w=MainWindow(); w.show(); app.processEvents(); w.close(); print('ui ok')"
+
       - name: Build executable
         shell: pwsh
         run: |
@@ -42,6 +48,14 @@ jobs:
         run: |
           if (!(Test-Path "dist\AGCN Live Voice\AGCN Live Voice.exe")) { throw "Executavel nao encontrado" }
           Get-ChildItem "dist\AGCN Live Voice" | Select-Object Name,Length
+
+      - name: Smoke executable
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\AGCN Live Voice\AGCN Live Voice.exe" -PassThru
+          Start-Sleep -Seconds 4
+          if ($p.HasExited) { throw "Executavel encerrou logo apos abrir. ExitCode=$($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
 
       - name: Package artifact
         shell: pwsh
