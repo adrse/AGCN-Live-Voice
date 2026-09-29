@@ -5,7 +5,7 @@
 A voz é independente da API de inteligência.
 
 Sem API externa:
-- Qwen/Ollama continua sendo o Brain;
+- AGCN Local Brain (Qwen3-4B/llama.cpp) continua sendo o Brain;
 - Qwen3-TTS local gera a voz;
 - o usuário escolhe feminina/masculina;
 - o slider controla velocidade;
@@ -84,7 +84,7 @@ Kokoro-82M PT-BR continua embutido:
 ## Runtime
 
 Brain local:
-Qwen/Ollama -> BrainResult validado -> Qwen3-TTS HQ -> AudioSink.
+AGCN Local Brain (Qwen3-4B/llama.cpp) -> BrainResult validado -> Qwen3-TTS HQ -> AudioSink.
 
 Brain API:
 API -> BrainResult validado -> Qwen3-TTS HQ -> AudioSink.
@@ -115,7 +115,8 @@ Qwen3-TTS 1.7B é mais pesado que Kokoro. CPU é o backend universal; GPU pode r
 
 ## Internet
 
-Internet é necessária no build/instalação do Voice Pack para baixar os arquivos.
+O workflow de build precisa de internet para montar o instalador completo.
+O cliente que recebe o pacote completo não precisa baixar Brain ou Voice Pack durante a instalação.
 
 Depois de instalado:
 - Qwen3-TTS roda local;
