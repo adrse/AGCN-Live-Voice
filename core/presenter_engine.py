@@ -128,7 +128,7 @@ class PresenterEngine:
         value = clean(value)
         return value or None
 
-    def _short(self, text: str | None, limit: int = 190) -> str | None:
+    def _short(self, text: str | None, limit: int = 130) -> str | None:
         if not text:
             return None
         pieces = _sentences(text)
@@ -227,10 +227,33 @@ class PresenterEngine:
                 return topic
         return None
 
+    def _description_points(self) -> list[str]:
+        points = self.product.get("description_points") or []
+        if isinstance(points, list):
+            cleaned = [clean(point) for point in points if clean(point)]
+            if cleaned:
+                return cleaned
+
+        # Compatibilidade com produtos antigos, salvos antes da descrição
+        # estruturada em tópicos.
+        return _sentences(self.known("description") or "")
+
+    def _all_facts(self) -> list[str]:
+        facts = list(self._description_points())
+        facts.extend(_sentences(self.known("additional_info") or ""))
+
+        result = []
+        seen = set()
+        for fact in facts:
+            fact = clean(fact)
+            key = fact.casefold()
+            if fact and key not in seen:
+                result.append(fact)
+                seen.add(key)
+        return result
+
     def _fact_for_question(self, text: str) -> str | None:
-        description = self.known("description") or ""
-        additional = self.known("additional_info") or ""
-        candidates = _sentences(" ".join(x for x in (description, additional) if x))
+        candidates = self._all_facts()
         if not candidates:
             return None
 
@@ -243,8 +266,8 @@ class PresenterEngine:
 
         best = None
         best_score = 0
-        for sentence in candidates:
-            s = sentence.casefold()
+        for fact in candidates:
+            s = fact.casefold()
             score = sum(1 for word in query_words if word in s)
 
             if topic:
@@ -253,32 +276,28 @@ class PresenterEngine:
                 )
 
             if score > best_score:
-                best = sentence
+                best = fact
                 best_score = score
 
         return self._short(best) if best_score > 0 else None
 
-    def unknown(self, user: str, topic: str | None = None) -> str:
-        person = self._friendly_user(user)
-        prefix = f"{person}, " if person else ""
-        if topic:
-            return (
-                f"{prefix}sobre {topic}, eu não tenho certeza dessa informação "
-                "agora e prefiro não te passar errado, tá?"
-            )
-        return (
-            f"{prefix}essa informação eu não tenho certeza agora, "
-            "então prefiro não te passar errado, tá?"
-        )
-
     def _natural_reply(self, user: str, fact: str, lead: str | None = None) -> str:
         person = self._friendly_user(user)
-        prefix = f"{person}, " if person else ""
-        variants = (
-            f"{prefix}{lead + ' ' if lead else ''}{fact}",
-            f"{prefix}olha, {lead + ' ' if lead else ''}{fact}",
-            f"{prefix}sim — {fact}" if lead is None else f"{prefix}{lead} {fact}",
-        )
+        fact = self._short(fact) or clean(fact)
+
+        if person:
+            variants = (
+                f"{person}, {lead + ' ' if lead else ''}{fact}",
+                f"Olha, {person}, {lead + ' ' if lead else ''}{fact}",
+                f"{person}, {fact}",
+            )
+        else:
+            variants = (
+                f"{lead + ' ' if lead else ''}{fact}",
+                f"Olha, {lead + ' ' if lead else ''}{fact}",
+                fact,
+            )
+
         value = variants[self.response_step % len(variants)]
         self.response_step += 1
         return clean(value)
@@ -290,70 +309,58 @@ class PresenterEngine:
         category: str,
     ) -> str | None:
         name = self.product_name()
-        description = self._short(self.known("description"))
-        additional = self._short(self.known("additional_info"))
         price = self.price_text()
         matched_fact = self._fact_for_question(text)
+        points = self._description_points()
 
+        # Regra do Presenter: se a informação não está disponível, não responde.
+        # A pergunta simplesmente não entra na fila de fala.
         if category == "price":
             if not price:
-                return self.unknown(user, "o preço")
+                return None
             person = self._friendly_user(user)
             prefix = f"{person}, " if person else ""
-            return f"{prefix}{price}"
+            return clean(f"{prefix}{price}")
 
-        if category == "availability":
-            if matched_fact:
-                return self._natural_reply(user, matched_fact)
-            return self.unknown(user, "cor, tamanho ou disponibilidade")
-
-        if category == "shipping":
-            if matched_fact:
-                return self._natural_reply(user, matched_fact)
-            return self.unknown(user, "a entrega")
+        if category in {"availability", "shipping", "direct_question"}:
+            if not matched_fact:
+                return None
+            return self._natural_reply(user, matched_fact)
 
         if category == "usage":
-            fact = matched_fact or description
-            if fact:
-                return self._natural_reply(user, fact, "funciona assim:")
-            return self.unknown(user, "como ele funciona")
+            if matched_fact:
+                return self._natural_reply(user, matched_fact)
+
+            # Para perguntas genéricas como "como funciona?", pode usar um
+            # único tópico de descrição, nunca a descrição inteira.
+            generic = clean(text).casefold()
+            if points and any(k in generic for k in (
+                "como funciona", "como usa", "como usar", "serve pra", "serve para"
+            )):
+                return self._natural_reply(user, points[0])
+            return None
 
         if category == "buying_intent":
             person = self._friendly_user(user)
             prefix = f"{person}, " if person else ""
             if price:
-                return (
-                    f"{prefix}boa! É esse {name} mesmo. {price} "
-                    "Dá uma olhada nos detalhes do produto aí."
-                )
-            return (
-                f"{prefix}boa! É esse {name} que eu tô mostrando. "
-                "Dá uma olhada nos detalhes aí."
-            )
+                return clean(f"{prefix}boa! É esse {name} mesmo. {price}")
+            return clean(f"{prefix}boa! É esse {name} que eu tô mostrando.")
 
         if category == "objection":
             person = self._friendly_user(user)
             prefix = f"{person}, " if person else ""
-            fact = matched_fact or description or additional
-            if fact and price:
-                return f"{prefix}entendo. {fact} {price}"
-            if fact:
-                return f"{prefix}entendo. {fact}"
-            if price:
-                return f"{prefix}entendo. {price}"
-            return self.unknown(user)
-
-        if category == "direct_question":
             if matched_fact:
-                return self._natural_reply(user, matched_fact)
-            topic = self._question_topic(text)
-            return self.unknown(user, topic)
+                return clean(f"{prefix}entendo. {matched_fact}")
+            if price:
+                return clean(f"{prefix}entendo. {price}")
+            return None
 
         if category == "engagement":
             person = self._friendly_user(user)
             if person:
-                return f"Boa, {person}! Esse {name} tá bem legal mesmo."
-            return f"Esse {name} tá bem legal mesmo."
+                return f"Boa, {person}! Esse {name} tá legal demais."
+            return f"Esse {name} tá legal demais."
 
         return None
 
@@ -407,9 +414,11 @@ class PresenterEngine:
         return item
 
     def _sales_fact(self) -> str | None:
-        description = self.known("description")
-        additional = self.known("additional_info")
-        facts = _sentences(" ".join(x for x in (description, additional) if x))
+        # A fala proativa usa um tópico por vez. Isso evita despejar uma
+        # descrição inteira na LIVE e deixa a apresentação mais espontânea.
+        facts = self._description_points()
+        if not facts:
+            facts = _sentences(self.known("additional_info") or "")
         if not facts:
             return None
         index = self.proactive_step % len(facts)
@@ -425,25 +434,23 @@ class PresenterEngine:
 
         if fact:
             templates.extend([
-                f"Olha só esse {name}, gente. {fact}",
-                f"Pra quem acabou de entrar, eu tô mostrando o {name}. {fact}",
-                f"Uma coisa legal desse {name}: {fact}",
+                f"Olha esse {name}, gente. {fact}",
+                f"Pra quem chegou agora: {fact}",
+                f"Outra coisa legal dele: {fact}",
             ])
 
         if price:
             templates.extend([
-                f"E presta atenção no valor: {price}",
-                f"Pra quem perguntou de preço, {price}",
+                f"E olha o preço: {price}",
+                f"Pra quem perguntou valor, {price}",
             ])
 
         if fact and price:
-            templates.append(
-                f"Resumindo pra quem chegou agora: {fact} {price}"
-            )
+            templates.append(f"Ó, {fact} E hoje {price.lower()}")
 
         templates.extend([
-            f"Se você tá de olho nesse {name}, dá uma conferida nos detalhes do produto aí.",
-            f"Vou continuar mostrando o {name} porque tem bastante coisa interessante nele.",
+            f"Quem tá chegando agora, eu tô mostrando o {name}.",
+            f"Vou mostrar mais um pouco desse {name} pra vocês.",
         ])
 
         speech = templates[self.proactive_step % len(templates)]
