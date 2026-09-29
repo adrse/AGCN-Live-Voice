@@ -3,6 +3,7 @@ name: AGCN Full Test Suite
 on:
   push:
     branches:
+      - main
       - astra-handoff-2026-09-29
     paths:
       - "core/**"
