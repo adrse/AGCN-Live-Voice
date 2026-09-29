@@ -14,7 +14,7 @@ Resultado: entende, responde com 1–2 fatos reais e continua a venda.
 
 ## D — pergunta técnica sem fato
 Comentário: "pega internet?" sem informação cadastrada.
-Resultado: entende a pergunta, não inventa, responde de forma humana e `needs_fact=true`.
+Resultado: entende a pergunta, não inventa e não gera fala para o espectador; se o Brain sinalizar `needs_fact=true`, o Presenter descarta essa saída.
 
 ## E — prioridade
 Fila contém saudação, emoji, preço e "como compra?".
@@ -93,3 +93,14 @@ Resultado:
 - Doctor informa HQ indisponível;
 - Kokoro Dora/Alex assume;
 - usuário consegue distinguir que está em fallback.
+
+
+## T — aba dedicada de Voz e áudio
+A navegação oferece Dashboard, Produto, Voz e áudio e Configurações.
+
+Resultado:
+- Dashboard mantém apenas resumo operacional de voz;
+- `Ajustes avançados` abre a aba Voz e áudio;
+- a aba Voz e áudio concentra motor, perfil, velocidade, expressividade, estilo, APIs, teste e saída;
+- Configurações permanece dedicada ao Presenter Brain/diagnóstico;
+- salvar uma dessas áreas não apaga configurações ocultas da outra.
