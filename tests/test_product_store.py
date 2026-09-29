@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 
+from core.product_profile import now_iso
 from core.product_store import ProductStore
 
 
@@ -179,3 +180,18 @@ def test_save_research_draft_preserves_origin():
         assert updated["brand"] == "Marca corrigida"
         assert updated["field_meta"]["brand"]["origin"] == "user"
         assert updated["field_meta"]["brand"]["locked_by_user"] is True
+
+
+
+def test_product_timestamp_does_not_require_iana_tzdata():
+    stamp = now_iso()
+    assert "T" in stamp
+    assert stamp[-6] in {"+", "-"} or stamp.endswith("Z")
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "core"
+        / "product_profile.py"
+    ).read_text(encoding="utf-8")
+    assert "from zoneinfo import ZoneInfo" not in source
+    assert "return datetime.now().astimezone().isoformat" in source

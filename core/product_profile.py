@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 
 PERMANENT_FIELDS = [
@@ -56,9 +55,13 @@ BOOL_FIELDS = {"live_offer"}
 
 
 def now_iso() -> str:
-    return datetime.now(
-        ZoneInfo("America/Araguaina")
-    ).isoformat(timespec="seconds")
+    """Timestamp local do sistema sem depender do banco IANA de fusos.
+
+    No Windows empacotado, `zoneinfo.ZoneInfo("America/Araguaina")` pode
+    falhar quando o banco tzdata não está presente. `astimezone()` usa o
+    fuso configurado no próprio Windows e mantém o offset no ISO.
+    """
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def default_field_meta(origin: str = "unknown") -> dict:
