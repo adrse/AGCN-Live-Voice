@@ -17,6 +17,52 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "desktop" / "config.example.json"
 
+BUILTIN_DEFAULTS = {
+    "brain": {
+        "provider": "qwen_local",
+        "fallback_local": True,
+        "max_retries": 1,
+        "ollama": {
+            "base_url": "http://127.0.0.1:11434",
+            "model": "qwen3:4b",
+            "timeout_seconds": 45,
+            "temperature": 0.25,
+            "keep_alive": "10m",
+        },
+        "api": {
+            "type": "openai_responses",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-6-luna",
+            "api_key_env": "OPENAI_API_KEY",
+            "timeout_seconds": 45,
+            "max_output_tokens": 500,
+        },
+    },
+    "tts": {
+        "provider": "local",
+        "voice": "",
+        "fallback_local": True,
+        "local": {"rate": 190, "volume": 1.0},
+        "api": {
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o-mini-tts",
+            "voice": "coral",
+            "api_key_env": "OPENAI_API_KEY",
+            "timeout_seconds": 45,
+        },
+    },
+    "audio": {
+        "output_device": "",
+        "volume": 1.0,
+    },
+    "presenter": {
+        "silence_target_seconds": 8,
+        "silence_hard_limit_seconds": 10,
+        "cta_cooldown_seconds": 45,
+        "fact_cooldown_seconds": 120,
+    },
+}
+
 
 def app_data_dir() -> Path:
     base = os.getenv("APPDATA")
@@ -84,10 +130,16 @@ class ConfigStore:
 
     def defaults(self) -> dict:
         if not self.defaults_path.exists():
-            return {}
-        return json.loads(
-            self.defaults_path.read_text(encoding="utf-8")
-        )
+            return deepcopy(BUILTIN_DEFAULTS)
+        try:
+            loaded = json.loads(
+                self.defaults_path.read_text(encoding="utf-8")
+            )
+            if isinstance(loaded, dict):
+                return _deep_merge(BUILTIN_DEFAULTS, loaded)
+        except Exception:
+            pass
+        return deepcopy(BUILTIN_DEFAULTS)
 
     def load(self) -> dict:
         defaults = self.defaults()
