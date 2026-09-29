@@ -21,6 +21,7 @@ class FakeTTS:
         self._name = name
         self.error = error
         self.calls = []
+        self.configured = []
 
     @property
     def name(self):
@@ -28,6 +29,9 @@ class FakeTTS:
 
     def healthcheck(self):
         return True, "ok"
+
+    def configure_for_job(self, metadata=None):
+        self.configured.append(dict(metadata or {}))
 
     def synthesize(self, text, *, voice=None):
         self.calls.append((text, voice))
@@ -99,3 +103,30 @@ def test_voice_service_can_restart_after_stop():
     assert service.stop_event.is_set() is False
 
     service.stop()
+
+
+def test_voice_service_manual_style_overrides_automatic_metadata():
+    tts = FakeTTS()
+    service = VoiceService(
+        tts,
+        FakeSink(),
+        style_selection="suspense_reveal",
+    )
+    service.enqueue(
+        "agora presta atenção",
+        metadata={
+            "type": "proactive",
+            "voice_style": "sales_energy",
+        },
+    )
+
+    job = service.queue.get_nowait()
+    service.current_job = job
+    metadata = dict(job.metadata)
+    if service.style_selection not in {"", "auto"}:
+        metadata["voice_style"] = service.style_selection
+        job.metadata["voice_style"] = service.style_selection
+    tts.configure_for_job(metadata)
+
+    assert job.metadata["voice_style"] == "suspense_reveal"
+    assert tts.configured[-1]["voice_style"] == "suspense_reveal"

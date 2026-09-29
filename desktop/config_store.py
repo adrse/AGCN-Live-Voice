@@ -47,7 +47,10 @@ BUILTIN_DEFAULTS = {
             "pack_dir": "",
             "port": 18765,
             "startup_timeout_seconds": 120,
-            "request_timeout_seconds": 60
+            "request_timeout_seconds": 60,
+            "expressive": True,
+            "expression_strength": 1.0,
+            "voice_style": "auto",
         },
         "kokoro": {
             "model_dir": ""

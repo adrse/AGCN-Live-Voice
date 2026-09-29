@@ -141,22 +141,38 @@ class DesktopController:
         self,
         *,
         text: str = "Teste de voz do AGCN Live Voice.",
+        config_override: dict[str, Any] | None = None,
     ) -> tuple[bool, str]:
         try:
-            tts = build_tts_provider(self.config)
-            audio_cfg = dict(self.config.get("audio") or {})
+            config = dict(self.config)
+            if config_override:
+                config.update(config_override)
+
+            tts = build_tts_provider(config)
+            audio_cfg = dict(config.get("audio") or {})
             sink = SoundDeviceAudioSink(
                 device_name=str(
                     audio_cfg.get("output_device") or ""
                 ),
                 volume=float(audio_cfg.get("volume", 1.0)),
             )
+            tts_cfg = dict(config.get("tts") or {})
+            hq_cfg = dict(tts_cfg.get("qwen3_hq") or {})
+            style = str(hq_cfg.get("voice_style") or "auto")
+            configure = getattr(tts, "configure_for_job", None)
+            if callable(configure):
+                configure({
+                    "type": "proactive",
+                    "topic": "benefits",
+                    "tactic": "benefit_translation",
+                    "voice_style": (
+                        style if style not in {"", "auto"} else "sales_energy"
+                    ),
+                })
+
             chunk = tts.synthesize(
                 text,
-                voice=str(
-                    (self.config.get("tts") or {}).get("voice_override")
-                    or ""
-                ) or None,
+                voice=str(tts_cfg.get("voice_override") or "") or None,
             )
             sink.play(chunk)
             return True, f"Voz testada com {tts.name}."
