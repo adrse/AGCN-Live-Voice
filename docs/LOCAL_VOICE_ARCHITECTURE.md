@@ -2,83 +2,96 @@
 
 ## Regra de produto
 
-A voz NÃO depende da API de inteligência.
+A voz é independente da API de inteligência.
 
-O AGCN precisa falar mesmo quando:
-- não existe OPENAI_API_KEY;
-- não existe ELEVENLABS_API_KEY;
-- a internet está indisponível;
-- o Windows não possui vozes SAPI adicionais.
+Sem API externa:
+- Qwen/Ollama continua sendo o Brain;
+- Qwen3-TTS local gera a voz;
+- o usuário escolhe feminina/masculina;
+- o slider controla velocidade;
+- áudio segue para speakers/VB-CABLE.
 
-## Motor
+## Motor principal — Qualidade Máxima
 
-Kokoro-82M v1.0 via kokoro-onnx/ONNX Runtime.
+Qwen3-TTS 1.7B CustomVoice, usando qwentts.cpp/GGML.
 
-Arquivos empacotados:
-- models/kokoro/kokoro-v1.0.onnx
-- models/kokoro/voices-v1.0.bin
+Distribuição HQ:
+- talker: `qwen-talker-1.7b-customvoice-Q8_0.gguf`;
+- codec: `qwen-tokenizer-12hz-Q8_0.gguf`;
+- engine: `tts-server.exe`;
+- idioma: `Portuguese`;
+- servidor: somente localhost;
+- nenhuma chamada à internet durante síntese.
 
-O build baixa versões fixas antes do PyInstaller e inclui os dois arquivos no pacote Windows.
+Perfis:
+- `female_fast` -> Vivian;
+- `male_fast` -> Ryan.
 
-## Perfis oficiais PT-BR
+O modelo fica residente no processo local para evitar recarregamento em cada fala.
 
-- female_fast -> pf_dora
-- male_fast -> pm_alex
+## Por que 1.7B Q8
 
-Alternativa masculina existente no modelo: pm_santa. Não é o padrão do MVP.
+O checkpoint 1.7B oferece maior capacidade que 0.6B e o CustomVoice suporta speakers premium. O formato Q8 reduz bastante o tamanho em disco mantendo precisão maior que Q4.
 
 ## Velocidade
 
 UI:
-- mínimo: 0.80x
-- padrão: 1.28x
-- máximo: 1.60x
+- 0,80x a 1,60x;
+- padrão 1,28x.
 
-O Kokoro aceita faixa maior internamente; a UI restringe para uma faixa útil para LIVE commerce.
+A fala é sintetizada e depois ajustada por FFmpeg/atempo para a velocidade escolhida, preservando o pitch melhor que simples resampling.
 
-Além da velocidade do áudio, PresenterPolicy exige:
-- respostas curtas;
-- resposta ao comentário na primeira frase;
-- pouca pausa;
-- retorno imediato à venda;
-- discurso proativo.
+A PresenterPolicy também exige frases curtas e ritmo comercial alto.
+
+## Fallback
+
+Kokoro-82M PT-BR continua embutido:
+- feminina: Dora;
+- masculina: Alex.
+
+É usado somente quando o pack Qwen3 HQ está ausente ou falha.
 
 ## Runtime
 
 Brain local:
-Qwen/Ollama -> BrainResult validado -> Kokoro local -> AudioSink.
+Qwen/Ollama -> BrainResult validado -> Qwen3-TTS HQ -> AudioSink.
 
 Brain API:
-API -> BrainResult validado -> Kokoro local -> AudioSink.
+API -> BrainResult validado -> Qwen3-TTS HQ -> AudioSink.
 
-Portanto trocar o Brain NÃO troca a voz.
+Falha/ausência do pack HQ:
+Brain -> Kokoro fallback -> AudioSink.
 
-## Build
+Trocar o Brain nunca troca a arquitetura de voz.
 
-O workflow Windows:
-1. instala kokoro-onnx;
-2. baixa model/voices;
-3. faz smoke import;
-4. sintetiza uma frase PT-BR com Dora;
-5. sintetiza uma frase PT-BR com Alex;
-6. só então executa PyInstaller;
-7. verifica se model/voices ficaram dentro do build;
-8. abre o exe;
-9. gera ZIP.
+## Build HQ
 
-Se Dora ou Alex não sintetizarem localmente, o build deve falhar.
+Workflow: `.github/workflows/build-windows-hq.yml`.
+
+Ele:
+1. compila qwentts.cpp no Windows;
+2. baixa talker/codec Q8;
+3. testa assets;
+4. sintetiza Vivian em Português;
+5. sintetiza Ryan em Português;
+6. compila o AGCN;
+7. copia o Voice Pack HQ para `_internal/voice_hq`;
+8. abre o executável;
+9. publica a distribuição HQ.
+
+## Hardware
+
+Qwen3-TTS 1.7B é mais pesado que Kokoro. CPU é o backend universal; GPU pode reduzir muito a latência. A qualidade máxima não deve ser substituída por voz pior apenas para esconder uma limitação de hardware: o Doctor deve informar quando houver fallback.
 
 ## Internet
 
-Internet é necessária durante desenvolvimento/build para baixar dependências/modelo.
+Internet é necessária no build/instalação do Voice Pack para baixar os arquivos.
 
-Depois que o usuário recebe o pacote completo:
-- inferência de voz é local;
-- não há request HTTP para gerar áudio.
-
-A API permanece opcional apenas para a inteligência do Presenter Brain.
+Depois de instalado:
+- Qwen3-TTS roda local;
+- Kokoro roda local;
+- nenhuma API de voz é necessária.
 
 ## Licenças
 
-Antes de distribuição comercial, ler:
-docs/THIRD_PARTY_VOICE_NOTICE.md
+Ver `docs/THIRD_PARTY_VOICE_NOTICE.md` antes de distribuição comercial.
