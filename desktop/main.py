@@ -23,9 +23,10 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("AGCN Live Voice")
     app.setOrganizationName("AGCN")
+    app.setStyle("Fusion")
 
     window = MainWindow()
-    window.show()
+    window.showMaximized()
     return app.exec()
 
 
