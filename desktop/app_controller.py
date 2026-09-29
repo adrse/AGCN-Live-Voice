@@ -123,6 +123,9 @@ class DesktopController:
     def api_key_saved(self) -> bool:
         return has_secret("OPENAI_API_KEY")
 
+    def set_gemini_key(self, value: str) -> None:
+        set_secret("GEMINI_API_KEY", value)
+
     def gemini_key_saved(self) -> bool:
         return has_secret("GEMINI_API_KEY")
 
