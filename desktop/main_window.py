@@ -466,8 +466,10 @@ class SettingsPage(QWidget):
 
         brain_actions = QHBoxLayout()
         self.test_brain_btn = QPushButton("Testar Brain")
+        self.doctor_btn = QPushButton("Diagnóstico completo")
         self.key_status = QLabel("")
         brain_actions.addWidget(self.test_brain_btn)
+        brain_actions.addWidget(self.doctor_btn)
         brain_actions.addWidget(self.key_status, 1)
         brain_form.addRow("", brain_actions)
         stack.addWidget(brain_box)
@@ -504,6 +506,7 @@ class SettingsPage(QWidget):
         self.save_btn.clicked.connect(self._save)
         self.refresh_devices_btn.clicked.connect(self._devices)
         self.test_brain_btn.clicked.connect(self._test_brain)
+        self.doctor_btn.clicked.connect(self._doctor)
         self.test_voice_btn.clicked.connect(self._test_voice)
 
         self.load()
@@ -615,6 +618,31 @@ class SettingsPage(QWidget):
             )
         except Exception as exc:
             QMessageBox.critical(self, "Teste do Brain", str(exc))
+
+    def _doctor(self) -> None:
+        try:
+            ok, message = self.controller.diagnostics()
+            box = QMessageBox(self)
+            box.setWindowTitle("Diagnóstico AGCN")
+            box.setIcon(
+                QMessageBox.Icon.Information
+                if ok
+                else QMessageBox.Icon.Warning
+            )
+            box.setText(
+                "Pronto para teste de LIVE"
+                if ok
+                else "Há pendências no ambiente"
+            )
+            box.setDetailedText(message)
+            box.setInformativeText(message)
+            box.exec()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Diagnóstico AGCN",
+                str(exc),
+            )
 
     def _test_voice(self) -> None:
         try:
