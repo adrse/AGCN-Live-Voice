@@ -64,7 +64,9 @@ class LlamaCppLocalTransport:
         max_output_tokens: int = 500,
         session=None,
     ) -> None:
-        self.pack_dir = Path(pack_dir) if pack_dir else default_local_brain_dir()
+        self.pack_dir = (
+            Path(pack_dir) if pack_dir else default_local_brain_dir()
+        ).resolve()
         self.bin_dir = self.pack_dir / "bin"
         self.model_dir = self.pack_dir / "models"
         self.engine_path = self.bin_dir / (
