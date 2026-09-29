@@ -25,6 +25,9 @@ def build_voice_service(
     return VoiceService(
         tts,
         sink,
-        default_voice=str(tts_cfg.get("voice") or "") or None,
+        # Override manual é opcional. Sem ele, o provider usa o perfil.
+        default_voice=str(
+            tts_cfg.get("voice_override") or ""
+        ) or None,
         max_queue=int(tts_cfg.get("max_queue", 30)),
     )
