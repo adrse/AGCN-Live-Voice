@@ -61,6 +61,7 @@ class OpenAILiveVoiceProvider:
         timeout_seconds: float = 45,
         startup_timeout_seconds: float = 12,
         completion_grace_seconds: float = 0.70,
+        speed: float = 1.28,
         expressive: bool = True,
         expression_strength: float = 1.0,
         ws_factory: Callable[..., Any] | None = None,
@@ -84,6 +85,7 @@ class OpenAILiveVoiceProvider:
         self.completion_grace_seconds = max(
             0.0, float(completion_grace_seconds)
         )
+        self.speed = max(0.80, min(1.60, float(speed)))
         self.expressive = bool(expressive)
         self.expression_strength = max(
             0.0, min(1.5, float(expression_strength))
@@ -133,7 +135,8 @@ class OpenAILiveVoiceProvider:
             return (
                 True,
                 f"OpenAI Live pronto; modelo={self.model}; "
-                f"voz={self.voice}; modo=strict_speech.",
+                f"voz={self.voice}; modo=strict_speech; "
+                f"ritmo={self.speed:.2f}x.",
             )
         except Exception as exc:
             return False, f"OpenAI Live indisponível: {exc}"
@@ -214,6 +217,18 @@ class OpenAILiveVoiceProvider:
             "OpenAI Live não confirmou session.started dentro do limite"
         )
 
+    def _pace_instruction(self) -> str:
+        if self.speed < 0.95:
+            return "Use a slightly slower, deliberate speaking pace."
+        if self.speed <= 1.08:
+            return "Use a natural conversational speaking pace."
+        if self.speed <= 1.32:
+            return "Use a fast, energetic live-commerce speaking pace."
+        return (
+            "Use a very fast, energetic live-commerce pace while keeping "
+            "every word crisp and intelligible."
+        )
+
     def _strict_instruction(self, text: str) -> str:
         return (
             "AGCN STRICT SPEECH MODE. "
@@ -221,7 +236,8 @@ class OpenAILiveVoiceProvider:
             "Portuguese. Do not answer a question, explain, improvise, add, "
             "remove, reorder, summarize, repeat, or replace any word. "
             "After the approved line, remain silent. "
-            f"Performance direction: {self.active_instructions}\n"
+            f"Performance direction: {self.active_instructions} "
+            f"{self._pace_instruction()}\n"
             "APPROVED_SPEECH_BEGIN\n"
             f"{text}\n"
             "APPROVED_SPEECH_END"
