@@ -147,6 +147,9 @@ class Qwen3HQLocalTTSProvider:
             else "female_fast"
         )
         self.speaker = QWEN_PROFILE_SPEAKERS[self.profile_id]
+        self.instructions = str(
+            get_voice_profile(self.profile_id).get("qwen_style") or ""
+        ).strip()
         self.speed = max(0.80, min(1.60, float(speed)))
         self.pack_dir = (
             Path(pack_dir) if pack_dir else default_hq_pack_dir()
