@@ -120,6 +120,10 @@ class VoiceService:
                 else None
             ),
             "tts": self.tts.name,
+            "active_provider": (
+                getattr(self.tts, "last_provider", "")
+                or self.tts.name
+            ),
             "last_error": self.last_error or None,
         }
 
