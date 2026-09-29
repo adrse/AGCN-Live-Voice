@@ -23,6 +23,12 @@ VOICE_PROFILES = {
             "francisca",
             "helena",
         ],
+        "qwen_speaker": "vivian",
+        "qwen_style": (
+            "Bright young female sales presenter. Brazilian Portuguese. "
+            "Energetic, confident, fast-paced live-commerce delivery, crisp "
+            "articulation, short pauses, persuasive but natural."
+        ),
         "openai_voice": "marin",
         "default_speed": 1.28,
         "openai_instructions": (
@@ -47,6 +53,12 @@ VOICE_PROFILES = {
             "antonio",
             "paulo",
         ],
+        "qwen_speaker": "ryan",
+        "qwen_style": (
+            "Dynamic male sales presenter. Brazilian Portuguese. Energetic, "
+            "confident, fast-paced live-commerce delivery, strong rhythmic "
+            "drive, crisp articulation, short pauses and immediate answers."
+        ),
         "openai_voice": "cedar",
         "default_speed": 1.28,
         "openai_instructions": (
