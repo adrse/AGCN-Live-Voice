@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - astra-handoff-2026-09-29
+      - fix/windows-timezone-product-save
     paths:
       - "core/**"
       - "desktop/**"
