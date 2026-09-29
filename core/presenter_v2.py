@@ -253,9 +253,9 @@ class PresenterV2:
             brand = as_text(self.guard.get("brand"))
             if brand:
                 speech = (
-                    f"{user}, é {brand}."
+                    f"{user}, a marca é {brand}."
                     if user
-                    else f"É {brand}."
+                    else f"A marca é {brand}."
                 )
             else:
                 speech = (
