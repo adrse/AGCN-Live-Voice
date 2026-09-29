@@ -6,3 +6,7 @@ venv/
 .DS_Store
 data/runtime/*.json
 !data/runtime/.gitkeep
+
+# Modelos de voz baixados/empacotados durante o build
+models/kokoro/*.onnx
+models/kokoro/*.bin
