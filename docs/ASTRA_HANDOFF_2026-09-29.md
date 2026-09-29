@@ -201,3 +201,56 @@ Não reescrever a arquitetura. Primeiro auditar e executar.
 13. falha de API/TTS premium cai para local quando habilitado;
 14. secrets não entram no exe/repo;
 15. build Windows fica pronto.
+
+
+---
+
+## Atualização final desta preparação
+
+Após o handoff inicial, também foram concluídos:
+
+- Dashboard, Produto e Configurações deixaram de ser placeholders e estão ligados ao core;
+- `desktop/app_controller.py` liga UI, Runtime, ProductStore, Brain, voz e config;
+- `desktop/config_store.py` persiste configuração em AppData;
+- `core/secret_store.py` usa variável de ambiente ou keyring/Windows Credential Manager;
+- `core/runtime.py` passou a executar Presenter em worker de background; `snapshot()` é somente leitura e não consome LLM;
+- restart do Presenter/VoiceService após Stop foi corrigido;
+- `core/diagnostics.py` + `scripts/doctor.py` verificam produto, Brain, TTS, devices e VB-CABLE;
+- `scripts/setup_qwen_windows.ps1` prepara Ollama/qwen3:4b;
+- `scripts/ultra_preflight.ps1` concentra os testes de amanhã;
+- logging/crash report fica em AppData;
+- ProductStore também grava em AppData, adequado para executável Windows;
+- build Windows automático com smoke da UI e do executável;
+- suíte completa do repositório validada: **75 passed, 2 warnings**.
+
+### Build Windows comprovado
+
+Workflow `Build Windows Desktop` validou com sucesso:
+- instalação de dependências;
+- imports;
+- criação da UI;
+- PyInstaller;
+- presença do `.exe`;
+- abertura do próprio executável sem crash imediato;
+- criação e upload do ZIP.
+
+Artifact: `AGCN-Live-Voice-Windows`
+Build de produção verificado: `1654d8975bbf7559af8ad8655eff89666cf9e280`.
+
+### Portanto, amanhã NÃO é mais necessário
+
+- desenhar arquitetura do Brain;
+- implementar integração Qwen;
+- implementar transporte OpenAI;
+- criar validação factual;
+- criar TTS base;
+- criar saída de áudio;
+- criar fila de voz;
+- criar telas base;
+- descobrir como usar PyInstaller;
+- descobrir como persistir configuração;
+- criar sistema de logs;
+- escrever testes unitários do zero.
+
+O foco de amanhã é somente ambiente real/hardware/serviços:
+Ollama + qwen3:4b, API real opcional, áudio real, VB-CABLE, TikTok LIVE Studio, LIVE real e ajustes concretos encontrados nesses testes.
