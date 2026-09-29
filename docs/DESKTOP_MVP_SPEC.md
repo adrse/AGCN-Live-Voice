@@ -5,7 +5,7 @@
 Presenter: STOPPED | STARTING | RUNNING | PAUSED | ERROR
 TikTok: DISCONNECTED | CONNECTING | LIVE | ENDED | ERROR
 Brain: LOCAL_QWEN | API
-TTS: LOCAL | PREMIUM_API
+TTS: OPENAI_NEURAL | ELEVENLABS_NEURAL
 
 ## Pipeline
 
@@ -121,15 +121,16 @@ Falha:
 
 ## TTS
 
-Local:
-- offline;
-- WAV/PCM;
-- voz configurável.
+Oficial:
+- neural;
+- independente das vozes/SAPI instaladas no Windows;
+- dois perfis fixos do AGCN: Feminina — Vendas rápidas e Masculina — Vendas rápidas;
+- OpenAI Neural como padrão;
+- ElevenLabs Neural como alternativa;
+- controle de velocidade na UI;
+- perfil de estilo rápido/proativo em ambos.
 
-Premium:
-- opcional;
-- provider/voz configurável;
-- fallback local.
+O Windows é somente o destino do áudio. Vozes locais/SAPI não são requisito do produto.
 
 ## Áudio Windows
 
