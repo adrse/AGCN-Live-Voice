@@ -1,8 +1,11 @@
 import time
 
-from core.brain_context_builder import build_allowed_facts
+from core.brain_context_builder import build_allowed_facts, build_brain_context
 from core.comment_intelligence import CommentIntelligence
 from core.integration_contracts import BrainResult
+from core.memory_manager import MemoryManager
+from core.sales_guard import SalesGuard
+from core.speech_planner import SpeechPlanner
 from core.presenter_v3 import PresenterV3
 from core.product_store import ProductStore
 from core.runtime import AGCNVoiceRuntime
@@ -135,3 +138,57 @@ def test_comment_can_wait_as_plan_without_spending_brain():
     assert len(created) == 1
     assert brain.calls == 1
     assert brain.modes == ["comment_reply"]
+
+
+def test_conversion_slot_prefers_real_scarcity_when_available():
+    planner = SpeechPlanner()
+    memory = MemoryManager()
+    memory.proactive_turns = 2
+    guard = SalesGuard({
+        "name": "Produto X",
+        "description": "Descrição real",
+        "current_price": 49.90,
+        "regular_price": 99.90,
+        "stock": 4,
+    })
+
+    topic = planner.choose_proactive_topic(guard, memory)
+
+    assert topic == "scarcity"
+
+
+def test_proactive_plan_exposes_sales_tactic():
+    planner = SpeechPlanner()
+    memory = MemoryManager()
+    guard = SalesGuard({
+        "name": "Produto X",
+        "current_price": 49.90,
+        "regular_price": 99.90,
+    })
+    decision = {
+        "type": "proactive",
+        "intent": "proactive",
+        "topic": "price_value",
+        "priority": 30,
+        "user": None,
+        "comment": None,
+    }
+
+    plan = planner.plan(decision, guard, memory)
+
+    assert plan["tactic"] == "price_anchor"
+
+
+def test_recent_purchase_count_becomes_authorized_social_proof():
+    context = build_brain_context(
+        product={"name": "Produto X"},
+        mode="proactive",
+        decision={"type": "proactive", "topic": "social_proof"},
+        planner_topic="social_proof",
+        memory_snapshot={
+            "recent_purchase_count": 2,
+            "recent_speeches": [],
+        },
+    )
+
+    assert "compras confirmadas recentemente: 2" in context.allowed_facts
