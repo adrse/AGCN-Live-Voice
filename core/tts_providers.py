@@ -290,7 +290,7 @@ class FallbackTTSProvider:
 def _selected_speed(cfg: dict, profile: dict) -> float:
     value = cfg.get("speed")
     if value in (None, ""):
-        return float(profile["openai_speed"])
+        return float(profile["default_speed"])
     return float(value)
 
 
