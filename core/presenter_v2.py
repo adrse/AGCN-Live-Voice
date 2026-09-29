@@ -51,6 +51,7 @@ class PresenterV2:
         "compatibility",
         "technical_question",
         "shipping",
+        "coupon",
         "warranty",
         "brand",
         "included_items",
