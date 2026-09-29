@@ -6,6 +6,7 @@ from core.integration_contracts import BrainResult
 from core.memory_manager import MemoryManager
 from core.sales_guard import SalesGuard
 from core.speech_planner import SpeechPlanner
+from core.presenter_v2 import PresenterV2
 from core.presenter_v3 import PresenterV3
 from core.product_store import ProductStore
 from core.runtime import AGCNVoiceRuntime
@@ -309,3 +310,37 @@ def test_pain_solution_turn_limits_problems_and_supporting_benefits():
 
     assert 1 <= len(visible_problems) <= 2
     assert 1 <= len(visible_benefits) <= 2
+
+
+def test_legacy_presenter_also_ignores_unknown_question():
+    presenter = PresenterV2({
+        "name": "SmartBand X",
+        "description": "Tela AMOLED",
+    })
+
+    result = presenter.test_comment(
+        "Maria",
+        "tem GPS integrado?",
+    )
+
+    assert result["speech"] is None
+    assert result["ok"] is False
+
+
+def test_legacy_presenter_known_answer_is_natural_without_internal_language():
+    presenter = PresenterV2({
+        "name": "SmartBand X",
+        "warranty": "1 ano",
+    })
+
+    result = presenter.test_comment(
+        "Maria",
+        "tem garantia?",
+    )
+
+    speech = (result.get("speech") or {}).get("speech", "").casefold()
+    assert speech
+    assert "cadastro" not in speech
+    assert "cadastrad" not in speech
+    assert "ficha" not in speech
+    assert "sistema" not in speech
