@@ -53,6 +53,11 @@ jobs:
         run: |
           python -c "import core.runtime, core.presenter_v3, core.tts_providers, core.local_kokoro_tts, core.audio_output, desktop.main_window; print('imports ok')"
 
+      - name: Smoke product persistence on Windows
+        shell: pwsh
+        run: |
+          python -c "import tempfile; from pathlib import Path; from core.product_store import ProductStore; p=Path(tempfile.mkdtemp())/'products.json'; s=ProductStore(p); item=s.add(name='Produto teste', current_price='49,90', manual_fields=['name','current_price']); assert item['name']=='Produto teste'; assert s.active()['live_conditions']['current_price']==49.90; print('product save ok', item['created_at'])"
+
       - name: Smoke two offline PT-BR voices
         shell: pwsh
         run: |
