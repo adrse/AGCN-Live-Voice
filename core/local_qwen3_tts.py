@@ -213,7 +213,8 @@ class Qwen3HQLocalTTSProvider:
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
         env = os.environ.copy()
-        env.setdefault("GGML_BACKEND", "")
+        if not str(env.get("GGML_BACKEND") or "").strip():
+            env.pop("GGML_BACKEND", None)
 
         self._stderr_path = (
             _local_appdata() / "logs" / "qwen3-tts-server.log"
