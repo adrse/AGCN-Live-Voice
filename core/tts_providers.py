@@ -1,4 +1,9 @@
-"""Providers de texto-para-voz do AGCN Live Voice."""
+"""Providers de texto-para-voz do AGCN Live Voice.
+
+As vozes oficiais do produto são neurais e independentes das vozes instaladas
+no Windows. O provider local/pyttsx3 permanece apenas como fallback legado
+explicitamente selecionado.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,7 @@ from typing import Any
 import requests
 
 from core.integration_contracts import AudioChunk, TTSProvider
+from core.neural_tts import ElevenLabsTTSProvider
 from core.secret_store import get_secret
 from core.voice_profiles import get_voice_profile
 
@@ -39,7 +45,7 @@ def wav_bytes_to_chunk(data: bytes) -> AudioChunk:
 
 
 class LocalPyttsx3TTSProvider:
-    """TTS offline usando Windows/SAPI com perfil de apresentação."""
+    """Fallback legado. Não é uma das vozes oficiais do AGCN."""
 
     def __init__(
         self,
@@ -61,7 +67,7 @@ class LocalPyttsx3TTSProvider:
     @property
     def name(self) -> str:
         suffix = f" / {self.profile_label}" if self.profile_label else ""
-        return f"Local Windows TTS/pyttsx3{suffix}"
+        return f"Local legado Windows/pyttsx3{suffix}"
 
     @staticmethod
     def _engine():
@@ -86,39 +92,25 @@ class LocalPyttsx3TTSProvider:
         voices = list(engine.getProperty("voices") or [])
         if not voices:
             return None
-
         for keyword in self.preferred_voice_keywords:
             for item in voices:
                 voice_id, name, languages = self._voice_data(item)
                 haystack = f"{voice_id} {name} {languages}".casefold()
                 if keyword in haystack:
                     return voice_id
-
-        # Se o Windows não expõe metadata suficiente, usa uma voz disponível.
-        # O Doctor alerta quando não há duas vozes distintas instaladas.
         return str(getattr(voices[0], "id", "") or "") or None
 
     def healthcheck(self) -> tuple[bool, str]:
         try:
             engine = self._engine()
             voices = engine.getProperty("voices") or []
-            selected = self._profile_voice_id(engine)
-            selected_name = ""
-            for item in voices:
-                voice_id, name, _ = self._voice_data(item)
-                if voice_id == selected:
-                    selected_name = name or voice_id
-                    break
             engine.stop()
-            detail = (
-                f"TTS local disponível ({len(voices)} voz(es)); "
-                f"perfil: {self.profile_label or 'padrão'}"
+            return (
+                bool(voices),
+                f"Fallback local disponível ({len(voices)} voz(es)).",
             )
-            if selected_name:
-                detail += f"; voz: {selected_name}"
-            return bool(voices), detail
         except Exception as exc:
-            return False, f"TTS local indisponível: {exc}"
+            return False, f"Fallback local indisponível: {exc}"
 
     def list_voices(self) -> list[dict[str, str]]:
         engine = self._engine()
@@ -139,7 +131,6 @@ class LocalPyttsx3TTSProvider:
         target = str(voice or "").strip().casefold()
         if not target:
             return self._profile_voice_id(engine)
-
         for item in engine.getProperty("voices") or []:
             voice_id, name, _ = self._voice_data(item)
             if target in {voice_id.casefold(), name.casefold()}:
@@ -162,10 +153,7 @@ class LocalPyttsx3TTSProvider:
             if voice_id:
                 engine.setProperty("voice", voice_id)
 
-            handle = tempfile.NamedTemporaryFile(
-                suffix=".wav",
-                delete=False,
-            )
+            handle = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
             temp_path = Path(handle.name)
             handle.close()
 
@@ -173,8 +161,7 @@ class LocalPyttsx3TTSProvider:
             engine.runAndWait()
 
             if not temp_path.exists() or temp_path.stat().st_size <= 44:
-                raise TTSError("TTS local não gerou arquivo WAV válido")
-
+                raise TTSError("TTS local não gerou WAV válido")
             return wav_bytes_to_chunk(temp_path.read_bytes())
         finally:
             try:
@@ -189,7 +176,7 @@ class LocalPyttsx3TTSProvider:
 
 
 class OpenAITTSProvider:
-    """TTS premium opcional via /v1/audio/speech."""
+    """Voz neural oficial via OpenAI Audio Speech API."""
 
     def __init__(
         self,
@@ -215,12 +202,12 @@ class OpenAITTSProvider:
         self.session = session or requests.Session()
 
         if not self.api_key:
-            raise ValueError("api_key da OpenAI é obrigatória para TTS")
+            raise ValueError("OPENAI_API_KEY não configurada")
 
     @property
     def name(self) -> str:
         suffix = f" / {self.profile_label}" if self.profile_label else ""
-        return f"OpenAI TTS/{self.model}{suffix}"
+        return f"OpenAI Neural Voice/{self.model}{suffix}"
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -238,12 +225,11 @@ class OpenAITTSProvider:
             response.raise_for_status()
             return (
                 True,
-                f"TTS OpenAI disponível com {self.model}; "
-                f"perfil: {self.profile_label or 'padrão'}; "
-                f"velocidade: {self.speed:.2f}x.",
+                f"OpenAI Voice disponível; {self.profile_label}; "
+                f"{self.speed:.2f}x.",
             )
         except Exception as exc:
-            return False, f"TTS OpenAI indisponível: {exc}"
+            return False, f"OpenAI Voice indisponível: {exc}"
 
     def synthesize(self, text: str, *, voice: str | None = None) -> AudioChunk:
         text = str(text or "").strip()
@@ -269,7 +255,7 @@ class OpenAITTSProvider:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise TTSError(f"falha no TTS OpenAI: {exc}") from exc
+            raise TTSError(f"falha no OpenAI Voice: {exc}") from exc
 
         return wav_bytes_to_chunk(bytes(response.content))
 
@@ -300,61 +286,113 @@ class FallbackTTSProvider:
             return chunk
 
 
-def build_tts_provider(config: dict | None = None) -> TTSProvider:
-    config = dict(config or {})
-    cfg = dict(config.get("tts") or config)
-    provider = str(cfg.get("provider") or "local").casefold()
-    profile = get_voice_profile(cfg.get("profile"))
+def _selected_speed(cfg: dict, profile: dict) -> float:
+    value = cfg.get("speed")
+    if value in (None, ""):
+        return float(profile["openai_speed"])
+    return float(value)
 
-    local_cfg = dict(cfg.get("local") or {})
-    local_rate = local_cfg.get("rate_override")
-    local = LocalPyttsx3TTSProvider(
-        rate=int(
-            local_rate
-            if local_rate not in (None, "")
-            else profile["local_rate"]
+
+def _build_openai(cfg: dict, profile: dict) -> OpenAITTSProvider:
+    api = dict(cfg.get("openai") or cfg.get("api") or {})
+    return OpenAITTSProvider(
+        api_key=get_secret(
+            str(api.get("api_key_env") or "OPENAI_API_KEY")
         ),
-        volume=float(local_cfg.get("volume", 1.0)),
-        preferred_voice_keywords=profile["local_keywords"],
+        model=str(api.get("model") or "gpt-4o-mini-tts"),
+        default_voice=str(
+            api.get("voice_override")
+            or profile["openai_voice"]
+        ),
+        base_url=str(
+            api.get("base_url") or "https://api.openai.com/v1"
+        ),
+        timeout_seconds=float(api.get("timeout_seconds", 45)),
+        instructions=str(
+            api.get("instructions_override")
+            or profile["openai_instructions"]
+        ),
+        speed=_selected_speed(cfg, profile),
         profile_label=profile["label"],
     )
 
-    if provider in {"local", "pyttsx3", "windows"}:
-        return local
 
-    if provider in {"openai", "premium", "api"}:
-        api = dict(cfg.get("api") or {})
-        key_env = str(api.get("api_key_env") or "OPENAI_API_KEY")
+def _build_elevenlabs(
+    cfg: dict,
+    profile: dict,
+) -> ElevenLabsTTSProvider:
+    api = dict(cfg.get("elevenlabs") or {})
+    profile_ids = dict(api.get("voice_ids") or {})
+    voice_id = str(
+        api.get("voice_id_override")
+        or profile_ids.get(profile["id"])
+        or ""
+    ).strip()
+    return ElevenLabsTTSProvider(
+        api_key=get_secret(
+            str(api.get("api_key_env") or "ELEVENLABS_API_KEY")
+        ),
+        voice_id=voice_id,
+        model=str(
+            api.get("model") or "eleven_v3_conversational"
+        ),
+        base_url=str(
+            api.get("base_url") or "https://api.elevenlabs.io/v1"
+        ),
+        timeout_seconds=float(api.get("timeout_seconds", 45)),
+        speed=_selected_speed(cfg, profile),
+        stability=float(api.get("stability", 0.45)),
+        similarity_boost=float(api.get("similarity_boost", 0.80)),
+        style=float(api.get("style", 0.20)),
+        use_speaker_boost=bool(api.get("use_speaker_boost", True)),
+    )
+
+
+def build_tts_provider(config: dict | None = None) -> TTSProvider:
+    config = dict(config or {})
+    cfg = dict(config.get("tts") or config)
+    provider = str(cfg.get("provider") or "openai").casefold()
+    profile = get_voice_profile(cfg.get("profile"))
+
+    if provider in {"openai", "neural", "premium"}:
+        return _build_openai(cfg, profile)
+
+    if provider in {"elevenlabs", "eleven"}:
+        return _build_elevenlabs(cfg, profile)
+
+    if provider in {"neural_auto", "auto"}:
+        errors = []
         try:
-            premium = OpenAITTSProvider(
-                api_key=get_secret(key_env),
-                model=str(api.get("model") or "gpt-4o-mini-tts"),
-                default_voice=str(
-                    api.get("voice_override")
-                    or profile["openai_voice"]
-                ),
-                base_url=str(
-                    api.get("base_url")
-                    or "https://api.openai.com/v1"
-                ),
-                timeout_seconds=float(api.get("timeout_seconds", 45)),
-                instructions=str(
-                    api.get("instructions_override")
-                    or profile["openai_instructions"]
-                ),
-                speed=float(
-                    api.get("speed_override")
-                    or profile["openai_speed"]
-                ),
-                profile_label=profile["label"],
-            )
-        except Exception:
-            if bool(cfg.get("fallback_local", True)):
-                return local
-            raise
+            primary = _build_openai(cfg, profile)
+        except Exception as exc:
+            primary = None
+            errors.append(str(exc))
+        try:
+            fallback = _build_elevenlabs(cfg, profile)
+        except Exception as exc:
+            fallback = None
+            errors.append(str(exc))
 
-        if bool(cfg.get("fallback_local", True)):
-            return FallbackTTSProvider(premium, local)
-        return premium
+        if primary and fallback:
+            return FallbackTTSProvider(primary, fallback)
+        if primary:
+            return primary
+        if fallback:
+            return fallback
+        raise TTSError(
+            "Nenhum motor neural configurado. " + " | ".join(errors)
+        )
+
+    if provider in {"local_legacy", "pyttsx3", "windows"}:
+        local_cfg = dict(cfg.get("local_legacy") or {})
+        return LocalPyttsx3TTSProvider(
+            rate=int(
+                local_cfg.get("rate")
+                or profile["local_rate"]
+            ),
+            volume=float(local_cfg.get("volume", 1.0)),
+            preferred_voice_keywords=profile["local_keywords"],
+            profile_label=profile["label"],
+        )
 
     raise ValueError(f"TTS provider desconhecido: {provider}")
