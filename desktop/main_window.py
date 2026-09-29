@@ -1493,9 +1493,24 @@ class SettingsPage(QWidget):
         brain_form.setHorizontalSpacing(18)
         brain_form.setVerticalSpacing(10)
         self.brain_provider = QComboBox()
-        self.brain_provider.addItems(
-            ["qwen_local", "openai", "openai_compatible"]
+        self.brain_provider.addItem(
+            "AGCN Local — Qwen3 4B (incluído)",
+            "agcn_local",
         )
+        self.brain_provider.addItem(
+            "OpenAI API",
+            "openai",
+        )
+        self.brain_provider.addItem(
+            "API compatível com OpenAI",
+            "openai_compatible",
+        )
+        self.local_brain_status = QLabel(
+            "Qwen3 4B + llama.cpp fazem parte do instalador completo. "
+            "Não é necessário instalar Ollama."
+        )
+        self.local_brain_status.setWordWrap(True)
+        self.local_brain_status.setObjectName("InfoBanner")
         self.ollama_url = QLineEdit()
         self.ollama_model = QLineEdit()
         self.api_url = QLineEdit()
@@ -1505,10 +1520,11 @@ class SettingsPage(QWidget):
         self.api_key.setPlaceholderText(
             "Deixe vazio para manter a chave OpenAI já salva"
         )
-        self.fallback = QCheckBox("Usar Qwen local se API falhar")
+        self.fallback = QCheckBox(
+            "Usar AGCN Local se a API falhar"
+        )
         brain_form.addRow("Provider", self.brain_provider)
-        brain_form.addRow("Ollama URL", self.ollama_url)
-        brain_form.addRow("Modelo local", self.ollama_model)
+        brain_form.addRow("Brain local", self.local_brain_status)
         brain_form.addRow("API URL", self.api_url)
         brain_form.addRow("Modelo API", self.api_model)
         brain_form.addRow("Chave OpenAI", self.api_key)
@@ -1544,8 +1560,12 @@ class SettingsPage(QWidget):
         ollama = brain.get("ollama") or {}
         api = brain.get("api") or {}
 
-        self.brain_provider.setCurrentText(
-            str(brain.get("provider") or "qwen_local")
+        provider_id = str(brain.get("provider") or "agcn_local")
+        if provider_id in {"qwen_local", "local"}:
+            provider_id = "agcn_local"
+        provider_index = self.brain_provider.findData(provider_id)
+        self.brain_provider.setCurrentIndex(
+            provider_index if provider_index >= 0 else 0
         )
         self.ollama_url.setText(
             str(ollama.get("base_url") or "http://127.0.0.1:11434")
@@ -1561,13 +1581,16 @@ class SettingsPage(QWidget):
         self.key_status.setText(
             "Chave OpenAI salva"
             if self.controller.api_key_saved()
-            else "Chave OpenAI opcional para Brain local"
+            else "Chave OpenAI opcional; AGCN Local funciona offline"
         )
 
     def _patch(self) -> dict:
         return {
             "brain": {
-                "provider": self.brain_provider.currentText(),
+                "provider": (
+                    self.brain_provider.currentData()
+                    or "agcn_local"
+                ),
                 "fallback_local": self.fallback.isChecked(),
                 "ollama": {
                     "base_url": self.ollama_url.text().strip(),
