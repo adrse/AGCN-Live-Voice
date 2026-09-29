@@ -15,6 +15,9 @@ Nesta versão, o apresentador deixa de se comportar como chatbot. Comentários c
 - comentários continuam entrando na fila durante essa janela, sem interromper a fala;
 - quando não há pergunta para responder, a apresentadora continua falando do produto;
 - linguagem curta, informal e natural;
+- perguntas sem resposta conhecida são ignoradas silenciosamente;
+- descrição do produto pode ser cadastrada em vários pontos independentes;
+- a apresentadora usa um ponto de descrição por vez, sem ler o bloco inteiro;
 - nunca expõe termos internos como "cadastro", "base de dados" ou "contexto";
 - quando uma informação não está disponível, responde naturalmente sem inventar;
 - perguntas repetidas são filtradas e a fila de respostas é limitada;
@@ -70,8 +73,9 @@ uvicorn backend.app:app --host 0.0.0.0 --port $PORT
 
 ## Próximas evoluções
 
-- integração do planejador com voz local;
+- integração do planejador com voz local no aplicativo Windows;
 - integração opcional com API de voz/modelo;
+- a interface Windows deverá consumir o mesmo campo `description_points` usado pelo núcleo e pelo teste web;
 - Memory Manager;
 - Comment Fusion;
 - Decision Engine V2;
