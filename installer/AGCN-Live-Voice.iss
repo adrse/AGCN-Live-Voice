@@ -33,6 +33,7 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 
 [Files]
 Source: "..\dist\AGCN Live Voice\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\installer_payload\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{autoprograms}\AGCN Live Voice"; Filename: "{app}\{#MyAppExeName}"
@@ -42,4 +43,5 @@ Name: "{autodesktop}\AGCN Live Voice"; Filename: "{app}\{#MyAppExeName}"; Tasks:
 Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; GroupDescription: "Atalhos:"; Flags: unchecked
 
 [Run]
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Preparando componentes do Windows..."; Flags: waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "Abrir AGCN Live Voice"; Flags: nowait postinstall skipifsilent
