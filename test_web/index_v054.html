@@ -215,7 +215,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.6</span><span class="dot"></span><span>Manual Product + Presenter Focus</span>
+      <span>v0.6.1</span><span class="dot"></span><span>Natural Presenter</span>
     </div>
   </aside>
 
@@ -288,16 +288,17 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <div class="presenter-status">
           <div class="control-box">
             <div class="control-label">Motor atual</div>
-            <div class="control-value">Presenter Behavior V1</div>
+            <div class="control-value">Natural Presenter V0.6.1</div>
           </div>
           <div class="control-box">
             <div class="control-label">Saída</div>
             <div class="control-value">Texto de teste</div>
           </div>
         </div>
-        <div class="toggle-line"><span class="toggle on"></span>Responder comentários relevantes</div>
-        <div class="toggle-line"><span class="toggle on"></span>Memória curta + retomada de assunto</div>
-        <div class="toggle-line"><span class="toggle on"></span>Silence Watchdog — alvo máximo 8s</div>
+        <div class="toggle-line"><span class="toggle on"></span>Responder só quando houver informação conhecida</div>
+        <div class="toggle-line"><span class="toggle on"></span>3 respostas no máximo → 30s falando do produto</div>
+        <div class="toggle-line"><span class="toggle on"></span>Descrição em tópicos — um ponto por fala</div>
+        <div class="toggle-line"><span class="toggle on"></span>Silence Watchdog — mantém a LIVE andando</div>
         <div id="behaviorStatus" class="note">Memória: aguardando • Watchdog: aguardando</div>
       </div>
     </section>
@@ -364,10 +365,11 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
           <div class="fact-list-editor">
             <div id="pDescriptionList" class="fact-items" data-fact-list-for="pDescription"></div>
             <div class="fact-add-row">
-              <input id="pDescriptionAdd" placeholder="Ex.: smartwatch com chamadas Bluetooth e monitoramento esportivo">
-              <button class="btn secondary" type="button" data-add-fact="pDescription" data-input="pDescriptionAdd">＋ Adicionar</button>
+              <input id="pDescriptionAdd" placeholder="Um ponto por vez — ex.: bateria dura até 6 dias">
+              <button class="btn secondary" type="button" data-add-fact="pDescription" data-input="pDescriptionAdd">＋ Adicionar descrição</button>
             </div>
           </div>
+          <div class="helper" style="margin:7px 0 0">Adicione cada informação separadamente. O Presenter usa só um ponto por fala e não lê a descrição inteira.</div>
         </div>
         <div class="field full">
           <div class="field-head"><span class="field-label">Principais benefícios</span><span id="meta-key_benefits" class="meta-badge">Não informado</span></div>
@@ -723,7 +725,8 @@ function renderProduct(data){
   const p=data.active_product||{};
   const live=p.live_conditions||{};
   $("#activeName").textContent=p.name||"Nenhum produto ativo";
-  $("#activeDesc").textContent=p.description||"Cadastre um produto para iniciar os testes.";
+  const descPoints=splitFactItems(p.description||"");
+  $("#activeDesc").textContent=descPoints[0]||"Cadastre um produto para iniciar os testes.";
   $("#oldPrice").textContent=brl(live.regular_price);
   $("#currentPrice").textContent=brl(live.current_price ?? live.regular_price);
 
@@ -787,8 +790,18 @@ function renderDecision(data){
 
 function renderSpeech(data){
   const s=data.current_speech;
+  const paused=Number(data.comments_paused_seconds||0);
   $("#speech").textContent=s?s.speech:"Aguardando próxima decisão...";
-  $("#speechState").textContent=s?"● Gerando fala":"● Em espera";
+
+  if(data.presenter_mode==="produto" || paused>0){
+    $("#speechState").textContent="● Modo produto • comentários em "+paused+"s";
+  }else if(s?.type==="reactive"){
+    $("#speechState").textContent="● Respondendo comentário";
+  }else if(s?.type==="proactive"){
+    $("#speechState").textContent="● Falando do produto";
+  }else{
+    $("#speechState").textContent="● Em espera";
+  }
 
   const q=Array.isArray(data.queue)?data.queue:[];
   $("#nextSpeeches").innerHTML=q.length ? q.slice(0,3).map((i,index)=>
@@ -825,8 +838,10 @@ function render(data){
   const memory=presenter.memory||{};
   const watchdog=presenter.watchdog||{};
   $("#behaviorStatus").textContent=
-    "Silêncio: "+String(memory.seconds_since_speech??"—")+"s / alvo 8s • "+
-    "Tópico: "+String(memory.current_topic||"—")+" • Watchdog: "+String(watchdog.status||"—");
+    "Modo: "+String(data.presenter_mode||"interativo")+" • "+
+    "Respostas seguidas: "+String(data.reactive_streak??0)+"/"+String(data.max_reactive_burst??3)+" • "+
+    "Comentários em: "+String(data.comments_paused_seconds??0)+"s • "+
+    "Tópico: "+String(memory.current_topic||"—");
 
   $("#summary").textContent=data.summary||"Aguardando...";
 }
@@ -851,11 +866,17 @@ async function runLabComment(){
     });
     const analyzed=result.analyzed||{};
     const speech=result.speech||{};
-    $("#labMeta").innerHTML=
-      '<b>'+esc(analyzed.label||analyzed.intent||"Resposta")+'</b>'+
-      ' • prioridade '+esc(analyzed.priority||"—")+
-      ' • tópico '+esc(analyzed.topic||"—");
-    $("#labSpeech").textContent=speech.speech||"Sem resposta.";
+
+    if(result.ignored || !result.speech){
+      $("#labMeta").innerHTML='<b>Ignorada</b> • essa informação não está disponível no produto';
+      $("#labSpeech").textContent="A apresentadora não responde e continua falando do produto.";
+    }else{
+      $("#labMeta").innerHTML=
+        '<b>'+esc(analyzed.label||analyzed.intent||"Resposta")+'</b>'+
+        ' • prioridade '+esc(analyzed.priority||"—")+
+        ' • tópico '+esc(analyzed.topic||"—");
+      $("#labSpeech").textContent=speech.speech||"";
+    }
   }catch(e){
     $("#labMeta").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
     $("#labSpeech").textContent="Não foi possível gerar a resposta.";
