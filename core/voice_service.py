@@ -100,6 +100,12 @@ class VoiceService:
             self.sink.stop()
         except Exception:
             pass
+        close_tts = getattr(self.tts, "close", None)
+        if callable(close_tts):
+            try:
+                close_tts()
+            except Exception:
+                pass
 
     def snapshot(self) -> dict:
         return {
