@@ -55,8 +55,8 @@ def test_two_required_fast_voice_profiles_exist():
     profiles = {item["id"]: item for item in list_voice_profiles()}
     assert "female_fast" in profiles
     assert "male_fast" in profiles
-    assert profiles["female_fast"]["openai_speed"] > 1.0
-    assert profiles["male_fast"]["openai_speed"] > 1.0
+    assert profiles["female_fast"]["default_speed"] > 1.0
+    assert profiles["male_fast"]["default_speed"] > 1.0
 
 
 def test_official_local_ptbr_voices_are_distinct():
