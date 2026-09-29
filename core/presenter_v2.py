@@ -185,10 +185,13 @@ class PresenterV2:
         analyzed = self.intelligence.analyze(user, text)
         if not analyzed:
             return {
-                "ok": False,
-                "message": "Comentário sem intenção comercial reconhecida.",
+                "ok": True,
+                "ignored": True,
                 "analyzed": None,
+                "decision": None,
+                "plan": None,
                 "speech": None,
+                "memory": self.memory.snapshot(),
             }
 
         group = {
