@@ -29,6 +29,7 @@ class AGCNVoiceRuntime:
 
     MAX_REACTIVE_BURST = 3
     FORCED_PRODUCT_SECONDS = 30.0
+    REACTIVE_INTERRUPT_PRIORITY = 80
 
     def __init__(
         self,
@@ -321,7 +322,19 @@ class AGCNVoiceRuntime:
             return
 
         if item.get("type") == "reactive":
-            self.voice_service.clear_pending(proactive_only=True)
+            priority = int(item.get("priority", 0))
+            if priority >= self.REACTIVE_INTERRUPT_PRIORITY:
+                interrupt = getattr(
+                    self.voice_service,
+                    "interrupt_proactive",
+                    None,
+                )
+                if callable(interrupt):
+                    interrupt()
+                else:
+                    self.voice_service.clear_pending(proactive_only=True)
+            else:
+                self.voice_service.clear_pending(proactive_only=True)
 
         voice_style = infer_voice_style(item)
         item["voice_style"] = voice_style
@@ -437,9 +450,13 @@ class AGCNVoiceRuntime:
 
             if (
                 queue
-                and queue[0].get("priority", 0) >= 90
                 and queue[0].get("priority", 0)
-                > self.current_speech.get("priority", 0)
+                >= self.REACTIVE_INTERRUPT_PRIORITY
+                and (
+                    self.current_speech.get("type") == "proactive"
+                    or queue[0].get("priority", 0)
+                    > self.current_speech.get("priority", 0)
+                )
             ):
                 self.current_speech_until = 0.0
                 self.interruptions += 1
