@@ -4,7 +4,7 @@
 #define MyAppExeName "AGCN Live Voice.exe"
 
 [Setup]
-AppId={{A9A9A2F2-4B8F-4F1D-9C0E-AGCN20260929}
+AppId={{A9A9A2F2-4B8F-4F1D-9C0E-A6C120260929}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
