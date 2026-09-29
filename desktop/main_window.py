@@ -329,11 +329,11 @@ class ProductPage(QWidget):
         ("regular_price", "Preço regular"),
         ("current_price", "Preço atual"),
         ("discount", "Desconto (%)"),
-        ("stock", "Estoque"),
+        ("stock", "Estoque real disponível"),
         ("shipping_info", "Frete / entrega"),
         ("coupon", "Cupom"),
-        ("live_offer_text", "Texto da oferta"),
-        ("promotion_note", "Observação promocional"),
+        ("live_offer_text", "Oferta real da LIVE"),
+        ("promotion_note", "Urgência real / prazo promocional"),
     ]
 
     def __init__(self, controller: DesktopController) -> None:
@@ -392,7 +392,9 @@ class ProductPage(QWidget):
             widget = QLineEdit()
             self.fields[field] = widget
             live_form.addRow(label, widget)
-        self.live_offer = QCheckBox("Oferta ativa nesta LIVE")
+        self.live_offer = QCheckBox(
+            "Oferta ativa nesta LIVE (usar apenas condição real)"
+        )
         live_form.addRow("", self.live_offer)
         stack.addWidget(live_box)
 
