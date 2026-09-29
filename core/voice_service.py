@@ -120,6 +120,11 @@ class VoiceService:
                 else None
             ),
             "tts": self.tts.name,
+            "current_style": (
+                self.current_job.metadata.get("voice_style")
+                if self.current_job
+                else None
+            ),
             "active_provider": (
                 getattr(self.tts, "last_provider", "")
                 or self.tts.name
@@ -136,6 +141,9 @@ class VoiceService:
 
             self.current_job = job
             try:
+                configure = getattr(self.tts, "configure_for_job", None)
+                if callable(configure):
+                    configure(job.metadata)
                 chunk = self.tts.synthesize(
                     job.text,
                     voice=job.voice or self.default_voice,

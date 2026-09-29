@@ -23,6 +23,7 @@ from pathlib import Path
 import requests
 
 from core.integration_contracts import AudioChunk
+from core.voice_expression import build_voice_instructions
 from core.voice_profiles import get_voice_profile
 
 
@@ -139,6 +140,8 @@ class Qwen3HQLocalTTSProvider:
         port: int = 18765,
         startup_timeout_seconds: float = 120,
         request_timeout_seconds: float = 60,
+        expressive: bool = True,
+        expression_strength: float = 1.0,
         session=None,
     ) -> None:
         self.profile_id = (
@@ -147,9 +150,15 @@ class Qwen3HQLocalTTSProvider:
             else "female_fast"
         )
         self.speaker = QWEN_PROFILE_SPEAKERS[self.profile_id]
-        self.instructions = str(
+        self.base_instructions = str(
             get_voice_profile(self.profile_id).get("qwen_style") or ""
         ).strip()
+        self.expressive = bool(expressive)
+        self.expression_strength = max(
+            0.0, min(1.5, float(expression_strength))
+        )
+        self.active_style = "sales_energy"
+        self.active_instructions = self.base_instructions
         self.speed = max(0.80, min(1.60, float(speed)))
         self.pack_dir = (
             Path(pack_dir) if pack_dir else default_hq_pack_dir()
@@ -270,6 +279,22 @@ class Qwen3HQLocalTTSProvider:
             "Qwen3-TTS local não ficou pronto dentro do tempo limite"
         )
 
+    def configure_for_job(self, metadata: dict | None = None) -> str:
+        """Aplica direção emocional por fala sem alterar o texto."""
+        if not self.expressive:
+            self.active_style = "sales_energy"
+            self.active_instructions = self.base_instructions
+            return self.active_style
+
+        style_id, instructions = build_voice_instructions(
+            self.base_instructions,
+            metadata,
+            strength=self.expression_strength,
+        )
+        self.active_style = style_id
+        self.active_instructions = instructions
+        return style_id
+
     def healthcheck(self) -> tuple[bool, str]:
         try:
             ok, message = self.assets_status()
@@ -303,7 +328,8 @@ class Qwen3HQLocalTTSProvider:
                 )
             return True, (
                 f"Qwen3-TTS 1.7B HQ pronto; speaker={self.speaker}; "
-                f"Portuguese; velocidade={self.speed:.2f}x"
+                f"Portuguese; velocidade={self.speed:.2f}x; "
+                f"expressivo={'sim' if self.expressive else 'não'}"
             )
         except Exception as exc:
             return False, f"Qwen3-TTS HQ indisponível: {exc}"
@@ -328,7 +354,7 @@ class Qwen3HQLocalTTSProvider:
                 "input": text,
                 "voice": speaker,
                 "language": "Portuguese",
-                "instructions": self.instructions,
+                "instructions": self.active_instructions,
                 "response_format": "wav",
                 "seed": 42,
                 "temperature": 0.75,

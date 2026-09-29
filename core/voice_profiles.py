@@ -25,9 +25,11 @@ VOICE_PROFILES = {
         ],
         "qwen_speaker": "vivian",
         "qwen_style": (
-            "Bright young female sales presenter. Brazilian Portuguese. "
-            "Energetic, confident, fast-paced live-commerce delivery, crisp "
-            "articulation, short pauses, persuasive but natural."
+            "Young Brazilian Portuguese live-commerce presenter. Bright, "
+            "expressive, confident and persuasive, with natural conversational "
+            "prosody, crisp articulation, quick rhythm and short pauses. "
+            "Vary intonation organically and avoid a flat announcer or robotic "
+            "reading style."
         ),
         "openai_voice": "marin",
         "default_speed": 1.28,
@@ -55,9 +57,11 @@ VOICE_PROFILES = {
         ],
         "qwen_speaker": "ryan",
         "qwen_style": (
-            "Dynamic male sales presenter. Brazilian Portuguese. Energetic, "
-            "confident, fast-paced live-commerce delivery, strong rhythmic "
-            "drive, crisp articulation, short pauses and immediate answers."
+            "Brazilian Portuguese male live-commerce presenter. Dynamic, "
+            "expressive, confident and persuasive, with natural conversational "
+            "prosody, strong rhythmic drive, crisp articulation and short "
+            "pauses. Vary intonation organically and avoid a flat announcer "
+            "or robotic reading style."
         ),
         "openai_voice": "cedar",
         "default_speed": 1.28,

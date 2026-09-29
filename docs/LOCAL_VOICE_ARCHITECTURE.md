@@ -43,6 +43,36 @@ A fala é sintetizada e depois ajustada por FFmpeg/atempo para a velocidade esco
 
 A PresenterPolicy também exige frases curtas e ritmo comercial alto.
 
+
+## Direção expressiva dinâmica
+
+O Qwen3-TTS HQ não usa mais uma única atuação fixa para toda a LIVE.
+
+Antes de cada fala, o runtime deriva um `voice_style` dos metadados já
+aprovados pelo Presenter. A camada `core/voice_expression.py` não muda o
+texto nem cria fatos; ela somente orienta a interpretação vocal.
+
+Estilos atuais:
+- `sales_energy`: venda energética padrão;
+- `celebratory`: compra confirmada/prova social real;
+- `urgent_grounded`: urgência somente quando a escassez é sustentada;
+- `price_confident`: preço/ancoragem de valor;
+- `reassuring`: objeção, garantia, confiança;
+- `empathetic_solution`: dor -> solução;
+- `vivid_desire`: descrição, uso e visualização;
+- `clear_answer`: resposta curta a comentário;
+- `welcoming`: recap/entrada de público.
+
+A instrução final combina o perfil Vivian/Ryan com o estilo daquele job. A
+intensidade é configurável em `tts.qwen3_hq.expression_strength` (0.0 a 1.5)
+e pode ser desligada com `tts.qwen3_hq.expressive=false`.
+
+O `voice_style` também é colocado no estado do runtime/metadata da fila para
+a interface poder mostrar como a próxima fala será interpretada.
+
+Essa camada foi desenhada para ser reaproveitada futuramente por motores de
+voz via API (Gemini/OpenAI), mantendo o Presenter como fonte de decisão.
+
 ## Fallback
 
 Kokoro-82M PT-BR continua embutido:
