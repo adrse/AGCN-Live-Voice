@@ -82,11 +82,21 @@ def test_presenter_answers_grounded_technical_fact():
     assert "3000" in item["speech"]
 
 
-def test_numeric_stock_alone_does_not_create_scarcity():
+def test_high_stock_alone_does_not_create_scarcity():
+    guard = SalesGuard({
+        "name": "Produto X",
+        "stock": 30,
+        "live_offer": False,
+    })
+    assert guard.grounded_urgency() == []
+    assert guard.can_claim("scarcity") is False
+
+
+def test_low_real_stock_can_create_grounded_scarcity():
     guard = SalesGuard({
         "name": "Produto X",
         "stock": 3,
         "live_offer": False,
     })
-    assert guard.grounded_urgency() == []
-    assert guard.can_claim("scarcity") is False
+    assert "stock:3" in guard.grounded_urgency()
+    assert guard.can_claim("scarcity") is True
