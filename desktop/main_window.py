@@ -220,12 +220,19 @@ class DashboardPage(QWidget):
             )
         )
 
+        configured_style = str(
+            voice.get("style_selection") or "auto"
+        )
         self.voice_style.setText(
             str(
                 voice.get("current_style")
-                or (data.get("current_speech") or {}).get("voice_style")
-                or "—"
-            )
+                or (
+                    configured_style
+                    if configured_style not in {"", "auto"}
+                    else (data.get("current_speech") or {}).get("voice_style")
+                )
+                or "automático"
+            ).replace("_", " ")
         )
 
         self.presenter_mode.setText(
@@ -237,11 +244,22 @@ class DashboardPage(QWidget):
             f"{int(data.get('comments_paused_seconds') or 0)}s"
         )
 
-        current = data.get("current_speech") or {}
+        current = dict(data.get("current_speech") or {})
+        fixed_style = (
+            configured_style
+            if configured_style not in {"", "auto"}
+            else ""
+        )
+        if fixed_style and current:
+            current["voice_style"] = fixed_style
+
         self.speech.setPlainText(current.get("speech") or "")
         self.current_action.setText(self._action_text(current))
 
-        queued = list(data.get("queue") or [])
+        queued = [dict(item) for item in (data.get("queue") or [])]
+        if fixed_style:
+            for item in queued:
+                item["voice_style"] = fixed_style
         product_locked = (
             data.get("presenter_mode") == "produto"
             and int(data.get("comments_paused_seconds") or 0) > 0
