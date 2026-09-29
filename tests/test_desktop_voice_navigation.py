@@ -40,7 +40,8 @@ def test_dashboard_has_compact_voice_summary_and_advanced_shortcut():
     dashboard = _class_source("DashboardPage")
     main = _class_source("MainWindow")
 
-    assert 'group("Voz e áudio")' in dashboard
+    assert '"Voz e áudio"' in dashboard
+    assert "voice_advanced_btn" in dashboard
     assert "self.voice_summary_engine" in dashboard
     assert "self.voice_summary_profile" in dashboard
     assert "self.voice_summary_speed" in dashboard
@@ -104,3 +105,18 @@ def test_voice_patch_does_not_overwrite_hidden_engine_paths():
     assert '"models_base_url"' not in patch
     assert '"base_url"' not in patch
     assert '"timeout_seconds"' not in patch
+
+
+def test_desktop_uses_polished_theme_and_maximized_startup():
+    source = _source()
+    main_path = SOURCE_PATH.parent / "main.py"
+    main_source = main_path.read_text(encoding="utf-8")
+
+    assert "APP_STYLESHEET" in source
+    assert 'setObjectName("Sidebar")' in source
+    assert 'setObjectName("SidebarNav")' in source
+    assert 'setObjectName("PageRoot")' in source
+    assert '"Status da LIVE"' in source
+    assert '"Andamento da apresentação"' in source
+    assert "showMaximized()" in main_source
+    assert 'setStyle("Fusion")' in main_source
