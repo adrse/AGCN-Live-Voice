@@ -35,17 +35,23 @@ Velocidade continua configurável separadamente.
 
 ## Nível 2 — Gemini Premium TTS
 
-Planejado:
-- Gemini TTS via API;
-- foco em interpretação, emoção, sotaque e baixa latência;
-- recebe o MESMO texto aprovado pelo Presenter;
-- recebe também o estilo vocal planejado pelo AGCN;
-- se API falhar, pode cair para Qwen local.
+Implementado:
+- Gemini 3.8 Flash-Lite TTS como opção rápida/econômica;
+- Gemini 3.8 Flash TTS como opção de máxima qualidade;
+- integração via Gemini Interactions API;
+- texto aprovado pelo Presenter é enviado como transcrição literal;
+- estilo vocal vai em speech_metadata.style;
+- Kore é o perfil feminino padrão e Puck o masculino padrão;
+- velocidade final continua obedecendo ao slider do AGCN;
+- falha/ausência de API cai automaticamente para Qwen HQ e depois Kokoro;
+- GEMINI_API_KEY fica no secret store/ambiente, nunca no Git/config distribuído.
 
-Fluxo recomendado:
-Presenter -> BrainResult validado -> VoiceJob -> direção expressiva -> Gemini TTS -> AudioSink.
+Fluxo:
+Presenter -> BrainResult validado -> VoiceJob -> direção expressiva ->
+Gemini 3.8 TTS -> AudioSink.
 
-A API key deve ficar em secret store/ambiente, nunca no Git/config distribuído.
+Fallback:
+Gemini -> Qwen3-TTS HQ -> Kokoro.
 
 ## Nível 3 — OpenAI Live / Realtime
 
@@ -108,9 +114,9 @@ A LIVE não deve ficar muda por indisponibilidade de uma API.
 
 ## Próximo trabalho
 
-1. Finalizar/validar Qwen expressivo.
-2. Criar contrato provider-neutro de VoiceTurn/TurnPlan.
-3. Implementar Gemini Premium TTS.
+1. Validar acusticamente Qwen expressivo no Windows.
+2. Validar Gemini real com API key e comparar Flash-Lite vs Flash.
+3. Criar/fechar contrato provider-neutro de VoiceTurn/TurnPlan.
 4. Implementar OpenAI Live/Realtime em strict_speech.
 5. Só depois avaliar guided_agent.
-6. Expor no Windows as três opções e o estado atual/próximo da fila.
+6. Refinar no Windows a comparação A/B dos três motores.
