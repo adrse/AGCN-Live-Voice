@@ -58,6 +58,18 @@ class PresenterBehaviorTests(unittest.TestCase):
         self.assertIsNone(queued)
         self.assertEqual(engine.queue_snapshot(), [])
 
+    def test_known_guarantee_reply_is_short_and_informal(self):
+        engine = PresenterEngine(PRODUCT)
+        reply = engine.build_response(
+            "Maria",
+            "tem garantia?",
+            "direct_question",
+        )
+
+        self.assertIn("Maria", reply)
+        self.assertIn("tem garantia de 1 ano", reply.casefold())
+        self.assertLess(len(reply), 120)
+
     def test_three_reactive_answers_force_thirty_seconds_of_product_talk(self):
         engine = PresenterEngine(PRODUCT)
         base = 1000.0
