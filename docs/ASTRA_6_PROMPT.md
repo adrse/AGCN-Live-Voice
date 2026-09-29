@@ -13,12 +13,16 @@ Leia nesta ordem:
 6. `core/brain_orchestrator.py`
 7. `core/brain_factory.py`
 8. `core/presenter_v3.py`
-9. `core/comment_selection_policy.py`
-10. `core/runtime.py`
-11. `desktop/config.example.json`
-12. `docs/DESKTOP_MVP_SPEC.md`
-13. `docs/ACCEPTANCE_TESTS_MVP.md`
-14. testes existentes.
+9. `core/tts_providers.py`
+10. `core/audio_output.py`
+11. `core/voice_service.py`
+12. `core/voice_factory.py`
+13. `core/runtime.py`
+14. `core/comment_selection_policy.py`
+15. `desktop/config.example.json`
+16. `docs/DESKTOP_MVP_SPEC.md`
+17. `docs/ACCEPTANCE_TESTS_MVP.md`
+18. testes existentes.
 
 MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
 
@@ -27,68 +31,104 @@ MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz int
 - sem avatar/MuseTalk;
 - sem player/playlist de vídeo no AGCN;
 - vídeo fica no TikTok LIVE Studio/OBS;
-- cadastro manual do produto é essencial;
+- cadastro manual do produto é essencial e é a fonte da verdade;
 - Qwen/Ollama local é o Brain padrão;
 - API é alternativa opcional;
 - Qwen e API usam a MESMA PresenterPolicy;
 - nenhum provider pode ter prompt comercial próprio;
 - nenhum texto bruto de LLM vai direto ao TTS;
-- nenhum secret embutido;
 - TTS local padrão + premium opcional;
-- áudio sai no device escolhido/VB-CABLE.
+- áudio sai no device escolhido/VB-CABLE;
+- nenhum secret embutido.
 
-## O que já foi implementado e deve ser auditado, não refeito do zero
+## Já implementado — audite antes de alterar
 
-- Ollama/Qwen real em `core/model_transports.py`;
-- OpenAI Responses API com Structured Output;
-- provider genérico OpenAI-compatible;
-- factory/fallback em `core/brain_factory.py`;
-- fatos canônicos derivados do cadastro em `core/brain_context_builder.py`;
-- Presenter V3 com comentários, proatividade, memória e continuidade;
-- runtime capaz de receber Brain real;
-- script `scripts/test_brain.py`;
-- testes dos transportes/contexto/fallback/Presenter V3.
+Brain:
+- Ollama/Qwen real;
+- OpenAI Responses API;
+- provider OpenAI-compatible;
+- JSON Schema;
+- factory e fallback;
+- BrainContext derivado do produto ativo;
+- PresenterV3;
+- validação de fatos e alegações sensíveis.
 
-## Regras funcionais
+Voz:
+- TTS local pyttsx3/SAPI;
+- TTS OpenAI opcional;
+- fallback TTS;
+- SoundDeviceAudioSink;
+- listagem/seleção de device;
+- VoiceService com fila prioritária;
+- VoiceFactory.
 
-Fluxo:
-TikTok -> filtro/prioridade -> decisão -> Speech Planner -> produto ativo + memória -> PresenterPolicy -> Qwen/API -> BrainResult JSON -> validação -> TTS -> áudio.
+Runtime:
+- pode receber Brain e Voice reais;
+- fala aprovada é enfileirada para TTS;
+- resposta prioritária remove proativos pendentes;
+- frase que já está tocando termina antes da resposta;
+- TikTokMonitor e ProductStore antigos são preservados.
 
-O Brain deve:
-- falar continuamente;
-- responder comentários prioritários;
-- responder direto antes de expandir;
-- usar apenas o produto ativo e condições da LIVE;
-- não inventar;
-- variar assunto;
-- evitar repetição;
-- preservar `sales_thread`;
-- retomar venda depois da resposta.
+Laboratórios:
+- `scripts/test_brain.py`;
+- `scripts/test_voice.py`.
 
-`used_facts` deve copiar exatamente fatos de `ALLOWED_FACTS`.
+Testes:
+- `tests/test_brain_orchestrator.py`;
+- `tests/test_model_transports.py`;
+- `tests/test_brain_context_builder.py`;
+- `tests/test_brain_factory.py`;
+- `tests/test_presenter_v3.py`;
+- `tests/test_tts_voice_service.py`;
+- demais testes históricos;
+- CI `.github/workflows/test-presenter-brain.yml`.
+
+## Fluxo final esperado
+
+TikTok LIVE
+-> comentário/métricas
+-> filtro + prioridade
+-> Decision Engine
+-> Speech Planner
+-> produto ativo + memória
+-> PresenterPolicy
+-> Qwen/API
+-> BrainResult JSON
+-> validação factual
+-> VoiceService
+-> TTS
+-> dispositivo/VB-CABLE
+-> TikTok LIVE Studio.
+
+Sem comentário relevante, o sistema continua falando do produto.
+Com comentário prioritário, responde e retoma a venda.
+Produto e condições comerciais são a única fonte de fatos.
 
 ## Trabalho de amanhã
 
 1. Rode toda a suíte e corrija qualquer regressão.
-2. Teste Qwen/Ollama real no Windows, incluindo JSON estruturado.
+2. Teste Qwen/Ollama real no Windows.
 3. Teste OpenAI Responses API real e fallback.
-4. Faça testes de factualidade e comentários.
-5. Integre PresenterV3 definitivamente ao desktop.
-6. Implemente TTS local funcional.
-7. Implemente TTS/API premium opcional.
-8. Implemente fila/prefetch/playback e device de áudio.
-9. Integre VB-CABLE.
-10. Termine UI real de Dashboard/Produto/Configurações.
-11. Teste com TikTokMonitor real.
-12. Gere e valide o .exe.
+4. Faça testes agressivos de factualidade/alucinação.
+5. Teste TTS local e TTS premium reais.
+6. Teste SoundDevice + VB-CABLE.
+7. Integre o runtime às telas reais.
+8. Termine Dashboard, Produto e Configurações.
+9. Faça Configurações permitir escolher Brain, modelo, TTS, voz, device e testar cada item.
+10. Garanta persistência local segura.
+11. Teste cadastro/ativação/troca de produto.
+12. Teste TikTokMonitor real e fala contínua.
+13. Valide resposta a comentários + retomada.
+14. Gere e teste o .exe.
 
 Não gaste tempo com vídeo, avatar, mobile, pagamentos ou pesquisa automática.
 
 Ao terminar entregue:
 - arquivos alterados;
-- testes executados e resultados;
-- Qwen testado;
-- API testada;
-- TTS/device testados;
+- testes e resultados;
+- Qwen real testado;
+- API real testada;
+- TTS/device/VB-CABLE testados;
 - pendências reais;
-- comando/caminho de build do exe.
+- caminho do .exe;
+- instruções mínimas para instalar Ollama/Qwen e VB-CABLE.
