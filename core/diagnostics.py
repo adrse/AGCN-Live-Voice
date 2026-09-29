@@ -73,15 +73,15 @@ def run_diagnostics(
     add(
         "Duas vozes AGCN",
         {"female_fast", "male_fast"}.issubset(profiles),
-        "Dora (feminina) + Alex (masculina), PT-BR local",
+        "Vivian (feminina) + Ryan (masculina) no Qwen3-TTS HQ; Dora/Alex no fallback",
     )
 
     try:
         tts = build_tts_provider(config)
         ok, detail = tts.healthcheck()
-        add("Voz neural local", ok, detail)
+        add("Motor de voz local", ok, detail)
     except Exception as exc:
-        add("Voz neural local", False, str(exc))
+        add("Motor de voz local", False, str(exc))
 
     try:
         sink = SoundDeviceAudioSink()
@@ -109,7 +109,7 @@ def run_diagnostics(
         "Produto ativo",
         "Presenter Brain",
         "Duas vozes AGCN",
-        "Voz neural local",
+        "Motor de voz local",
         "Dispositivos de áudio",
     ]
     by_name = {item["name"]: item for item in checks}
