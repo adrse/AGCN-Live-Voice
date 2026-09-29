@@ -103,12 +103,14 @@ Falha:
 
 ## Qwen local
 
-- Ollama local;
-- endpoint/modelo configurável;
-- botão Testar Qwen;
+- AGCN Local Brain embutido;
+- Qwen3-4B Q4_K_M;
+- runtime llama.cpp empacotado e gerenciado pelo próprio AGCN;
+- localhost privado, sem instalação de Ollama;
+- botão Testar Brain;
 - timeout;
 - mesma PresenterPolicy;
-- streaming opcional.
+- fallback determinístico se o pack estiver ausente/falhar.
 
 ## API
 
@@ -155,12 +157,17 @@ Brain e voz são independentes. A voz pode ser local (Qwen3-TTS/Kokoro) ou por A
 
 ## Empacotamento
 
-PyInstaller:
-- Windows;
-- sem console;
-- ícone/assets;
+Distribuição completa:
+- PyInstaller para o aplicativo Windows sem console;
+- `brain_local` com llama.cpp + Qwen3-4B;
+- `voice_hq` com Qwen3-TTS Vivian/Ryan;
+- Kokoro embutido como fallback;
+- Visual C++ Runtime dentro do instalador;
+- Inno Setup como instalação única;
 - sem secrets;
-- script de build no repositório.
+- nenhuma instalação manual de Ollama/Python/modelo pelo cliente.
+
+Workflow: `.github/workflows/build-windows-complete.yml`.
 
 
 ## Interface desktop
