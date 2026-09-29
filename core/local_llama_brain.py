@@ -143,6 +143,8 @@ class LlamaCppLocalTransport:
             "-t",
             str(self.threads),
             "--jinja",
+            "--reasoning",
+            "off",
         ]
 
     def _start_server(self) -> None:
