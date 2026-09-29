@@ -19,9 +19,21 @@ DEFAULT_CONFIG_PATH = ROOT / "desktop" / "config.example.json"
 
 BUILTIN_DEFAULTS = {
     "brain": {
-        "provider": "qwen_local",
+        "provider": "agcn_local",
         "fallback_local": True,
         "max_retries": 1,
+        "local_brain": {
+            "pack_dir": "",
+            "model_file": "Qwen3-4B-Q4_K_M.gguf",
+            "model_alias": "agcn-qwen3-4b",
+            "port": 18766,
+            "context_size": 4096,
+            "threads": None,
+            "startup_timeout_seconds": 180,
+            "timeout_seconds": 45,
+            "temperature": 0.25,
+            "max_output_tokens": 500,
+        },
         "ollama": {
             "base_url": "http://127.0.0.1:11434",
             "model": "qwen3:4b",
