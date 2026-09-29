@@ -132,7 +132,6 @@ def build_allowed_facts(product: dict | None) -> list[str]:
             "key_benefits",
             "differentials",
             "problems_solved",
-            "included_items",
         }:
             if isinstance(value, (list, tuple, set)):
                 items = [str(x).strip() for x in value if str(x).strip()]
@@ -208,6 +207,32 @@ def build_brain_context(
     )
 
     allowed_facts = build_allowed_facts(product)
+
+    # Para campos cadastrados por tópicos, o planner escolhe somente alguns
+    # pontos por fala. O Brain recebe apenas esses pontos daquela categoria,
+    # impedindo que despeje todos os benefícios/problemas de uma vez.
+    selected = decision.get("selected_facts") or {}
+    if isinstance(selected, dict) and selected:
+        for field, values in selected.items():
+            label = FACT_LABELS.get(str(field), str(field))
+            prefix = f"{label}: "
+            allowed_values = {
+                str(value).strip().casefold()
+                for value in (values or [])
+                if str(value).strip()
+            }
+            if not allowed_values:
+                continue
+
+            filtered = []
+            for fact in allowed_facts:
+                if not fact.startswith(prefix):
+                    filtered.append(fact)
+                    continue
+                suffix = fact[len(prefix):].strip().casefold()
+                if suffix in allowed_values:
+                    filtered.append(fact)
+            allowed_facts = filtered
 
     # Prova social só pode usar compras realmente confirmadas pela memória.
     try:
