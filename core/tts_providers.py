@@ -421,6 +421,7 @@ def _build_openai_live(
         completion_grace_seconds=float(
             api.get("completion_grace_seconds", 0.70)
         ),
+        speed=_selected_speed(cfg, profile),
         expressive=_expressive_enabled(cfg),
         expression_strength=_expression_strength(cfg),
     )
