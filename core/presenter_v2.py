@@ -73,8 +73,8 @@ class PresenterV2:
         self.decision_engine = DecisionEngine()
         self.planner = SpeechPlanner()
         self.watchdog = SilenceWatchdog(
-            target_seconds=8.0,
-            hard_seconds=10.0,
+            target_seconds=2.5,
+            hard_seconds=4.0,
         )
         self.queue = []
         self.counter = itertools.count()
