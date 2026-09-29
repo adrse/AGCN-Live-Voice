@@ -216,11 +216,17 @@ class DashboardPage(QWidget):
         self.diagnostic.setText(str(error))
 
 
-class DescriptionPointsEditor(QWidget):
-    """Editor visual: cada ponto de descrição é cadastrado separadamente."""
+class PointsEditor(QWidget):
+    """Editor visual reutilizável para campos cadastrados por tópicos."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        add_label: str,
+        placeholder: str,
+    ) -> None:
         super().__init__()
+        self.placeholder = placeholder
         self.rows: list[tuple[QWidget, QLineEdit]] = []
 
         root = QVBoxLayout(self)
@@ -231,7 +237,7 @@ class DescriptionPointsEditor(QWidget):
         self.rows_layout.setSpacing(6)
         root.addLayout(self.rows_layout)
 
-        self.add_btn = QPushButton("+ Adicionar descrição")
+        self.add_btn = QPushButton(add_label)
         self.add_btn.clicked.connect(lambda: self.add_point(""))
         root.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
@@ -244,9 +250,7 @@ class DescriptionPointsEditor(QWidget):
         layout.setSpacing(6)
 
         edit = QLineEdit()
-        edit.setPlaceholderText(
-            "Ex.: bateria de até 6 dias"
-        )
+        edit.setPlaceholderText(self.placeholder)
         edit.setText(str(value or "").strip())
 
         remove = QPushButton("×")
@@ -312,8 +316,8 @@ class ProductPage(QWidget):
         ("model", "Modelo"),
         ("category", "Categoria"),
         ("description", "Descrição por tópicos"),
-        ("key_benefits", "Benefícios"),
-        ("problems_solved", "Problemas que resolve"),
+        ("key_benefits", "Benefícios por tópicos"),
+        ("problems_solved", "Problemas que resolve por tópicos"),
         ("differentials", "Diferenciais"),
         ("included_items", "Itens inclusos"),
         ("compatibility", "Compatibilidade"),
@@ -370,10 +374,21 @@ class ProductPage(QWidget):
         permanent_form = QFormLayout(permanent_box)
         for field, label in self.PERMANENT:
             if field == "description":
-                widget = DescriptionPointsEditor()
+                widget = PointsEditor(
+                    add_label="+ Adicionar descrição",
+                    placeholder="Ex.: bateria de até 6 dias",
+                )
+            elif field == "key_benefits":
+                widget = PointsEditor(
+                    add_label="+ Adicionar benefício",
+                    placeholder="Ex.: áudio claro mesmo em chamadas",
+                )
+            elif field == "problems_solved":
+                widget = PointsEditor(
+                    add_label="+ Adicionar problema que resolve",
+                    placeholder="Ex.: evita ficar preso a fios",
+                )
             elif field in {
-                "key_benefits",
-                "problems_solved",
                 "differentials",
                 "included_items",
                 "additional_info",
@@ -418,7 +433,7 @@ class ProductPage(QWidget):
 
     @staticmethod
     def _get_text(widget) -> str:
-        if isinstance(widget, DescriptionPointsEditor):
+        if isinstance(widget, PointsEditor):
             return widget.text()
         if isinstance(widget, QTextEdit):
             return widget.toPlainText().strip()
@@ -426,7 +441,7 @@ class ProductPage(QWidget):
 
     @staticmethod
     def _set_text(widget, value) -> None:
-        if isinstance(widget, DescriptionPointsEditor):
+        if isinstance(widget, PointsEditor):
             widget.set_text(value)
             return
         text = "" if value is None else str(value)
