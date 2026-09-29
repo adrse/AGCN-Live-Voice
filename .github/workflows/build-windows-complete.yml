@@ -103,7 +103,7 @@ jobs:
       - name: Smoke bundled local Brain
         shell: pwsh
         run: |
-          python -c "from core.local_llama_brain import LlamaCppLocalTransport; p=LlamaCppLocalTransport(pack_dir='brain_local',startup_timeout_seconds=180,timeout_seconds=30); print(p.assets_status()); assert p.assets_status()[0]; ok,msg=p.healthcheck(); print(msg); assert ok; p.close()"
+          python -c "import json; from core.local_llama_brain import LlamaCppLocalTransport; p=LlamaCppLocalTransport(pack_dir='brain_local',startup_timeout_seconds=180,timeout_seconds=120,max_output_tokens=120); print(p.assets_status()); assert p.assets_status()[0]; ok,msg=p.healthcheck(); print(msg); assert ok; raw=p.complete(system_instruction='Responda em JSON conforme o schema. Seja curto.',user_payload='Crie uma fala de teste sem fatos comerciais. topic deve ser test, used_facts vazio, needs_fact false e next_sales_thread benefits.'); data=json.loads(raw); print(data); assert data.get('speech'); assert data.get('needs_fact') is False; p.close()"
 
       - name: Smoke HQ voice assets
         shell: pwsh
