@@ -22,24 +22,26 @@
   },
   "tts": {
     "provider": "local",
-    "voice": "",
+    "profile": "female_fast",
+    "voice_override": "",
     "fallback_local": true,
     "local": {
-      "rate": 190,
-      "volume": 1.0
+      "rate_override": null,
+      "volume": 1
     },
     "api": {
       "base_url": "https://api.openai.com/v1",
       "model": "gpt-4o-mini-tts",
-      "voice": "coral",
       "api_key_env": "OPENAI_API_KEY",
       "timeout_seconds": 45,
-      "instructions": "Fale em português brasileiro, ritmo ágil e natural de LIVE commerce."
+      "voice_override": "",
+      "speed_override": null,
+      "instructions_override": ""
     }
   },
   "audio": {
     "output_device": "",
-    "volume": 1.0
+    "volume": 1
   },
   "presenter": {
     "silence_target_seconds": 8,
