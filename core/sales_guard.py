@@ -13,6 +13,8 @@ class SalesGuard:
         "availability": "stock",
         "stock": "stock",
         "shipping": "shipping_info",
+        "coupon": "coupon",
+        "discount": "discount",
         "warranty": "warranty",
         "compatibility": "compatibility",
         "included_items": "included_items",
