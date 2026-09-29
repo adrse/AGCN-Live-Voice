@@ -136,7 +136,6 @@ Voz:
 ```
 python scripts/test_voice.py --list-devices
 python scripts/test_voice.py --device "CABLE Input" --text "Teste da voz AGCN"
-python scripts/test_voice.py --provider openai --device "CABLE Input"
 ```
 
 ## Cadastro do produto — regra essencial
@@ -247,7 +246,7 @@ Após o handoff inicial, também foram concluídos:
 - logging/crash report fica em AppData;
 - ProductStore também grava em AppData, adequado para executável Windows;
 - build Windows automático com smoke da UI e do executável;
-- suíte completa do repositório validada após arquitetura neural: **80 passed, 2 warnings**.
+- suíte completa do repositório validada após Qwen3-TTS HQ: **85 passed, 2 warnings**.
 
 ### Build Windows comprovado
 
@@ -284,30 +283,22 @@ Ollama + qwen3:4b, API real opcional, áudio real, VB-CABLE, TikTok LIVE Studio,
 
 ### Regra final de voz
 
-As vozes oficiais NÃO podem depender de vozes instaladas no Windows.
+As vozes oficiais não dependem de API nem de vozes instaladas no Windows.
 
-O usuário escolhe na própria UI:
-- Feminina — Vendas rápidas;
-- Masculina — Vendas rápidas;
+O usuário escolhe:
+- Feminina — Vendas rápidas -> Vivian no motor HQ;
+- Masculina — Vendas rápidas -> Ryan no motor HQ;
 - velocidade por slider.
 
-OpenAI Neural é o caminho padrão por ter vozes integradas e estáveis sem voice ID externo. ElevenLabs fica disponível para comparação/upgrade, exigindo chave e voice IDs configurados.
+Motor principal:
+- Qwen3-TTS 1.7B CustomVoice Q8 local.
 
-O Windows é somente destino do áudio (speakers/VB-CABLE), nunca a origem das vozes oficiais.
+Fallback:
+- Kokoro Dora/Alex, somente se o pack HQ estiver ausente ou falhar.
 
+A API existe exclusivamente para aumentar a qualidade do Presenter Brain. Trocar Qwen/Ollama por API NÃO troca a voz.
 
-## Decisão corrigida: voz NÃO usa API
-
-A API existe somente para aumentar a qualidade do Presenter Brain.
-
-Mesmo sem nenhuma chave:
-- Qwen/Ollama pode ser o Brain;
-- Kokoro local gera a voz;
-- Dora/Alex continuam disponíveis;
-- speed continua ajustável;
-- áudio continua indo para VB-CABLE.
-
-Não substituir Kokoro local por OpenAI TTS, ElevenLabs ou vozes do Windows como requisito.
+Não substituir Qwen3-TTS HQ por OpenAI TTS, ElevenLabs ou vozes do Windows como requisito.
 
 
 ### Voice Pack HQ
@@ -322,3 +313,25 @@ Workflow: `Build Windows HQ Voice`.
 Script dev: `scripts/setup_qwen3_hq_voice.ps1`.
 
 Kokoro continua obrigatório como fallback, mas NÃO é a voz de qualidade máxima.
+
+
+### Build HQ comprovado
+
+Workflow `Build Windows HQ Voice` — run `36510038423`: **SUCCESS**.
+
+Validado no Windows:
+- compilação qwentts.cpp;
+- download dos pesos Q8;
+- carregamento do Voice Pack;
+- Vivian sintetizando Português sem API;
+- Ryan sintetizando Português sem API;
+- PyInstaller;
+- Voice Pack dentro da distribuição;
+- abertura do executável;
+- pacote HQ publicado.
+
+Artifact: `AGCN-Live-Voice-Windows-HQ`
+Artifact ID: `11008264976`
+Build SHA: `98509848070e001988eaaa3add6c93b3c5cdc1ab`
+
+Amanhã o Astra não deve reimplementar voz. Deve somente testar o som e a latência no PC real, VB-CABLE e LIVE real.
