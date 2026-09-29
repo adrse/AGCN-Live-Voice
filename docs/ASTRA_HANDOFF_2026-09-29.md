@@ -26,7 +26,7 @@ TikTok LIVE
 -> BrainResult JSON
 -> validação factual
 -> VoiceService
--> TTS neural OpenAI OU ElevenLabs
+-> Kokoro-82M PT-BR local (Dora/Alex)
 -> SoundDeviceAudioSink
 -> VB-CABLE/dispositivo
 -> TikTok LIVE Studio
@@ -67,24 +67,24 @@ Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
 
 ### Voz e áudio
 
-- `core/voice_profiles.py`
-  - dois perfis oficiais: `female_fast` e `male_fast`;
-  - ambos rápidos, proativos e orientados a LIVE commerce;
-  - OpenAI usa vozes-base distintas (`marin` / `cedar`) e instruções distintas.
+- `core/local_kokoro_tts.py`
+  - TTS oficial do produto;
+  - Kokoro-82M ONNX local;
+  - PT-BR;
+  - `pf_dora` feminina;
+  - `pm_alex` masculina;
+  - speed local;
+  - zero chamadas de rede durante síntese.
 
 - `core/tts_providers.py`
-  - OpenAI Neural é o TTS oficial padrão;
-  - velocidade configurável por slider;
-  - não depende das vozes/SAPI do Windows;
-  - `pyttsx3` permanece apenas como código legado não incluído no build oficial.
+  - `kokoro_local` é o provider padrão;
+  - APIs de voz não são requisito do produto.
 
-- `core/neural_tts.py`
-  - ElevenLabs Neural opcional;
-  - suporta `eleven_v3_conversational`;
-  - PCM 24 kHz direto;
-  - speed/stability/similarity/style configuráveis;
-  - IDs feminino/masculino configuráveis.
+- `scripts/smoke_kokoro.py`
+  - sintetiza Dora e Alex em PT-BR no Windows CI;
+  - o build falha se qualquer uma não gerar áudio.
 
+- Build baixa `kokoro-v1.0.onnx` + `voices-v1.0.bin` e os embute no pacote com PyInstaller.
 
 - `core/audio_output.py`
   - lista dispositivos de saída;
@@ -166,8 +166,8 @@ Qwen e API recebem exatamente a mesma PresenterPolicy e os mesmos fatos do produ
 
 `desktop/config.example.json` contém Brain, TTS, áudio e Presenter.
 
-- OpenAI Brain/Voice usa `OPENAI_API_KEY`.
-- ElevenLabs Voice usa `ELEVENLABS_API_KEY`.
+- OpenAI é opcional e usado pelo Brain/inteligência via `OPENAI_API_KEY`.
+- A voz principal não usa chave nem API.
 - Provider compatível pode usar `AGCN_LLM_API_KEY`.
 - nenhuma chave deve entrar no Git, config distribuído ou exe.
 
@@ -188,8 +188,8 @@ Não reescrever a arquitetura. Primeiro auditar e executar.
 1. Rodar toda a suíte e corrigir regressões.
 2. Testar Ollama/Qwen real em Windows.
 3. Testar API real e fallback para local.
-4. Testar TTS local real no Windows.
-5. Testar TTS premium.
+4. Testar Dora e Alex locais no Windows sem API.
+5. Ajustar velocidade ideal pelo slider.
 6. Testar listagem/seleção de device e VB-CABLE.
 7. Ligar PresenterV3 + VoiceService definitivamente às telas.
 8. Completar Dashboard, Produto e Configurações.
@@ -212,7 +212,7 @@ Não reescrever a arquitetura. Primeiro auditar e executar.
 10. após resposta a venda continua;
 11. TTS toca no device escolhido;
 12. VB-CABLE entrega áudio ao TikTok LIVE Studio;
-13. falha de API/TTS premium cai para local quando habilitado;
+13. falha/ausência da API não interrompe a voz local;
 14. secrets não entram no exe/repo;
 15. build Windows fica pronto.
 
@@ -282,3 +282,17 @@ O usuário escolhe na própria UI:
 OpenAI Neural é o caminho padrão por ter vozes integradas e estáveis sem voice ID externo. ElevenLabs fica disponível para comparação/upgrade, exigindo chave e voice IDs configurados.
 
 O Windows é somente destino do áudio (speakers/VB-CABLE), nunca a origem das vozes oficiais.
+
+
+## Decisão corrigida: voz NÃO usa API
+
+A API existe somente para aumentar a qualidade do Presenter Brain.
+
+Mesmo sem nenhuma chave:
+- Qwen/Ollama pode ser o Brain;
+- Kokoro local gera a voz;
+- Dora/Alex continuam disponíveis;
+- speed continua ajustável;
+- áudio continua indo para VB-CABLE.
+
+Não substituir Kokoro local por OpenAI TTS, ElevenLabs ou vozes do Windows como requisito.
