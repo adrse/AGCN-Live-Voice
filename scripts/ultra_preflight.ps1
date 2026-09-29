@@ -44,8 +44,10 @@ if ($ollama) {
 }
 
 Write-Host ""
-Write-Host "[7] Audio"
+Write-Host "[7] Voz local e audio"
 python scripts\test_voice.py --list-devices
+python scripts\test_voice.py --profile female_fast --speed 1.28
+python scripts\test_voice.py --profile male_fast --speed 1.28
 
 Write-Host ""
 Write-Host "[8] Build"
@@ -61,7 +63,7 @@ Write-Host "Doctor exit: $doctor"
 Write-Host "Build exit:  $build"
 
 if ($tests -eq 0 -and $build -eq 0) {
-    Write-Host "CORE/BUILD OK. Foque apenas nos testes reais de Qwen, audio, VB-CABLE e TikTok."
+    Write-Host "CORE/BUILD OK. Voz local, Qwen, audio, VB-CABLE e TikTok devem ser validados no ambiente real."
     exit 0
 }
 
