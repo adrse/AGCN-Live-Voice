@@ -823,10 +823,19 @@ class SettingsPage(QWidget):
         self.voice_hint.setWordWrap(True)
         self.voice_hint.setStyleSheet("color:#6B7280;font-size:12px;")
 
+        self.voice_test_text = QLineEdit()
+        self.voice_test_text.setText(
+            "Gente, presta atenção nessa oferta porque esse produto "
+            "está valendo muito a pena hoje!"
+        )
+        self.voice_test_text.setPlaceholderText(
+            "Digite uma frase para ouvir com os ajustes atuais"
+        )
+
         self.device = QComboBox()
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
-        self.test_voice_btn = QPushButton("Testar voz")
+        self.test_voice_btn = QPushButton("Ouvir teste com estes ajustes")
         voice_form.addRow("Motor", self.voice_engine)
         voice_form.addRow("Modelo Gemini", self.gemini_model)
         voice_form.addRow("Chave Gemini", self.gemini_key)
@@ -839,6 +848,7 @@ class SettingsPage(QWidget):
         voice_form.addRow("Expressividade", expression_row)
         voice_form.addRow("Estilo", self.voice_style_combo)
         voice_form.addRow("", self.voice_hint)
+        voice_form.addRow("Texto de teste", self.voice_test_text)
         voice_form.addRow("Saída de áudio", self.device)
 
         voice_actions = QHBoxLayout()
@@ -1180,8 +1190,13 @@ class SettingsPage(QWidget):
                     "Chave OpenAI salva · pronta para GPT-Live."
                 )
 
+            test_text = self.voice_test_text.text().strip()
             ok, message = self.controller.test_voice(
-                config_override=self._patch()
+                text=(
+                    test_text
+                    or "Teste de voz do AGCN Live Voice."
+                ),
+                config_override=self._patch(),
             )
             QMessageBox.information(
                 self,
