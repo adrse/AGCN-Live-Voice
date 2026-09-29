@@ -120,6 +120,9 @@ class DesktopController:
         self.runtime = self._build_runtime()
         return self.config
 
+    def set_openai_key(self, value: str) -> None:
+        set_secret("OPENAI_API_KEY", value)
+
     def api_key_saved(self) -> bool:
         return has_secret("OPENAI_API_KEY")
 
