@@ -56,6 +56,8 @@ class PresenterV3:
         self.watchdog = SilenceWatchdog(target_seconds=8.0, hard_seconds=10.0)
         self.queue = []
         self.counter = itertools.count()
+        self.plan_queue = []
+        self.plan_counter = itertools.count()
         self.recent_keys = {}
         self.recent_comments = deque(maxlen=12)
         self.recent_facts = deque(maxlen=24)
@@ -65,6 +67,9 @@ class PresenterV3:
         self.product = dict(product or {})
         self.guard = SalesGuard(self.product)
         self.recent_facts.clear()
+        self.queue.clear()
+        self.plan_queue.clear()
+        self.fusion.pending.clear()
 
     def ingest_comment(self, user: str, text: str) -> dict | None:
         analyzed = self.intelligence.analyze(user, text)
@@ -121,22 +126,75 @@ class PresenterV3:
         self.queue.pop(worst)
         heapq.heapify(self.queue)
 
-    def process_pending_comments(self) -> list[dict]:
-        created = []
+    def collect_pending_comments(self) -> int:
+        """Classifica/planeja comentários sem chamar o Brain.
+
+        Durante o modo produto, isso preserva a fila sem gastar API ou gerar
+        respostas que podem ficar desatualizadas antes de serem faladas.
+        """
+        added = 0
         for group in self.fusion.ready_groups():
             decision = self.decision_engine.decide(
                 group, self.memory.snapshot()
             )
             plan = self.planner.plan(decision, self.guard, self.memory)
 
-            # Regra V0.6.1: pergunta sem resposta conhecida não vira fala.
             if not self._plan_is_answerable(plan):
                 continue
 
+            heapq.heappush(
+                self.plan_queue,
+                (
+                    -int(plan.get("priority", 0)),
+                    next(self.plan_counter),
+                    plan,
+                ),
+            )
+            added += 1
+
+        # Mantém somente os planos de maior prioridade.
+        while len(self.plan_queue) > self.MAX_REACTIVE_QUEUE:
+            worst = max(
+                range(len(self.plan_queue)),
+                key=lambda i: (
+                    self.plan_queue[i][0],
+                    self.plan_queue[i][1],
+                ),
+            )
+            self.plan_queue.pop(worst)
+            heapq.heapify(self.plan_queue)
+
+        return added
+
+    def process_pending_comments(
+        self,
+        *,
+        max_generate: int = 3,
+        target_ready_queue: int = 6,
+    ) -> list[dict]:
+        """Gera poucas respostas por vez, sob demanda.
+
+        Comentários podem chegar em avalanche; Qwen/API só recebem os planos
+        que estão próximos de serem falados.
+        """
+        self.collect_pending_comments()
+
+        created = []
+        budget = max(0, int(max_generate))
+        target = max(1, int(target_ready_queue))
+
+        while (
+            self.plan_queue
+            and len(created) < budget
+            and len(self.queue) < target
+        ):
+            _, _, plan = heapq.heappop(self.plan_queue)
             item = self._generate_item(plan)
-            if item:
-                self._push(item)
-                created.append(item)
+            if not item:
+                continue
+            self._push(item)
+            created.append(item)
+
         return created
 
     def maybe_proactive(self) -> dict | None:
@@ -283,6 +341,7 @@ class PresenterV3:
                 "last_error": self.last_brain_error or None,
             },
             "recent_facts": list(self.recent_facts)[-12:],
+            "pending_comment_plans": len(self.plan_queue),
             "watchdog": {
                 "target_seconds": self.watchdog.target_seconds,
                 "hard_seconds": self.watchdog.hard_seconds,
