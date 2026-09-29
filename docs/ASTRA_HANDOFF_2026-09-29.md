@@ -25,16 +25,17 @@ TikTok LIVE
 -> Qwen/Ollama local OU API
 -> BrainResult JSON
 -> validação factual
--> fila
--> TTS
--> dispositivo/VB-CABLE
+-> VoiceService
+-> TTS local OU premium
+-> SoundDeviceAudioSink
+-> VB-CABLE/dispositivo
 -> TikTok LIVE Studio
 
 Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
 
 ## Implementado em 28/09
 
-Além do core histórico, agora existem:
+### Brain real
 
 - `core/model_transports.py`
   - `OllamaTransport` para Qwen local em `/api/chat`;
@@ -46,135 +47,142 @@ Além do core histórico, agora existem:
   - escolhe provider por configuração;
   - Qwen local é padrão;
   - API pode cair automaticamente para Qwen local;
-  - secrets vêm de variável de ambiente, nunca do exe/repo.
+  - secrets vêm de variável de ambiente.
 
 - `core/brain_context_builder.py`
   - separa PRODUCT e LIVE_CONDITIONS;
-  - transforma somente campos realmente cadastrados em `ALLOWED_FACTS`;
+  - transforma somente campos cadastrados em `ALLOWED_FACTS`;
   - cadastro do produto é a fonte factual da LIVE.
 
 - `core/presenter_v3.py`
   - reaproveita Comment Intelligence, Fusion, Decision Engine, Speech Planner, Memory e Watchdog;
-  - chama o Brain real para resposta e fala proativa;
-  - registra fatos usados e continuidade;
-  - comentário relevante vira missão para o Brain, não prompt solto.
+  - usa Brain real para respostas e fala proativa;
+  - registra fatos usados e continuidade.
 
-- `core/runtime.py`
-  - aceita `brain_provider` ou `brain_config`;
-  - sem configuração mantém V2 para compatibilidade;
-  - com configuração usa PresenterV3/Qwen/API.
+- `core/brain_orchestrator.py`
+  - exige BrainResult JSON;
+  - valida `used_facts`;
+  - bloqueia preço, desconto, estoque, frete, cupom, garantia, resistência à água e números explícitos sem suporte no cadastro;
+  - faz retry quando a saída é rejeitada.
 
-- `scripts/test_brain.py`
-  - laboratório manual sem precisar iniciar uma LIVE;
-  - usa produto ativo do ProductStore.
+### Voz e áudio
 
-- testes novos:
-  - `tests/test_model_transports.py`
-  - `tests/test_brain_context_builder.py`
-  - `tests/test_brain_factory.py`
-  - `tests/test_presenter_v3.py`
+- `core/tts_providers.py`
+  - TTS local offline via pyttsx3/SAPI;
+  - TTS OpenAI opcional;
+  - fallback premium -> local;
+  - saída normalizada em `AudioChunk`.
 
-## Regra central da inteligência
+- `core/audio_output.py`
+  - lista dispositivos de saída;
+  - seleciona device;
+  - volume;
+  - playback PCM;
+  - preparado para selecionar VB-CABLE.
 
-Qwen e API recebem a MESMA `PresenterPolicy`.
+- `core/voice_service.py`
+  - fila prioritária de voz;
+  - worker TTS/playback;
+  - permite remover falas proativas ainda não iniciadas quando chega resposta prioritária.
 
-O modelo NÃO escolhe livremente os fatos. O cadastro do produto fornece:
-- nome, marca, modelo, categoria;
-- descrição;
-- benefícios;
-- problemas resolvidos;
-- diferenciais;
-- itens inclusos;
-- compatibilidade;
-- tamanho;
-- bateria;
-- uso;
-- garantia;
-- limitações;
-- informações adicionais.
+- `core/voice_factory.py`
+  - monta TTS + AudioSink + VoiceService a partir da configuração.
 
-Condições da LIVE:
-- preço regular;
-- preço atual;
-- desconto;
-- estoque;
-- frete;
-- cupom;
-- oferta;
-- texto da oferta;
-- observação promocional.
+### Runtime
 
-`ALLOWED_FACTS` é gerado desses campos. Se o Brain disser que usou um fato, `used_facts` deve copiar exatamente o item correspondente. O orquestrador rejeita `used_facts` não autorizados.
+`core/runtime.py` aceita:
+- `brain_provider` ou `brain_config`;
+- `voice_service` ou `voice_config`.
 
-## Comportamento obrigatório
+Com ambos configurados, o fluxo chega a:
+TikTok -> comentário/decisão -> PresenterV3 -> Brain -> fala validada -> VoiceService -> TTS -> dispositivo.
 
-Pergunta:
-resposta direta -> expansão curta -> ponte para venda.
+A resposta prioritária não corta a frase de áudio no meio. Ela remove proativos pendentes e entra como próxima fala.
 
-Sem comentário:
-- continuar vendendo;
-- variar tópico;
-- usar produto ativo;
-- respeitar memória;
-- evitar repetição de fato/CTA;
-- não depender do chat para continuar.
+### Laboratórios
 
-Depois de comentário:
-- responder;
-- não reiniciar apresentação;
-- manter/atualizar `next_sales_thread`;
-- voltar naturalmente à venda.
-
-Nunca inventar preço, estoque, frete, cupom, garantia, função, compatibilidade ou especificação.
-
-## Configuração
-
-`desktop/config.example.json` agora contém:
-- provider do Brain;
-- Ollama URL/model/timeout/temperatura;
-- API URL/model/variável de ambiente;
-- fallback local;
-- retries.
-
-OpenAI: chave esperada em `OPENAI_API_KEY`.
-Nenhuma chave deve ser gravada no repositório.
-
-## Teste manual de Brain
-
-Com produto ativo:
-
+Brain:
 ```
 python scripts/test_brain.py --provider qwen_local --proactive
 python scripts/test_brain.py --provider qwen_local --comment "quanto custa?"
 python scripts/test_brain.py --provider openai --comment "pega internet?"
 ```
 
-Para OpenAI, definir `OPENAI_API_KEY` antes.
+Voz:
+```
+python scripts/test_voice.py --list-devices
+python scripts/test_voice.py --device "CABLE Input" --text "Teste da voz AGCN"
+python scripts/test_voice.py --provider openai --device "CABLE Input"
+```
+
+## Cadastro do produto — regra essencial
+
+O programa não pode iniciar a apresentação sem produto ativo.
+
+Campos permanentes preservados:
+- product_url;
+- name, brand, model, category;
+- description;
+- key_benefits;
+- problems_solved;
+- differentials;
+- included_items;
+- compatibility;
+- size_info;
+- battery_info;
+- usage_info;
+- warranty;
+- limitations;
+- additional_info;
+- image_url.
+
+Condições da LIVE:
+- regular_price;
+- current_price;
+- discount;
+- stock;
+- shipping_info;
+- coupon;
+- live_offer;
+- live_offer_text;
+- promotion_note.
+
+Qwen e API recebem exatamente a mesma PresenterPolicy e os mesmos fatos do produto ativo.
+
+## Configuração e secrets
+
+`desktop/config.example.json` contém Brain, TTS, áudio e Presenter.
+
+- OpenAI usa `OPENAI_API_KEY`.
+- Provider compatível pode usar `AGCN_LLM_API_KEY`.
+- nenhuma chave deve entrar no Git, config distribuído ou exe.
+
+## Testes adicionados
+
+- `tests/test_model_transports.py`
+- `tests/test_brain_context_builder.py`
+- `tests/test_brain_factory.py`
+- `tests/test_presenter_v3.py`
+- `tests/test_tts_voice_service.py`
+- testes reforçados em `tests/test_brain_orchestrator.py`
+- workflow `.github/workflows/test-presenter-brain.yml`.
 
 ## O que Astra 6 deve fazer amanhã
 
-Prioridade 1:
-- auditar o novo Brain;
-- rodar toda a suíte de testes;
-- corrigir incompatibilidades reais;
-- testar Ollama/Qwen de ponta a ponta em Windows;
-- testar API real;
-- integrar PresenterV3 como modo principal do desktop.
+Não reescrever a arquitetura. Primeiro auditar e executar.
 
-Prioridade 2:
-- implementar TTS local;
-- implementar TTS premium/API opcional;
-- fila/prefetch de áudio;
-- saída de áudio selecionável;
-- VB-CABLE;
-- Testar Voz;
-- fallback TTS local.
-
-Prioridade 3:
-- terminar telas Dashboard, Produto e Configurações;
-- ligar produto real, TikTok, Brain e áudio;
-- testar LIVE real;
-- empacotar .exe com PyInstaller.
+1. Rodar toda a suíte e corrigir regressões.
+2. Testar Ollama/Qwen real em Windows.
+3. Testar API real e fallback para local.
+4. Testar TTS local real no Windows.
+5. Testar TTS premium.
+6. Testar listagem/seleção de device e VB-CABLE.
+7. Ligar PresenterV3 + VoiceService definitivamente às telas.
+8. Completar Dashboard, Produto e Configurações.
+9. Garantir persistência das configurações e secrets fora do arquivo público.
+10. Testar TikTokMonitor + comentários + fala contínua em LIVE real.
+11. Testar troca de produto ativo durante execução.
+12. Empacotar e validar o .exe com PyInstaller.
 
 ## Pronto significa
 
@@ -185,11 +193,11 @@ Prioridade 3:
 5. PresenterV3 fala continuamente;
 6. Qwen local funciona sem chave;
 7. API usa exatamente a mesma PresenterPolicy;
-8. pergunta relevante interrompe a sequência no momento apropriado;
+8. pergunta relevante entra na frente de proativos pendentes;
 9. resposta usa apenas fatos cadastrados;
 10. após resposta a venda continua;
 11. TTS toca no device escolhido;
 12. VB-CABLE entrega áudio ao TikTok LIVE Studio;
-13. falha da API cai para local;
+13. falha de API/TTS premium cai para local quando habilitado;
 14. secrets não entram no exe/repo;
 15. build Windows fica pronto.
