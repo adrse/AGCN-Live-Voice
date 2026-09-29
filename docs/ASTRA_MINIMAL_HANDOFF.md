@@ -7,7 +7,7 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório após os perfis de voz: **82 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **85 passed, 2 warnings**;
 - smoke Windows real de TTS local: **Dora PT-BR OK + Alex PT-BR OK, sem API**;
 - build Windows com Kokoro/Dora/Alex embarcados: **SUCCESS**;
 - dependências Windows: OK;
@@ -95,11 +95,18 @@ Regras:
 - resposta curta e volta rápida à venda;
 - nenhuma voz deve soar como conversa casual lenta.
 
-As duas vozes oficiais são LOCAIS e ficam dentro do pacote do AGCN:
-- feminina: Kokoro PT-BR `pf_dora`;
-- masculina: Kokoro PT-BR `pm_alex`.
+A voz oficial principal é LOCAL e independente de API:
+- motor principal: Qwen3-TTS 1.7B CustomVoice Q8 via qwentts.cpp/GGML;
+- feminina: Vivian;
+- masculina: Ryan;
+- idioma: Portuguese;
+- velocidade: slider 0,80x–1,60x, com ajuste pós-síntese preservando pitch;
+- modelo permanece carregado em servidor localhost para evitar reload por frase.
 
-O modelo ONNX e o arquivo de vozes são empacotados no ZIP/instalador. Nenhuma API é usada para gerar voz. A velocidade é controlada por slider na UI.
+Fallback local:
+- Kokoro PT-BR Dora/Alex, apenas quando o Voice Pack HQ não existe ou falha.
+
+Nenhuma API externa é necessária para gerar voz.
 
 ## Testes reais que ainda importam
 
@@ -158,7 +165,7 @@ Diagnóstico:
 - Qwen local é padrão;
 - API é opcional;
 - mesma PresenterPolicy para todos os Brains;
-- TTS Kokoro PT-BR local é obrigatório e vem empacotado; nenhuma API é requisito de voz;
+- Qwen3-TTS 1.7B HQ é a voz principal local; Kokoro é somente fallback; nenhuma API é requisito de voz;
 - resposta prioritária espera a frase atual terminar e entra antes de proativos pendentes;
 - nenhum segredo em JSON/Git/exe;
 - preço/estoque/frete/especificações nunca podem ser inventados.
@@ -179,10 +186,11 @@ Não entregar relatório longo. Entregar:
 - opcional: API para aumentar qualidade de interpretação/conversação.
 
 **Voz**
-- sempre disponível localmente;
-- Kokoro-82M PT-BR;
-- Dora (feminina) e Alex (masculina);
-- modelo + vozes fazem parte do pacote Windows;
+- principal: Qwen3-TTS 1.7B CustomVoice Q8 local;
+- feminina: Vivian;
+- masculina: Ryan;
+- fallback: Kokoro Dora/Alex;
+- Voice Pack HQ faz parte da distribuição HQ;
 - API não deve ser exigida nem oferecida como dependência para a voz principal.
 
 
@@ -194,7 +202,7 @@ Eles NÃO fazem parte da arquitetura oficial do MVP.
 Não gastar tokens integrando OpenAI TTS/ElevenLabs TTS.
 A API OpenAI só interessa ao Presenter Brain.
 
-Provider oficial de voz: `kokoro_local`.
+Provider oficial: `qwen3_hq_auto` (Qwen3-TTS HQ -> fallback Kokoro).
 
 
 ## Build offline final validado
@@ -213,3 +221,21 @@ Workflow Windows validado:
 Artifact: `AGCN-Live-Voice-Windows`
 Workflow run: `36506324783`
 Build SHA: `cd7c7747f0457b60d9dbfb2595bdc58a5a9af38c`
+
+
+## Voice Pack HQ
+
+Arquivos principais:
+- `voice_hq/bin/tts-server.exe`;
+- `voice_hq/models/qwen-talker-1.7b-customvoice-Q8_0.gguf`;
+- `voice_hq/models/qwen-tokenizer-12hz-Q8_0.gguf`.
+
+O workflow `Build Windows HQ Voice` deve:
+1. compilar qwentts.cpp;
+2. baixar os pesos Q8;
+3. sintetizar Vivian em Português;
+4. sintetizar Ryan em Português;
+5. adicionar o pack à distribuição;
+6. publicar `AGCN-Live-Voice-Windows-HQ`.
+
+Se esse workflow estiver verde, não reimplementar voz.
