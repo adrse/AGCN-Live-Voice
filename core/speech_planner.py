@@ -36,12 +36,9 @@ class SpeechPlanner:
         fact = fact_packet.get("value")
         has_fact = bool(fact_packet.get("found"))
 
+        # Resposta factual deve ser curta. A venda continua no fluxo
+        # proativo do Presenter; não anexamos mini discurso após cada dúvida.
         steps = ["answer_directly"]
-        if has_fact and decision.get("intent") not in {
-            "purchase_confirmation",
-            "engagement",
-        }:
-            steps.append("expand_with_value")
 
         cta = self._select_cta(decision, guard, memory)
         if cta:
@@ -199,10 +196,6 @@ class SpeechPlanner:
                 return "buy_now"
             return None
 
-        if guard.live_offer() and not memory.recently_used_cta(
-            "live_offer",
-            within=35,
-        ):
-            return "live_offer"
-
+        # Comentários factuais não recebem CTA automático. Isso evita que
+        # cada resposta vire um mini pitch e deixa a LIVE mais humana.
         return None
