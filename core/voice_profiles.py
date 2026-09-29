@@ -24,7 +24,7 @@ VOICE_PROFILES = {
             "helena",
         ],
         "openai_voice": "marin",
-        "openai_speed": 1.28,
+        "default_speed": 1.28,
         "openai_instructions": (
             "Fale em português brasileiro com voz feminina clara, confiante e "
             "energética. Ritmo rápido de live commerce, dicção firme, frases "
@@ -48,7 +48,7 @@ VOICE_PROFILES = {
             "paulo",
         ],
         "openai_voice": "cedar",
-        "openai_speed": 1.28,
+        "default_speed": 1.28,
         "openai_instructions": (
             "Fale em português brasileiro com voz masculina firme, confiante e "
             "energética. Ritmo rápido de live commerce, dicção firme, frases "
