@@ -1,8 +1,8 @@
 # Critérios de aceitação — AGCN Live Voice MVP
 
 ## A — Qwen sem API
-Produto cadastrado + Ollama/Qwen + TTS neural configurado.
-Resultado: Brain funciona sem API de LLM; voz usa o motor neural escolhido.
+Produto cadastrado + Ollama/Qwen + Kokoro local.
+Resultado: Brain e voz funcionam sem qualquer API.
 
 ## B — fala contínua
 Sem comentário relevante por 30 s.
@@ -47,8 +47,8 @@ Resultado: não afirma resistência à água.
 Lista devices; escolha persiste; Testar Voz toca no device; presenter usa mesmo device.
 
 ## M — falha API
-API falha/timeout.
-Resultado: UI não trava; se `neural_auto` estiver configurado com dois providers, usa o provider neural alternativo.
+API do Brain falha/timeout.
+Resultado: UI não trava; Qwen local continua disponível e a voz Kokoro continua funcionando normalmente.
 
 ## N — TikTok real
 Conecta username de LIVE ativa.
@@ -74,12 +74,13 @@ Resultado:
 - pouca pausa;
 - comentário respondido rapidamente;
 - não soa como conversa casual lenta;
-- TTS premium aplica velocidade configurada;
-- slider de velocidade altera a velocidade do motor neural.
+- slider de velocidade altera a velocidade do Kokoro local.
 
-## R — independência das vozes do Windows
-Rodar Doctor em Windows.
+## R — voz funciona sem API e sem vozes do Windows
+Rodar Doctor em Windows e desconectar qualquer API de voz.
 Resultado:
-- dois perfis AGCN existem mesmo sem vozes SAPI adicionais;
-- geração de voz usa OpenAI Neural ou ElevenLabs Neural;
+- Dora e Alex sintetizam PT-BR localmente;
+- o modelo ONNX e as vozes estão no pacote;
+- não depende de SAPI/vozes instaladas;
+- não depende de OpenAI/ElevenLabs;
 - Windows participa somente como dispositivo de saída/VB-CABLE.
