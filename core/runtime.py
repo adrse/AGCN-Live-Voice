@@ -253,6 +253,13 @@ class AGCNVoiceRuntime:
             self.brain_degraded_reason = ""
             return
 
+        close_provider = getattr(provider, "close", None)
+        if callable(close_provider):
+            try:
+                close_provider()
+            except Exception:
+                pass
+
         with self.lock:
             active = self.store.active_for_presenter() or {}
             self.brain_provider = None
@@ -316,6 +323,13 @@ class AGCNVoiceRuntime:
                 self.voice_service.stop()
             except Exception:
                 pass
+        if self.brain_provider is not None:
+            close_brain = getattr(self.brain_provider, "close", None)
+            if callable(close_brain):
+                try:
+                    close_brain()
+                except Exception:
+                    pass
 
     def _queue_voice(self, item: dict) -> None:
         if self.voice_service is None:
