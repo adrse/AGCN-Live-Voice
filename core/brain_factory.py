@@ -10,6 +10,7 @@ from typing import Any
 from core.brain_orchestrator import PresenterBrain
 from core.integration_contracts import BrainContext, BrainProvider, BrainResult
 from core.secret_store import get_secret
+from core.local_llama_brain import LlamaCppLocalTransport
 from core.model_transports import (
     OllamaTransport,
     OpenAICompatibleChatTransport,
@@ -37,6 +38,15 @@ class FallbackBrainProvider:
             ok,
             f"primário: {message_primary} | fallback: {message_fallback}",
         )
+
+    def close(self) -> None:
+        for provider in (self.primary, self.fallback):
+            close = getattr(provider, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
 
     def generate(self, context: BrainContext) -> BrainResult:
         try:
@@ -69,7 +79,41 @@ def _brain_cfg(config: dict[str, Any] | None) -> dict[str, Any]:
     return dict(config.get("brain") or config)
 
 
-def _build_local(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
+def _build_agcn_local(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
+    local = dict(cfg.get("local_brain") or {})
+    return PresenterBrain(
+        LlamaCppLocalTransport(
+            pack_dir=local.get("pack_dir") or None,
+            model_file=str(
+                local.get("model_file")
+                or "Qwen3-4B-Q4_K_M.gguf"
+            ),
+            model_alias=str(
+                local.get("model_alias")
+                or "agcn-qwen3-4b"
+            ),
+            port=int(local.get("port", 18766)),
+            context_size=int(local.get("context_size", 4096)),
+            threads=local.get("threads") or None,
+            startup_timeout_seconds=float(
+                local.get("startup_timeout_seconds", 180)
+            ),
+            timeout_seconds=float(
+                local.get("timeout_seconds")
+                or cfg.get("timeout_seconds")
+                or 45
+            ),
+            temperature=float(local.get("temperature", 0.25)),
+            max_output_tokens=int(
+                local.get("max_output_tokens", 500)
+            ),
+            session=session,
+        ),
+        max_retries=int(cfg.get("max_retries", 1)),
+    )
+
+
+def _build_ollama(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
     ollama = dict(cfg.get("ollama") or {})
     base_url = (
         ollama.get("base_url")
@@ -148,11 +192,14 @@ def build_brain_provider(
     session=None,
 ) -> BrainProvider:
     cfg = _brain_cfg(config)
-    provider = str(cfg.get("provider") or "qwen_local").casefold()
+    provider = str(cfg.get("provider") or "agcn_local").casefold()
     fallback_enabled = bool(cfg.get("fallback_local", True))
 
-    if provider in {"qwen_local", "ollama", "local"}:
-        return _build_local(cfg, session=session)
+    if provider in {"agcn_local", "qwen_local", "local"}:
+        return _build_agcn_local(cfg, session=session)
+
+    if provider in {"ollama", "ollama_legacy"}:
+        return _build_ollama(cfg, session=session)
 
     try:
         if provider in {"openai", "openai_responses"}:
@@ -163,13 +210,13 @@ def build_brain_provider(
             raise ValueError(f"brain provider desconhecido: {provider}")
     except Exception:
         if fallback_enabled:
-            return _build_local(cfg, session=session)
+            return _build_agcn_local(cfg, session=session)
         raise
 
     if fallback_enabled:
         return FallbackBrainProvider(
             primary,
-            _build_local(cfg, session=session),
+            _build_agcn_local(cfg, session=session),
         )
 
     return primary
