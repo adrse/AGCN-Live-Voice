@@ -1640,29 +1640,36 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(
             "AGCN Live Voice — Sua voz inteligente para vender ao vivo."
         )
-        self.resize(1180, 780)
+        self.setMinimumSize(1180, 720)
+        self.resize(1440, 900)
 
         root = QWidget()
+        root.setObjectName("AppRoot")
         self.setCentralWidget(root)
         outer = QHBoxLayout(root)
         outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
         sidebar = QWidget()
-        sidebar.setFixedWidth(210)
-        sidebar.setStyleSheet("background:#0A0A0B;color:white;")
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(228)
         side_layout = QVBoxLayout(sidebar)
-        brand = QLabel("AGCN\nLive Voice")
-        brand.setStyleSheet(
-            "font-size:22px;font-weight:700;padding:12px;"
-        )
+        side_layout.setContentsMargins(12, 18, 12, 14)
+        side_layout.setSpacing(8)
+
+        brand = QLabel("AGCN Live Voice")
+        brand.setObjectName("BrandTitle")
+        brand.setWordWrap(True)
         side_layout.addWidget(brand)
 
+        brand_subtitle = QLabel("Apresentador inteligente para LIVE")
+        brand_subtitle.setObjectName("BrandSubtitle")
+        brand_subtitle.setWordWrap(True)
+        side_layout.addWidget(brand_subtitle)
+        side_layout.addSpacing(12)
+
         self.nav = QListWidget()
-        self.nav.setStyleSheet(
-            "QListWidget{border:0;background:transparent;}"
-            "QListWidget::item{padding:14px;}"
-            "QListWidget::item:selected{background:#0061FF;}"
-        )
+        self.nav.setObjectName("SidebarNav")
         for name in (
             "Dashboard",
             "Produto",
@@ -1671,6 +1678,10 @@ class MainWindow(QMainWindow):
         ):
             self.nav.addItem(QListWidgetItem(name))
         side_layout.addWidget(self.nav, 1)
+
+        footer = QLabel("●  Sistema pronto")
+        footer.setObjectName("SidebarFooter")
+        side_layout.addWidget(footer)
 
         self.pages = QStackedWidget()
         self.dashboard = DashboardPage(
@@ -1692,15 +1703,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(sidebar)
         outer.addWidget(self.pages, 1)
 
-        self.setStyleSheet(
-            "QMainWindow{background:#F3F5F9;}"
-            "QWidget{font-family:Segoe UI,Arial;font-size:13px;}"
-            "QLineEdit,QTextEdit,QComboBox,QListWidget{"
-            "border:1px solid #D1D5DB;border-radius:6px;padding:7px;background:white;}"
-            "QPushButton{padding:8px 12px;border-radius:6px;"
-            "border:1px solid #D1D5DB;background:white;}"
-            "QPushButton:hover{background:#F3F4F6;}"
-        )
+        self.setStyleSheet(APP_STYLESHEET)
 
         self.timer = QTimer(self)
         self.timer.setInterval(700)
