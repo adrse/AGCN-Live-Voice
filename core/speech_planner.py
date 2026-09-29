@@ -168,6 +168,29 @@ class SpeechPlanner:
 
         return available[0]
 
+    @staticmethod
+    def _rotating_items(
+        value,
+        guard,
+        memory,
+        *,
+        max_items: int,
+    ) -> list[str]:
+        items = guard.knowledge.entries(value)
+        if not items:
+            return []
+
+        cursor = memory.proactive_cursor()
+        count = min(
+            len(items),
+            max(1, min(max_items, 1 + (cursor % max_items))),
+        )
+        start = cursor % len(items)
+        return [
+            items[(start + offset) % len(items)]
+            for offset in range(count)
+        ]
+
     def _plan_proactive(self, decision: dict, guard, memory) -> dict:
         topic = decision.get("topic")
 
@@ -186,13 +209,51 @@ class SpeechPlanner:
         fact = guard.fact_for_topic(
             topic_to_fact.get(topic, topic)
         )
+        selected_facts: dict[str, list[str]] = {}
 
         if topic == "description" and fact:
-            items = guard.knowledge.entries(fact)
+            items = self._rotating_items(
+                fact,
+                guard,
+                memory,
+                max_items=1,
+            )
             if items:
-                fact = items[
-                    memory.proactive_cursor() % len(items)
-                ]
+                selected_facts["description"] = items
+                fact = items[0]
+
+        elif topic == "benefits" and fact:
+            items = self._rotating_items(
+                fact,
+                guard,
+                memory,
+                max_items=3,
+            )
+            if items:
+                selected_facts["key_benefits"] = items
+                fact = items
+
+        elif topic == "pain_solution" and fact:
+            problems = self._rotating_items(
+                fact,
+                guard,
+                memory,
+                max_items=2,
+            )
+            benefits = self._rotating_items(
+                guard.get("benefits"),
+                guard,
+                memory,
+                max_items=2,
+            )
+            if problems:
+                selected_facts["problems_solved"] = problems
+            if benefits:
+                selected_facts["key_benefits"] = benefits
+            fact = {
+                "problems": problems,
+                "benefits": benefits,
+            }
 
         if topic == "price_value":
             fact = guard.fact_for_topic("price")
@@ -208,6 +269,7 @@ class SpeechPlanner:
             "fact": fact,
             "has_fact": fact not in (None, "", [], {}),
             "tactic": self.TACTIC_BY_TOPIC.get(topic, "benefit_translation"),
+            "selected_facts": selected_facts,
             "steps": [
                 "proactive_value",
                 "apply_sales_tactic",
