@@ -10,7 +10,7 @@ from core.audio_output import SoundDeviceAudioSink
 from core.brain_factory import build_brain_provider
 from core.product_store import ProductStore
 from core.secret_store import has_secret
-from core.tts_providers import build_tts_provider
+from core.tts_providers import LocalPyttsx3TTSProvider, build_tts_provider
 
 
 def run_diagnostics(
@@ -74,6 +74,21 @@ def run_diagnostics(
         add("TTS", ok, detail)
     except Exception as exc:
         add("TTS", False, str(exc))
+
+    try:
+        local_probe = LocalPyttsx3TTSProvider()
+        local_voices = local_probe.list_voices()
+        add(
+            "Duas vozes locais",
+            len(local_voices) >= 2,
+            (
+                f"{len(local_voices)} voz(es) instalada(s) no Windows"
+                if local_voices
+                else "Nenhuma voz local detectada"
+            ),
+        )
+    except Exception as exc:
+        add("Duas vozes locais", False, str(exc))
 
     try:
         sink = SoundDeviceAudioSink()
