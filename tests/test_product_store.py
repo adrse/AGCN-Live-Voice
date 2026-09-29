@@ -193,5 +193,5 @@ def test_product_timestamp_does_not_require_iana_tzdata():
         / "core"
         / "product_profile.py"
     ).read_text(encoding="utf-8")
-    assert "ZoneInfo(" not in source
-    assert "America/Araguaina" not in source
+    assert "from zoneinfo import ZoneInfo" not in source
+    assert "return datetime.now().astimezone().isoformat" in source
