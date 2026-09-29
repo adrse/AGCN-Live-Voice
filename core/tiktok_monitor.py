@@ -6,7 +6,6 @@ import threading
 import time
 from collections import deque
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import (
@@ -24,6 +23,11 @@ from TikTokLive.events import (
 
 def clean(text) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip())
+
+
+def local_clock_text() -> str:
+    """Hora local do Windows sem depender do banco IANA/tzdata."""
+    return datetime.now().astimezone().strftime("%H:%M:%S")
 
 
 class TikTokMonitor:
@@ -204,9 +208,7 @@ class TikTokMonitor:
 
                 self.comments_received += 1
                 payload = {
-                    "time": datetime.now(
-                        ZoneInfo("America/Araguaina")
-                    ).strftime("%H:%M:%S"),
+                    "time": local_clock_text(),
                     "user": user,
                     "text": text,
                     "message_id": msg_id,

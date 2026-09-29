@@ -589,8 +589,12 @@ class DashboardPage(QWidget):
                 "Aguardando decisões do Presenter..."
             )
 
+        presenter = data.get("presenter") or {}
+        presenter_brain = presenter.get("brain") or {}
         error = (
             data.get("presenter_worker_error")
+            or data.get("brain_degraded_reason")
+            or presenter_brain.get("last_error")
             or voice.get("last_error")
             or data.get("error")
             or ""

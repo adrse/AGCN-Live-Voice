@@ -77,6 +77,13 @@ class AGCNVoiceRuntime:
         self.presenter_stop_event = threading.Event()
         self.presenter_thread: threading.Thread | None = None
         self.presenter_worker_error = ""
+        self.brain_preflight_done = self.brain_provider is None
+        self.brain_status = (
+            "deterministic"
+            if self.brain_provider is None
+            else "pending"
+        )
+        self.brain_degraded_reason = ""
 
     def _new_presenter(self, product: dict):
         if self.brain_provider is not None:
@@ -216,7 +223,54 @@ class AGCNVoiceRuntime:
         )
         self.presenter_thread.start()
 
+    def _preflight_brain(self) -> None:
+        """Valida o Brain fora do lock da UI.
+
+        Se o Brain configurado não estiver disponível (ex.: Ollama/Qwen não
+        instalado), a LIVE continua no Presenter determinístico em vez de
+        ficar esperando timeouts repetidos e travar o Dashboard.
+        """
+        if self.brain_preflight_done:
+            return
+
+        provider = self.brain_provider
+        if provider is None:
+            self.brain_preflight_done = True
+            self.brain_status = "deterministic"
+            return
+
+        self.brain_status = "checking"
+        try:
+            ok, message = provider.healthcheck()
+        except Exception as exc:
+            ok = False
+            message = f"{type(exc).__name__}: {exc}"
+
+        if ok:
+            self.brain_preflight_done = True
+            self.brain_status = "ready"
+            self.brain_degraded_reason = ""
+            return
+
+        with self.lock:
+            active = self.store.active_for_presenter() or {}
+            self.brain_provider = None
+            self.presenter = PresenterV2(active)
+            self.product_signature = self._product_signature(active)
+            self.current_speech = None
+            self.current_speech_until = 0.0
+            self.last_decision = None
+            self.reactive_streak = 0
+            self.forced_product_start_at = 0.0
+            self.forced_product_until = 0.0
+            self.brain_preflight_done = True
+            self.brain_status = "fallback"
+            self.brain_degraded_reason = (
+                str(message or "Brain configurado indisponível.")
+            )
+
     def _presenter_loop(self) -> None:
+        self._preflight_brain()
         while not self.presenter_stop_event.is_set():
             try:
                 with self.lock:
@@ -468,6 +522,10 @@ class AGCNVoiceRuntime:
                     self.brain_provider.name
                     if self.brain_provider is not None
                     else "deterministic-v2"
+                ),
+                "brain_status": self.brain_status,
+                "brain_degraded_reason": (
+                    self.brain_degraded_reason or None
                 ),
                 "voice_enabled": self.voice_service is not None,
                 "voice": voice_state,
