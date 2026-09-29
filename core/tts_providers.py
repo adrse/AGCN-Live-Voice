@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import os
 import tempfile
 import wave
 from pathlib import Path
@@ -12,6 +11,7 @@ from typing import Any
 import requests
 
 from core.integration_contracts import AudioChunk, TTSProvider
+from core.secret_store import get_secret
 
 
 class TTSError(RuntimeError):
@@ -261,7 +261,7 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
         key_env = str(api.get("api_key_env") or "OPENAI_API_KEY")
         try:
             premium = OpenAITTSProvider(
-                api_key=str(os.getenv(key_env) or ""),
+                api_key=get_secret(key_env),
                 model=str(api.get("model") or "gpt-4o-mini-tts"),
                 default_voice=str(api.get("voice") or "coral"),
                 base_url=str(
