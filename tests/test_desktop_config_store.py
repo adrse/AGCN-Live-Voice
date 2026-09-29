@@ -63,3 +63,9 @@ def test_builtin_defaults_use_local_voice_without_api(tmp_path):
         == "gemini-3.8-flash-lite-tts"
     )
     assert loaded["tts"]["gemini"]["api_key_env"] == "GEMINI_API_KEY"
+    assert loaded["tts"]["openai_live"]["model"] == "gpt-live-1"
+    assert loaded["tts"]["openai_live"]["mode"] == "strict_speech"
+    assert (
+        loaded["tts"]["openai_live"]["api_key_env"]
+        == "OPENAI_API_KEY"
+    )
