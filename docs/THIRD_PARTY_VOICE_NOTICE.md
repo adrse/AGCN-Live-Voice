@@ -30,3 +30,22 @@ Antes de distribuir o AGCN Live Voice comercialmente/fechado:
 4. não remover avisos de copyright/licença.
 
 Esta pendência jurídica não impede testes técnicos do MVP, mas deve ser resolvida antes de distribuição comercial.
+
+
+## Qwen3-TTS
+- função: motor neural principal de voz;
+- upstream: QwenLM/Qwen3-TTS;
+- licença do upstream: Apache-2.0.
+
+## qwentts.cpp
+- função: inferência C++/GGML local do Qwen3-TTS;
+- projeto: ServeurpersoCom/qwentts.cpp;
+- licença indicada pelo projeto: MIT.
+
+## Qwen3-TTS GGUF
+- função: pesos quantizados usados pela distribuição HQ;
+- repositório: Serveurperso/Qwen3-TTS-GGUF;
+- derivados do Qwen3-TTS;
+- licença indicada: Apache-2.0.
+
+A revisão final de distribuição deve incluir também avisos/licenças de GGML e demais dependências do motor nativo.
