@@ -146,3 +146,30 @@ def test_brain_rejects_unregistered_numeric_specification():
         pass
     else:
         raise AssertionError("deveria rejeitar número não autorizado")
+
+
+def test_needs_fact_does_not_bypass_numeric_validation():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "A bateria dura 12 dias.",
+            "topic": "battery",
+            "used_facts": [],
+            "needs_fact": True,
+            "next_sales_thread": "",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+
+    try:
+        brain.generate(
+            BrainContext(
+                mode="comment_reply",
+                allowed_facts=["nome: Produto X"],
+            )
+        )
+    except BrainOutputError:
+        pass
+    else:
+        raise AssertionError(
+            "needs_fact não pode liberar número inventado"
+        )
