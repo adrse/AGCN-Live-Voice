@@ -169,7 +169,11 @@ class DashboardPage(QWidget):
 
         voice = data.get("voice") or {}
         self.voice.setText(
-            str(voice.get("tts") or "Desativada")
+            str(
+                voice.get("active_provider")
+                or voice.get("tts")
+                or "Desativada"
+            )
         )
 
         current = data.get("current_speech") or {}
