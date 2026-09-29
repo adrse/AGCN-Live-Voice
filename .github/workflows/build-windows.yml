@@ -4,7 +4,17 @@ on:
   push:
     branches:
       - astra-handoff-2026-09-29
+    paths:
+      - "core/**"
+      - "desktop/**"
+      - "requirements-desktop.txt"
+      - "scripts/build_windows.bat"
+      - ".github/workflows/build-windows.yml"
   workflow_dispatch:
+
+concurrency:
+  group: agcn-windows-build
+  cancel-in-progress: true
 
 jobs:
   build-windows:
