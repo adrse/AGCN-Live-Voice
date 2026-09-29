@@ -147,7 +147,9 @@ class Qwen3HQLocalTTSProvider:
         )
         self.speaker = QWEN_PROFILE_SPEAKERS[self.profile_id]
         self.speed = max(0.80, min(1.60, float(speed)))
-        self.pack_dir = Path(pack_dir) if pack_dir else default_hq_pack_dir()
+        self.pack_dir = (
+            Path(pack_dir) if pack_dir else default_hq_pack_dir()
+        ).expanduser().resolve()
         self.bin_dir = self.pack_dir / "bin"
         self.models_dir = self.pack_dir / "models"
         self.server_exe = self.bin_dir / "tts-server.exe"
@@ -209,6 +211,12 @@ class Qwen3HQLocalTTSProvider:
         env = os.environ.copy()
         env.setdefault("GGML_BACKEND", "")
 
+        self._stderr_path = (
+            _local_appdata() / "logs" / "qwen3-tts-server.log"
+        )
+        self._stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        self._stderr_handle = self._stderr_path.open("ab")
+
         self.process = subprocess.Popen(
             [
                 str(self.server_exe),
@@ -227,7 +235,7 @@ class Qwen3HQLocalTTSProvider:
             ],
             cwd=str(self.bin_dir),
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=self._stderr_handle,
             creationflags=flags,
             env=env,
         )
@@ -235,8 +243,18 @@ class Qwen3HQLocalTTSProvider:
         deadline = time.monotonic() + self.startup_timeout_seconds
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
+                try:
+                    self._stderr_handle.flush()
+                    tail = self._stderr_path.read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )[-2000:]
+                except Exception:
+                    tail = ""
                 raise RuntimeError(
-                    f"Qwen3-TTS local encerrou ao iniciar (code={self.process.returncode})"
+                    "Qwen3-TTS local encerrou ao iniciar "
+                    f"(code={self.process.returncode}). "
+                    f"Log: {tail.strip()}"
                 )
             if self._server_healthy():
                 return
@@ -330,3 +348,10 @@ class Qwen3HQLocalTTSProvider:
                     self.process.kill()
         finally:
             self.process = None
+            handle = getattr(self, "_stderr_handle", None)
+            if handle is not None:
+                try:
+                    handle.close()
+                except Exception:
+                    pass
+                self._stderr_handle = None
