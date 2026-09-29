@@ -91,9 +91,9 @@ def validate_sensitive_claims(
     evidência também nos fatos reportados/autorizados. Respostas de ausência
     com needs_fact=true são permitidas sem fabricar o dado.
     """
-    if result.needs_fact:
-        return True, ""
-
+    # Mesmo quando o modelo marca needs_fact, continuamos validando a fala.
+    # A camada Presenter descarta esse resultado, mas nenhum número ou alegação
+    # inventada recebe passe livre.
     speech = _fold(result.speech)
     reported = [_fold(x) for x in result.used_facts]
     allowed = [_fold(x) for x in context.allowed_facts]
@@ -158,7 +158,7 @@ def validate_sensitive_claims(
 
     # Números explícitos normalmente são especificação, preço, desconto,
     # estoque, medida ou autonomia. Se aparecem na fala, devem existir em algum
-    # fato autorizado. Ignoramos números em respostas needs_fact=true acima.
+    # fato autorizado, inclusive em respostas marcadas needs_fact.
     allowed_numbers = {
         token.replace(".", ",")
         for fact in context.allowed_facts
