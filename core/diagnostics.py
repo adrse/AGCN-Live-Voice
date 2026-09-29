@@ -10,7 +10,8 @@ from core.audio_output import SoundDeviceAudioSink
 from core.brain_factory import build_brain_provider
 from core.product_store import ProductStore
 from core.secret_store import has_secret
-from core.tts_providers import LocalPyttsx3TTSProvider, build_tts_provider
+from core.tts_providers import build_tts_provider
+from core.voice_profiles import list_voice_profiles
 
 
 def run_diagnostics(
@@ -59,11 +60,41 @@ def run_diagnostics(
         "openai_responses",
     }:
         add(
-            "Chave OpenAI",
+            "Chave OpenAI Brain",
             has_secret("OPENAI_API_KEY"),
             (
-                "Disponível no ambiente/credencial do sistema"
+                "Disponível"
                 if has_secret("OPENAI_API_KEY")
+                else "Não configurada"
+            ),
+        )
+
+    profiles = {item["id"] for item in list_voice_profiles()}
+    add(
+        "Perfis de voz AGCN",
+        {"female_fast", "male_fast"}.issubset(profiles),
+        "Feminina — Vendas rápidas + Masculina — Vendas rápidas",
+    )
+
+    tts_cfg = dict(config.get("tts") or {})
+    tts_provider = str(tts_cfg.get("provider") or "openai").casefold()
+    if tts_provider in {"openai", "neural", "premium", "neural_auto", "auto"}:
+        add(
+            "Chave OpenAI Voice",
+            has_secret("OPENAI_API_KEY"),
+            (
+                "Disponível"
+                if has_secret("OPENAI_API_KEY")
+                else "Não configurada"
+            ),
+        )
+    if tts_provider in {"elevenlabs", "eleven", "neural_auto", "auto"}:
+        add(
+            "Chave ElevenLabs",
+            has_secret("ELEVENLABS_API_KEY"),
+            (
+                "Disponível"
+                if has_secret("ELEVENLABS_API_KEY")
                 else "Não configurada"
             ),
         )
@@ -71,24 +102,9 @@ def run_diagnostics(
     try:
         tts = build_tts_provider(config)
         ok, detail = tts.healthcheck()
-        add("TTS", ok, detail)
+        add("TTS neural", ok, detail)
     except Exception as exc:
-        add("TTS", False, str(exc))
-
-    try:
-        local_probe = LocalPyttsx3TTSProvider()
-        local_voices = local_probe.list_voices()
-        add(
-            "Duas vozes locais",
-            len(local_voices) >= 2,
-            (
-                f"{len(local_voices)} voz(es) instalada(s) no Windows"
-                if local_voices
-                else "Nenhuma voz local detectada"
-            ),
-        )
-    except Exception as exc:
-        add("Duas vozes locais", False, str(exc))
+        add("TTS neural", False, str(exc))
 
     try:
         sink = SoundDeviceAudioSink()
@@ -115,7 +131,8 @@ def run_diagnostics(
     required = [
         "Produto ativo",
         "Presenter Brain",
-        "TTS",
+        "Perfis de voz AGCN",
+        "TTS neural",
         "Dispositivos de áudio",
     ]
     by_name = {item["name"]: item for item in checks}
