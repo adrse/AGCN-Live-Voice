@@ -139,6 +139,14 @@ textarea{min-height:72px;resize:vertical}
 .next-num{width:22px;height:22px;border-radius:50%;background:#f0f4fa;display:grid;place-items:center;font-weight:850;color:#263951}
 details{margin-top:10px}summary{cursor:pointer;font-weight:850;color:#1e64b7;font-size:11px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.full{grid-column:1/-1}
+.field-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.field-label{font-size:11px;font-weight:850;color:#33455c}
+.description-list{display:grid;gap:7px}
+.description-row{display:grid;grid-template-columns:1fr 34px;gap:6px;align-items:center}
+.description-row input{width:100%}
+.remove-description{height:34px;padding:0!important;font-size:16px!important}
+.add-description{padding:6px 9px!important;font-size:10px!important}
+.field-help{font-size:9px;color:var(--muted);margin-top:6px;line-height:1.35}
 .saved-products{display:flex;gap:7px;overflow-x:auto;margin-top:9px;padding-bottom:2px}
 .product-chip{min-width:145px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fbfdff}
 .product-chip.active{border-color:#4d8edf;background:#f3f8ff}
@@ -179,7 +187,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.5.0</span><span class="dot"></span><span>Presenter Behavior</span>
+      <span>v0.5.1</span><span class="dot"></span><span>Presenter Behavior</span>
     </div>
   </aside>
 
@@ -252,7 +260,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <div class="presenter-status">
           <div class="control-box">
             <div class="control-label">Motor atual</div>
-            <div class="control-value">Presenter V0.4.1</div>
+            <div class="control-value">Presenter V0.5.1</div>
           </div>
           <div class="control-box">
             <div class="control-label">Saída</div>
@@ -272,7 +280,19 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
         <summary>+ Cadastrar novo produto</summary>
         <div class="form-grid">
           <input id="pName" class="full" placeholder="Nome do produto">
-          <textarea id="pDescription" class="full" placeholder="Descrição"></textarea>
+          <div class="full">
+            <div class="field-head">
+              <span class="field-label">Descrição do produto</span>
+              <button type="button" class="btn add-description" id="addDescription">+ Adicionar descrição</button>
+            </div>
+            <div id="descriptionPoints" class="description-list">
+              <div class="description-row">
+                <input class="description-point" placeholder="Descrição 1 — ex.: bateria dura até 6 dias">
+                <button type="button" class="btn remove-description" aria-label="Remover descrição">×</button>
+              </div>
+            </div>
+            <div class="field-help">Coloque um ponto por vez. A apresentadora usa só um ponto de cada vez na fala, em vez de ler tudo.</div>
+          </div>
           <input id="pRegular" placeholder="Preço normal">
           <input id="pCurrent" placeholder="Preço atual">
           <input id="pDiscount" placeholder="Desconto (%)">
@@ -426,7 +446,10 @@ function renderSystem(data){
 function renderProduct(data){
   const p=data.active_product||{};
   $("#activeName").textContent=p.name||"Nenhum produto ativo";
-  $("#activeDesc").textContent=p.description||"Cadastre um produto para iniciar os testes.";
+  const points=Array.isArray(p.description_points)?p.description_points.filter(Boolean):[];
+  $("#activeDesc").textContent=points.length
+    ? points.slice(0,2).join(" • ")
+    : (p.description||"Cadastre um produto para iniciar os testes.");
   $("#oldPrice").textContent=brl(p.regular_price);
   $("#currentPrice").textContent=brl(p.current_price ?? p.regular_price);
 
@@ -554,13 +577,56 @@ $("#username").addEventListener("keydown",e=>{
 
 $("#stop").onclick=()=>api("/api/live/stop",{method:"POST"}).catch(()=>{});
 
+function descriptionPointValues(){
+  return [...document.querySelectorAll(".description-point")]
+    .map(input=>input.value.trim())
+    .filter(Boolean);
+}
+
+function addDescriptionPoint(value=""){
+  const row=document.createElement("div");
+  row.className="description-row";
+
+  const input=document.createElement("input");
+  input.className="description-point";
+  input.placeholder="Outro ponto da descrição";
+  input.value=value;
+
+  const remove=document.createElement("button");
+  remove.type="button";
+  remove.className="btn remove-description";
+  remove.setAttribute("aria-label","Remover descrição");
+  remove.textContent="×";
+
+  row.append(input,remove);
+  $("#descriptionPoints").appendChild(row);
+  input.focus();
+}
+
+$("#addDescription").onclick=()=>addDescriptionPoint();
+
+$("#descriptionPoints").addEventListener("click",event=>{
+  const button=event.target.closest(".remove-description");
+  if(!button) return;
+
+  const rows=[...document.querySelectorAll(".description-row")];
+  if(rows.length===1){
+    rows[0].querySelector(".description-point").value="";
+    return;
+  }
+  button.closest(".description-row").remove();
+});
+
 $("#saveProduct").onclick=async()=>{
   try{
+    const points=descriptionPointValues();
+
     await api("/api/products",{
       method:"POST",
       body:JSON.stringify({
         name:$("#pName").value,
-        description:$("#pDescription").value,
+        description:points.join(". "),
+        description_points:points,
         regular_price:$("#pRegular").value,
         current_price:$("#pCurrent").value,
         discount:$("#pDiscount").value,
@@ -569,7 +635,7 @@ $("#saveProduct").onclick=async()=>{
         image_url:$("#pImage").value
       })
     });
-    $("#productMessage").innerHTML='<span class="ok">Produto salvo.</span>';
+    $("#productMessage").innerHTML='<span class="ok">Produto salvo com '+points.length+' ponto(s) de descrição.</span>';
   }catch(e){
     $("#productMessage").innerHTML='<span class="bad">'+esc(e.message)+'</span>';
   }
