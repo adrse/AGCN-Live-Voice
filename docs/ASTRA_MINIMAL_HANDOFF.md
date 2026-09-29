@@ -8,6 +8,7 @@ Branch: astra-handoff-2026-09-29
 ## Estado já verificado antes do handoff
 
 - suíte completa do repositório após os perfis de voz: **80 passed, 2 warnings**;
+- smoke Windows real de TTS local: **Dora PT-BR OK + Alex PT-BR OK, sem API**;
 - build Windows via GitHub Actions: **SUCCESS**;
 - dependências Windows: OK;
 - smoke imports: OK;
