@@ -45,6 +45,38 @@ VOICE_STYLE_OPTIONS = [
 ]
 
 
+
+VOICE_PROVIDER_LABELS = {
+    "qwen3_hq_auto": "Qwen Local HQ",
+    "qwen3_hq": "Qwen Local HQ",
+    "gemini_premium": "Gemini Premium",
+    "openai_live": "OpenAI Live",
+}
+
+
+def voice_provider_label(provider_id: str) -> str:
+    return VOICE_PROVIDER_LABELS.get(
+        str(provider_id or "").strip().casefold(),
+        str(provider_id or "—"),
+    )
+
+
+def voice_profile_label(profile_id: str) -> str:
+    target = str(profile_id or "").strip()
+    for profile in list_voice_profiles():
+        if profile.get("id") == target:
+            return str(profile.get("label") or target)
+    return target or "—"
+
+
+def voice_style_label(style_id: str) -> str:
+    target = str(style_id or "").strip().casefold()
+    for label, item_id in VOICE_STYLE_OPTIONS:
+        if item_id == target:
+            return label.replace(" — recomendado", "")
+    return (target or "automático").replace("_", " ").title()
+
+
 def heading(text: str, subtitle: str = "") -> tuple[QLabel, QLabel]:
     title = QLabel(text)
     title.setStyleSheet("font-size:26px;font-weight:700;color:#111827;")
@@ -65,9 +97,15 @@ def group(title: str) -> QGroupBox:
 
 
 class DashboardPage(QWidget):
-    def __init__(self, controller: DesktopController) -> None:
+    def __init__(
+        self,
+        controller: DesktopController,
+        *,
+        open_voice_audio=None,
+    ) -> None:
         super().__init__()
         self.controller = controller
+        self.open_voice_audio = open_voice_audio
 
         layout = QVBoxLayout(self)
         title, desc = heading(
@@ -160,6 +198,48 @@ class DashboardPage(QWidget):
         self.queue = QListWidget()
         queue_layout.addWidget(self.queue)
         columns.addWidget(queue_box, 1)
+
+        voice_box = group("Voz e áudio")
+        voice_form = QFormLayout(voice_box)
+        self.voice_summary_engine = QLabel("—")
+        self.voice_summary_profile = QLabel("—")
+        self.voice_summary_speed = QLabel("—")
+        self.voice_summary_expression = QLabel("—")
+        self.voice_summary_style = QLabel("—")
+        for widget in (
+            self.voice_summary_engine,
+            self.voice_summary_profile,
+            self.voice_summary_speed,
+            self.voice_summary_expression,
+            self.voice_summary_style,
+        ):
+            widget.setWordWrap(True)
+            widget.setStyleSheet("font-weight:600;")
+        voice_form.addRow("Motor ativo", self.voice_summary_engine)
+        voice_form.addRow("Perfil", self.voice_summary_profile)
+        voice_form.addRow("Velocidade", self.voice_summary_speed)
+        voice_form.addRow("Expressividade", self.voice_summary_expression)
+        voice_form.addRow("Estilo", self.voice_summary_style)
+
+        self.voice_advanced_btn = QPushButton("Ajustes avançados →")
+        self.voice_advanced_btn.setStyleSheet(
+            "padding:10px;font-weight:700;background:#0061FF;color:white;"
+            "border-radius:7px;"
+        )
+        if callable(self.open_voice_audio):
+            self.voice_advanced_btn.clicked.connect(self.open_voice_audio)
+        voice_form.addRow("", self.voice_advanced_btn)
+
+        self.voice_summary_hint = QLabel(
+            "Configurações completas ficam na aba Voz e áudio."
+        )
+        self.voice_summary_hint.setWordWrap(True)
+        self.voice_summary_hint.setStyleSheet(
+            "color:#6B7280;font-size:11px;"
+        )
+        voice_form.addRow("", self.voice_summary_hint)
+        columns.addWidget(voice_box, 1)
+
         layout.addLayout(columns, 1)
 
         self.diagnostic = QLabel("")
@@ -223,17 +303,57 @@ class DashboardPage(QWidget):
         configured_style = str(
             voice.get("style_selection") or "auto"
         )
-        self.voice_style.setText(
-            str(
-                voice.get("current_style")
-                or (
-                    configured_style
-                    if configured_style not in {"", "auto"}
-                    else (data.get("current_speech") or {}).get("voice_style")
-                )
-                or "automático"
-            ).replace("_", " ")
+        current_style = str(
+            voice.get("current_style")
+            or (
+                configured_style
+                if configured_style not in {"", "auto"}
+                else (data.get("current_speech") or {}).get("voice_style")
+            )
+            or "auto"
         )
+        self.voice_style.setText(voice_style_label(current_style))
+
+        tts_cfg = dict(self.controller.config.get("tts") or {})
+        provider_id = str(tts_cfg.get("provider") or "qwen3_hq_auto")
+        selected_provider = voice_provider_label(provider_id)
+        active_provider = str(
+            voice.get("active_provider")
+            or voice.get("tts")
+            or ""
+        ).strip()
+        self.voice_summary_engine.setText(
+            active_provider or selected_provider
+        )
+        self.voice_summary_profile.setText(
+            voice_profile_label(
+                str(tts_cfg.get("profile") or "female_fast")
+            )
+        )
+        self.voice_summary_speed.setText(
+            f"{float(tts_cfg.get('speed') or 1.28):.2f}x"
+        )
+        hq_cfg = dict(tts_cfg.get("qwen3_hq") or {})
+        strength = float(
+            tts_cfg.get(
+                "expression_strength",
+                hq_cfg.get("expression_strength", 1.0),
+            )
+        )
+        self.voice_summary_expression.setText(
+            f"{int(round(strength * 100))}%"
+        )
+        if configured_style in {"", "auto"}:
+            live_style = voice_style_label(current_style)
+            self.voice_summary_style.setText(
+                "Automático"
+                if current_style in {"", "auto"}
+                else f"Automático · {live_style}"
+            )
+        else:
+            self.voice_summary_style.setText(
+                voice_style_label(configured_style)
+            )
 
         self.presenter_mode.setText(
             "Produto"
@@ -656,15 +776,16 @@ class ProductPage(QWidget):
             QMessageBox.critical(self, "Erro", str(exc))
 
 
-class SettingsPage(QWidget):
+class VoiceAudioPage(QWidget):
     def __init__(self, controller: DesktopController) -> None:
         super().__init__()
         self.controller = controller
 
         root = QVBoxLayout(self)
         title, desc = heading(
-            "Configurações",
-            "Escolha Brain, voz e dispositivo. Secrets ficam fora do arquivo de configuração.",
+            "Voz e áudio",
+            "Configure o motor, interpretação, teste e saída de áudio. "
+            "O Dashboard mostra apenas o resumo operacional.",
         )
         root.addWidget(title)
         root.addWidget(desc)
@@ -674,42 +795,8 @@ class SettingsPage(QWidget):
         container = QWidget()
         stack = QVBoxLayout(container)
 
-        brain_box = group("Presenter Brain")
-        brain_form = QFormLayout(brain_box)
-        self.brain_provider = QComboBox()
-        self.brain_provider.addItems(
-            ["qwen_local", "openai", "openai_compatible"]
-        )
-        self.ollama_url = QLineEdit()
-        self.ollama_model = QLineEdit()
-        self.api_url = QLineEdit()
-        self.api_model = QLineEdit()
-        self.api_key = QLineEdit()
-        self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key.setPlaceholderText(
-            "Deixe vazio para manter a chave já salva"
-        )
-        self.fallback = QCheckBox("Usar Qwen local se API falhar")
-        brain_form.addRow("Provider", self.brain_provider)
-        brain_form.addRow("Ollama URL", self.ollama_url)
-        brain_form.addRow("Modelo local", self.ollama_model)
-        brain_form.addRow("API URL", self.api_url)
-        brain_form.addRow("Modelo API", self.api_model)
-        brain_form.addRow("Chave OpenAI", self.api_key)
-        brain_form.addRow("", self.fallback)
-
-        brain_actions = QHBoxLayout()
-        self.test_brain_btn = QPushButton("Testar Brain")
-        self.doctor_btn = QPushButton("Diagnóstico completo")
-        self.key_status = QLabel("")
-        brain_actions.addWidget(self.test_brain_btn)
-        brain_actions.addWidget(self.doctor_btn)
-        brain_actions.addWidget(self.key_status, 1)
-        brain_form.addRow("", brain_actions)
-        stack.addWidget(brain_box)
-
-        voice_box = group("Voz e áudio")
-        voice_form = QFormLayout(voice_box)
+        engine_box = group("Motor de voz e interpretação")
+        engine_form = QFormLayout(engine_box)
 
         self.voice_engine = QComboBox()
         self.voice_engine.addItem(
@@ -740,7 +827,10 @@ class SettingsPage(QWidget):
             "Deixe vazio para manter a chave Gemini já salva"
         )
         self.gemini_status = QLabel("")
-        self.gemini_status.setStyleSheet("color:#6B7280;font-size:12px;")
+        self.gemini_status.setWordWrap(True)
+        self.gemini_status.setStyleSheet(
+            "color:#6B7280;font-size:12px;"
+        )
 
         self.openai_live_model = QComboBox()
         self.openai_live_model.addItem(
@@ -769,9 +859,12 @@ class SettingsPage(QWidget):
                 "Será liberado depois dos testes do modo controlado."
             )
 
-        self.openai_live_status = QLabel(
-            "Usa a mesma Chave OpenAI do Presenter Brain."
+        self.openai_key = QLineEdit()
+        self.openai_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_key.setPlaceholderText(
+            "Deixe vazio para manter a chave OpenAI já salva"
         )
+        self.openai_live_status = QLabel("")
         self.openai_live_status.setWordWrap(True)
         self.openai_live_status.setStyleSheet(
             "color:#6B7280;font-size:12px;"
@@ -817,12 +910,41 @@ class SettingsPage(QWidget):
             self.voice_style_combo.addItem(label, style_id)
 
         self.voice_hint = QLabel(
-            "No modo Automático, o AGCN muda a interpretação conforme "
-            "comentário, preço, compra, objeção, escassez e etapa da venda."
+            "No modo Automático, o AGCN escolhe a interpretação conforme "
+            "comentário, preço, compra, objeção, escassez e etapa da venda. "
+            "O modo manual força o estilo selecionado em todas as falas."
         )
         self.voice_hint.setWordWrap(True)
         self.voice_hint.setStyleSheet("color:#6B7280;font-size:12px;")
 
+        engine_form.addRow("Motor", self.voice_engine)
+        engine_form.addRow("Modelo Gemini", self.gemini_model)
+        engine_form.addRow("Chave Gemini", self.gemini_key)
+        engine_form.addRow("", self.gemini_status)
+        engine_form.addRow("Modelo OpenAI Live", self.openai_live_model)
+        engine_form.addRow("Modo OpenAI Live", self.openai_live_mode)
+        engine_form.addRow("Chave OpenAI", self.openai_key)
+        engine_form.addRow("", self.openai_live_status)
+        engine_form.addRow("Perfil de voz", self.voice_profile)
+        engine_form.addRow("Velocidade", speed_row)
+        engine_form.addRow("Expressividade", expression_row)
+        engine_form.addRow("Estilo", self.voice_style_combo)
+        engine_form.addRow("", self.voice_hint)
+
+        self.fallback_hint = QLabel(
+            "Fallback automático: Gemini/OpenAI Live → Qwen Local HQ → "
+            "Kokoro. Se uma API falhar, a LIVE tenta continuar com voz local."
+        )
+        self.fallback_hint.setWordWrap(True)
+        self.fallback_hint.setStyleSheet(
+            "padding:9px;background:#EFF6FF;color:#1E3A8A;"
+            "border-radius:7px;"
+        )
+        engine_form.addRow("Continuidade", self.fallback_hint)
+        stack.addWidget(engine_box)
+
+        test_box = group("Teste e saída de áudio")
+        test_form = QFormLayout(test_box)
         self.voice_test_text = QLineEdit()
         self.voice_test_text.setText(
             "Gente, presta atenção nessa oferta porque esse produto "
@@ -836,28 +958,16 @@ class SettingsPage(QWidget):
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
         self.test_voice_btn = QPushButton("Ouvir teste com estes ajustes")
-        voice_form.addRow("Motor", self.voice_engine)
-        voice_form.addRow("Modelo Gemini", self.gemini_model)
-        voice_form.addRow("Chave Gemini", self.gemini_key)
-        voice_form.addRow("", self.gemini_status)
-        voice_form.addRow("Modelo OpenAI Live", self.openai_live_model)
-        voice_form.addRow("Modo OpenAI Live", self.openai_live_mode)
-        voice_form.addRow("", self.openai_live_status)
-        voice_form.addRow("Perfil de voz", self.voice_profile)
-        voice_form.addRow("Velocidade", speed_row)
-        voice_form.addRow("Expressividade", expression_row)
-        voice_form.addRow("Estilo", self.voice_style_combo)
-        voice_form.addRow("", self.voice_hint)
-        voice_form.addRow("Texto de teste", self.voice_test_text)
-        voice_form.addRow("Saída de áudio", self.device)
+        test_form.addRow("Texto de teste", self.voice_test_text)
+        test_form.addRow("Saída de áudio", self.device)
 
         voice_actions = QHBoxLayout()
         voice_actions.addWidget(self.refresh_devices_btn)
         voice_actions.addWidget(self.test_voice_btn)
-        voice_form.addRow("", voice_actions)
-        stack.addWidget(voice_box)
+        test_form.addRow("", voice_actions)
+        stack.addWidget(test_box)
 
-        self.save_btn = QPushButton("Salvar configurações")
+        self.save_btn = QPushButton("Salvar Voz e áudio")
         self.save_btn.setStyleSheet(
             "padding:12px;font-weight:700;background:#0061FF;color:white;"
             "border-radius:7px;"
@@ -869,8 +979,6 @@ class SettingsPage(QWidget):
 
         self.save_btn.clicked.connect(self._save)
         self.refresh_devices_btn.clicked.connect(self._devices)
-        self.test_brain_btn.clicked.connect(self._test_brain)
-        self.doctor_btn.clicked.connect(self._doctor)
         self.test_voice_btn.clicked.connect(self._test_voice)
         self.voice_engine.currentIndexChanged.connect(
             self._update_voice_provider_controls
@@ -880,28 +988,10 @@ class SettingsPage(QWidget):
 
     def load(self) -> None:
         config = self.controller.config
-        brain = config.get("brain") or {}
-        ollama = brain.get("ollama") or {}
-        api = brain.get("api") or {}
         tts = config.get("tts") or {}
         gemini = tts.get("gemini") or {}
         openai_live = tts.get("openai_live") or {}
         audio = config.get("audio") or {}
-
-        self.brain_provider.setCurrentText(
-            str(brain.get("provider") or "qwen_local")
-        )
-        self.ollama_url.setText(
-            str(ollama.get("base_url") or "http://127.0.0.1:11434")
-        )
-        self.ollama_model.setText(
-            str(ollama.get("model") or "qwen3:4b")
-        )
-        self.api_url.setText(
-            str(api.get("base_url") or "https://api.openai.com/v1")
-        )
-        self.api_model.setText(str(api.get("model") or ""))
-        self.fallback.setChecked(bool(brain.get("fallback_local", True)))
 
         provider_id = str(tts.get("provider") or "qwen3_hq_auto")
         provider_index = self.voice_engine.findData(provider_id)
@@ -932,6 +1022,7 @@ class SettingsPage(QWidget):
         profile_index = self.voice_profile.findData(profile_id)
         if profile_index >= 0:
             self.voice_profile.setCurrentIndex(profile_index)
+
         speed = float(tts.get("speed") or 1.28)
         self.speed_slider.setValue(
             max(80, min(160, int(round(speed * 100))))
@@ -947,6 +1038,7 @@ class SettingsPage(QWidget):
         self.expression_slider.setValue(
             max(0, min(150, int(round(strength * 100))))
         )
+
         style = str(
             tts.get("voice_style")
             or hq_cfg.get("voice_style")
@@ -960,11 +1052,6 @@ class SettingsPage(QWidget):
         self.device.setCurrentText(
             str(audio.get("output_device") or "")
         )
-        self.key_status.setText(
-            "API da inteligência salva"
-            if self.controller.api_key_saved()
-            else "API da inteligência opcional"
-        )
         self.gemini_status.setText(
             "Chave Gemini salva com segurança"
             if self.controller.gemini_key_saved()
@@ -972,32 +1059,24 @@ class SettingsPage(QWidget):
         )
         self.openai_live_status.setText(
             (
-                "Chave OpenAI salva · modo controlado valida a "
-                "transcrição antes de tocar o áudio."
+                "Chave OpenAI salva · pronta para OpenAI Live."
             )
             if self.controller.api_key_saved()
             else (
-                "Configure a Chave OpenAI acima. O modo controlado "
-                "bloqueia fala alterada e cai para Qwen."
+                "Chave OpenAI ainda não configurada. "
+                "Se o motor OpenAI Live for escolhido, o fallback local "
+                "continua disponível."
             )
         )
         self._update_voice_provider_controls()
 
     def _patch(self) -> dict:
+        """Salva somente controles expostos na UI.
+
+        Campos técnicos ocultos (URLs, timeouts, pack_dir etc.) permanecem
+        intactos no ConfigStore graças ao deep-merge.
+        """
         return {
-            "brain": {
-                "provider": self.brain_provider.currentText(),
-                "fallback_local": self.fallback.isChecked(),
-                "ollama": {
-                    "base_url": self.ollama_url.text().strip(),
-                    "model": self.ollama_model.text().strip(),
-                },
-                "api": {
-                    "base_url": self.api_url.text().strip(),
-                    "model": self.api_model.text().strip(),
-                    "api_key_env": "OPENAI_API_KEY",
-                },
-            },
             "tts": {
                 "provider": (
                     self.voice_engine.currentData()
@@ -1008,7 +1087,6 @@ class SettingsPage(QWidget):
                     or "female_fast"
                 ),
                 "speed": self.speed_slider.value() / 100.0,
-                "voice_override": "",
                 "expressive": self.expression_slider.value() > 0,
                 "expression_strength": (
                     self.expression_slider.value() / 100.0
@@ -1017,10 +1095,6 @@ class SettingsPage(QWidget):
                     self.voice_style_combo.currentData() or "auto"
                 ),
                 "qwen3_hq": {
-                    "pack_dir": "",
-                    "port": 18765,
-                    "startup_timeout_seconds": 120,
-                    "request_timeout_seconds": 60,
                     "expressive": self.expression_slider.value() > 0,
                     "expression_strength": (
                         self.expression_slider.value() / 100.0
@@ -1029,20 +1103,12 @@ class SettingsPage(QWidget):
                         self.voice_style_combo.currentData() or "auto"
                     ),
                 },
-                "kokoro": {
-                    "model_dir": "",
-                },
                 "gemini": {
                     "model": (
                         self.gemini_model.currentData()
                         or "gemini-3.8-flash-lite-tts"
                     ),
-                    "base_url": (
-                        "https://generativelanguage.googleapis.com"
-                    ),
                     "api_key_env": "GEMINI_API_KEY",
-                    "timeout_seconds": 45,
-                    "voice_override": "",
                 },
                 "openai_live": {
                     "model": (
@@ -1053,15 +1119,7 @@ class SettingsPage(QWidget):
                         self.openai_live_mode.currentData()
                         or "strict_speech"
                     ),
-                    "websocket_url": (
-                        "wss://api.openai.com/v1/live/sessions"
-                    ),
-                    "models_base_url": "https://api.openai.com/v1",
                     "api_key_env": "OPENAI_API_KEY",
-                    "timeout_seconds": 45,
-                    "startup_timeout_seconds": 12,
-                    "completion_grace_seconds": 0.70,
-                    "voice_override": "",
                 },
             },
             "audio": {
@@ -1071,23 +1129,27 @@ class SettingsPage(QWidget):
 
     def _save(self) -> None:
         try:
-            key = self.api_key.text()
-            gemini_key = self.gemini_key.text()
+            openai_key = self.openai_key.text().strip()
+            gemini_key = self.gemini_key.text().strip()
             self.controller.save_settings(
                 self._patch(),
-                openai_key=key if key else None,
+                openai_key=openai_key if openai_key else None,
                 gemini_key=gemini_key if gemini_key else None,
             )
-            self.api_key.clear()
+            self.openai_key.clear()
             self.gemini_key.clear()
             self.load()
             QMessageBox.information(
                 self,
-                "Configurações",
-                "Configurações salvas. O runtime foi recarregado.",
+                "Voz e áudio",
+                "Configurações de voz salvas. O runtime foi recarregado.",
             )
         except Exception as exc:
-            QMessageBox.critical(self, "Erro ao salvar", str(exc))
+            QMessageBox.critical(
+                self,
+                "Erro ao salvar Voz e áudio",
+                str(exc),
+            )
 
     def _update_voice_provider_controls(self) -> None:
         provider = self.voice_engine.currentData()
@@ -1100,6 +1162,7 @@ class SettingsPage(QWidget):
 
         self.openai_live_model.setEnabled(is_openai_live)
         self.openai_live_mode.setEnabled(is_openai_live)
+        self.openai_key.setEnabled(is_openai_live)
         self.openai_live_status.setEnabled(is_openai_live)
 
     def _devices(self) -> None:
@@ -1118,8 +1181,173 @@ class SettingsPage(QWidget):
                 str(exc),
             )
 
+    def _test_voice(self) -> None:
+        try:
+            if (
+                self.voice_engine.currentData() == "gemini_premium"
+                and self.gemini_key.text().strip()
+            ):
+                self.controller.set_gemini_key(
+                    self.gemini_key.text().strip()
+                )
+                self.gemini_key.clear()
+                self.gemini_status.setText(
+                    "Chave Gemini salva com segurança"
+                )
+
+            if (
+                self.voice_engine.currentData() == "openai_live"
+                and self.openai_key.text().strip()
+            ):
+                self.controller.set_openai_key(
+                    self.openai_key.text().strip()
+                )
+                self.openai_key.clear()
+                self.openai_live_status.setText(
+                    "Chave OpenAI salva · pronta para OpenAI Live."
+                )
+
+            test_text = self.voice_test_text.text().strip()
+            ok, message = self.controller.test_voice(
+                text=(
+                    test_text
+                    or "Teste de voz do AGCN Live Voice."
+                ),
+                config_override=self._patch(),
+            )
+            QMessageBox.information(
+                self,
+                "Teste de voz",
+                ("OK — " if ok else "Falhou — ") + message,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Teste de voz", str(exc))
+
+
+class SettingsPage(QWidget):
+    def __init__(self, controller: DesktopController) -> None:
+        super().__init__()
+        self.controller = controller
+
+        root = QVBoxLayout(self)
+        title, desc = heading(
+            "Configurações",
+            "Configure o Presenter Brain e o diagnóstico geral. "
+            "Voz e áudio agora ficam em uma aba própria.",
+        )
+        root.addWidget(title)
+        root.addWidget(desc)
+
+        brain_box = group("Presenter Brain")
+        brain_form = QFormLayout(brain_box)
+        self.brain_provider = QComboBox()
+        self.brain_provider.addItems(
+            ["qwen_local", "openai", "openai_compatible"]
+        )
+        self.ollama_url = QLineEdit()
+        self.ollama_model = QLineEdit()
+        self.api_url = QLineEdit()
+        self.api_model = QLineEdit()
+        self.api_key = QLineEdit()
+        self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key.setPlaceholderText(
+            "Deixe vazio para manter a chave OpenAI já salva"
+        )
+        self.fallback = QCheckBox("Usar Qwen local se API falhar")
+        brain_form.addRow("Provider", self.brain_provider)
+        brain_form.addRow("Ollama URL", self.ollama_url)
+        brain_form.addRow("Modelo local", self.ollama_model)
+        brain_form.addRow("API URL", self.api_url)
+        brain_form.addRow("Modelo API", self.api_model)
+        brain_form.addRow("Chave OpenAI", self.api_key)
+        brain_form.addRow("", self.fallback)
+
+        brain_actions = QHBoxLayout()
+        self.test_brain_btn = QPushButton("Testar Brain")
+        self.doctor_btn = QPushButton("Diagnóstico completo")
+        self.key_status = QLabel("")
+        brain_actions.addWidget(self.test_brain_btn)
+        brain_actions.addWidget(self.doctor_btn)
+        brain_actions.addWidget(self.key_status, 1)
+        brain_form.addRow("", brain_actions)
+        root.addWidget(brain_box)
+
+        self.save_btn = QPushButton("Salvar configurações do Brain")
+        self.save_btn.setStyleSheet(
+            "padding:12px;font-weight:700;background:#0061FF;color:white;"
+            "border-radius:7px;"
+        )
+        root.addWidget(self.save_btn)
+        root.addStretch(1)
+
+        self.save_btn.clicked.connect(self._save)
+        self.test_brain_btn.clicked.connect(self._test_brain)
+        self.doctor_btn.clicked.connect(self._doctor)
+
+        self.load()
+
+    def load(self) -> None:
+        config = self.controller.config
+        brain = config.get("brain") or {}
+        ollama = brain.get("ollama") or {}
+        api = brain.get("api") or {}
+
+        self.brain_provider.setCurrentText(
+            str(brain.get("provider") or "qwen_local")
+        )
+        self.ollama_url.setText(
+            str(ollama.get("base_url") or "http://127.0.0.1:11434")
+        )
+        self.ollama_model.setText(
+            str(ollama.get("model") or "qwen3:4b")
+        )
+        self.api_url.setText(
+            str(api.get("base_url") or "https://api.openai.com/v1")
+        )
+        self.api_model.setText(str(api.get("model") or ""))
+        self.fallback.setChecked(bool(brain.get("fallback_local", True)))
+        self.key_status.setText(
+            "Chave OpenAI salva"
+            if self.controller.api_key_saved()
+            else "Chave OpenAI opcional para Brain local"
+        )
+
+    def _patch(self) -> dict:
+        return {
+            "brain": {
+                "provider": self.brain_provider.currentText(),
+                "fallback_local": self.fallback.isChecked(),
+                "ollama": {
+                    "base_url": self.ollama_url.text().strip(),
+                    "model": self.ollama_model.text().strip(),
+                },
+                "api": {
+                    "base_url": self.api_url.text().strip(),
+                    "model": self.api_model.text().strip(),
+                    "api_key_env": "OPENAI_API_KEY",
+                },
+            },
+        }
+
+    def _save(self) -> None:
+        try:
+            key = self.api_key.text().strip()
+            self.controller.save_settings(
+                self._patch(),
+                openai_key=key if key else None,
+            )
+            self.api_key.clear()
+            self.load()
+            QMessageBox.information(
+                self,
+                "Configurações",
+                "Configurações do Brain salvas. O runtime foi recarregado.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao salvar", str(exc))
+
     def _apply_settings_before_test(self) -> None:
-        key = self.api_key.text()
+        key = self.api_key.text().strip()
         self.controller.save_settings(
             self._patch(),
             openai_key=key if key else None,
@@ -1164,48 +1392,6 @@ class SettingsPage(QWidget):
                 str(exc),
             )
 
-    def _test_voice(self) -> None:
-        try:
-            if (
-                self.voice_engine.currentData() == "gemini_premium"
-                and self.gemini_key.text().strip()
-            ):
-                self.controller.set_gemini_key(
-                    self.gemini_key.text().strip()
-                )
-                self.gemini_key.clear()
-                self.gemini_status.setText(
-                    "Chave Gemini salva com segurança"
-                )
-
-            if (
-                self.voice_engine.currentData() == "openai_live"
-                and self.api_key.text().strip()
-            ):
-                self.controller.set_openai_key(
-                    self.api_key.text().strip()
-                )
-                self.api_key.clear()
-                self.openai_live_status.setText(
-                    "Chave OpenAI salva · pronta para GPT-Live."
-                )
-
-            test_text = self.voice_test_text.text().strip()
-            ok, message = self.controller.test_voice(
-                text=(
-                    test_text
-                    or "Teste de voz do AGCN Live Voice."
-                ),
-                config_override=self._patch(),
-            )
-            QMessageBox.information(
-                self,
-                "Teste de voz",
-                ("OK — " if ok else "Falhou — ") + message,
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Teste de voz", str(exc))
-
 
 class MainWindow(QMainWindow):
     def __init__(
@@ -1241,16 +1427,26 @@ class MainWindow(QMainWindow):
             "QListWidget::item{padding:14px;}"
             "QListWidget::item:selected{background:#0061FF;}"
         )
-        for name in ("Dashboard", "Produto", "Configurações"):
+        for name in (
+            "Dashboard",
+            "Produto",
+            "Voz e áudio",
+            "Configurações",
+        ):
             self.nav.addItem(QListWidgetItem(name))
         side_layout.addWidget(self.nav, 1)
 
         self.pages = QStackedWidget()
-        self.dashboard = DashboardPage(self.controller)
+        self.dashboard = DashboardPage(
+            self.controller,
+            open_voice_audio=lambda: self.nav.setCurrentRow(2),
+        )
         self.product_page = ProductPage(self.controller)
+        self.voice_audio_page = VoiceAudioPage(self.controller)
         self.settings_page = SettingsPage(self.controller)
         self.pages.addWidget(self.dashboard)
         self.pages.addWidget(self.product_page)
+        self.pages.addWidget(self.voice_audio_page)
         self.pages.addWidget(self.settings_page)
 
         self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -1280,6 +1476,8 @@ class MainWindow(QMainWindow):
         if index == 1:
             self.product_page.reload_products()
         elif index == 2:
+            self.voice_audio_page.load()
+        elif index == 3:
             self.settings_page.load()
 
     def refresh(self) -> None:

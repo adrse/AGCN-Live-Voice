@@ -5,7 +5,7 @@
 Presenter: STOPPED | STARTING | RUNNING | PAUSED | ERROR
 TikTok: DISCONNECTED | CONNECTING | LIVE | ENDED | ERROR
 Brain: LOCAL_QWEN | API
-TTS: QWEN3_HQ_AUTO
+TTS: QWEN3_HQ_AUTO | GEMINI_PREMIUM | OPENAI_LIVE
 
 ## Pipeline
 
@@ -95,7 +95,7 @@ Regras reforçadas:
 - desconto/promoção exige condição real;
 - garantia exige warranty;
 - compatibilidade exige dado correspondente;
-- se faltou fato: responder sem inventar e marcar `needs_fact=true`.
+- se faltou fato: o Brain pode sinalizar `needs_fact=true`, mas o Presenter descarta a fala; o espectador não recebe resposta inventada.
 
 Falha:
 1. retry curto;
@@ -137,7 +137,7 @@ Fallback:
 - Dora (feminina) e Alex (masculina);
 - usado somente se o Voice Pack HQ estiver ausente ou falhar.
 
-API é uma opção de **Brain/inteligência**, não de voz.
+Brain e voz são independentes. A voz pode ser local (Qwen3-TTS/Kokoro) ou por API (Gemini/OpenAI Live), sem entregar o controle da LIVE ao provider de voz.
 
 ## Áudio Windows
 
@@ -162,3 +162,30 @@ PyInstaller:
 - sem secrets;
 - script de build no repositório.
 
+
+## Interface desktop
+
+Navegação principal:
+- Dashboard;
+- Produto;
+- Voz e áudio;
+- Configurações.
+
+Dashboard:
+- mostra status da LIVE, fala atual, comentários, fila/decisão e andamento Agora -> Próximo -> Depois;
+- exibe somente um resumo operacional de Voz e áudio: motor ativo, perfil, velocidade, expressividade e estilo;
+- o botão `Ajustes avançados` abre diretamente a aba `Voz e áudio`.
+
+Voz e áudio:
+- concentra configuração completa de Qwen Local HQ, Gemini Premium e OpenAI Live;
+- perfil feminino/masculino;
+- velocidade 0,80x–1,60x;
+- expressividade 0–150%;
+- estilo automático ou manual;
+- chave/modelo dos providers por API;
+- texto de teste e dispositivo de saída;
+- informa a cadeia de fallback local.
+
+Configurações:
+- fica dedicada ao Presenter Brain e diagnóstico geral;
+- não duplica controles de voz.

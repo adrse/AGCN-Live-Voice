@@ -116,3 +116,13 @@ A LIVE não deve ficar muda por indisponibilidade de uma API.
 4. Comparar Qwen vs Gemini vs GPT-Live usando o mesmo texto e estilo.
 5. Só depois avaliar guided_agent/sessão persistente.
 6. Refinar a interface com comparação A/B dos três motores.
+
+## Organização da interface
+
+A interface desktop separa operação de configuração:
+
+- **Dashboard**: andamento da apresentação, fala atual, fila/decisão, comentários e resumo de voz;
+- **Voz e áudio**: configuração completa dos três providers, perfil, velocidade, expressividade, estilo, chaves, teste e device;
+- **Configurações**: Presenter Brain e diagnóstico geral.
+
+O card de Voz e áudio do Dashboard é somente leitura operacional e possui `Ajustes avançados`, que navega para a página dedicada. Isso evita sobrecarregar o Dashboard sem esconder o provider/estilo que está ativo.
