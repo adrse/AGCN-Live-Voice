@@ -482,7 +482,6 @@ class SettingsPage(QWidget):
         self.tts_provider.addItem("OpenAI Neural (recomendado)", "openai")
         self.tts_provider.addItem("ElevenLabs Neural", "elevenlabs")
         self.tts_provider.addItem("Automático neural", "neural_auto")
-        self.tts_provider.addItem("Local legado (diagnóstico)", "local_legacy")
         self.voice_profile = QComboBox()
         for profile in list_voice_profiles():
             self.voice_profile.addItem(
