@@ -1,6 +1,7 @@
 from core.comment_intelligence import CommentIntelligence
 from core.product_knowledge import ProductKnowledge
 from core.presenter_v2 import PresenterV2
+from core.sales_guard import SalesGuard
 
 
 def test_product_knowledge_finds_power_from_additional_info():
@@ -79,3 +80,13 @@ def test_presenter_answers_grounded_technical_fact():
 
     assert item is not None
     assert "3000" in item["speech"]
+
+
+def test_numeric_stock_alone_does_not_create_scarcity():
+    guard = SalesGuard({
+        "name": "Produto X",
+        "stock": 3,
+        "live_offer": False,
+    })
+    assert guard.grounded_urgency() == []
+    assert guard.can_claim("scarcity") is False
