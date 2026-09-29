@@ -52,6 +52,9 @@ def run_diagnostics(
         brain = build_brain_provider(config)
         ok, detail = brain.healthcheck()
         add("Presenter Brain", ok, detail)
+        close_brain = getattr(brain, "close", None)
+        if callable(close_brain):
+            close_brain()
     except Exception as exc:
         add("Presenter Brain", False, str(exc))
 
