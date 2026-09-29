@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -27,6 +28,12 @@ from PySide6.QtWidgets import (
 
 from core.voice_profiles import list_voice_profiles
 from desktop.app_controller import DesktopController
+from desktop.ui_theme import (
+    APP_STYLESHEET,
+    apply_danger,
+    apply_ghost,
+    apply_primary,
+)
 
 
 VOICE_STYLE_OPTIONS = [
@@ -79,21 +86,53 @@ def voice_style_label(style_id: str) -> str:
 
 def heading(text: str, subtitle: str = "") -> tuple[QLabel, QLabel]:
     title = QLabel(text)
-    title.setStyleSheet("font-size:26px;font-weight:700;color:#111827;")
+    title.setObjectName("PageTitle")
     desc = QLabel(subtitle)
+    desc.setObjectName("PageSubtitle")
     desc.setWordWrap(True)
-    desc.setStyleSheet("color:#6B7280;font-size:13px;")
     return title, desc
 
 
 def group(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setStyleSheet(
-        "QGroupBox{font-weight:700;border:1px solid #E5E7EB;"
-        "border-radius:10px;margin-top:12px;padding-top:12px;background:white;}"
-        "QGroupBox::title{subcontrol-origin:margin;left:12px;padding:0 5px;}"
-    )
-    return box
+    return QGroupBox(title)
+
+
+def card(title: str, subtitle: str = "", *, variant: str = "Card"):
+    box = QFrame()
+    box.setObjectName(variant)
+    layout = QVBoxLayout(box)
+    layout.setContentsMargins(16, 14, 16, 16)
+    layout.setSpacing(10)
+
+    header = QLabel(title)
+    header.setObjectName("CardTitle")
+    layout.addWidget(header)
+
+    if subtitle:
+        desc = QLabel(subtitle)
+        desc.setObjectName("CardSubtitle")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+    return box, layout
+
+
+def metric_block(label: str, value: str = "—"):
+    box = QFrame()
+    box.setObjectName("SoftCard")
+    layout = QVBoxLayout(box)
+    layout.setContentsMargins(12, 10, 12, 10)
+    layout.setSpacing(3)
+
+    caption = QLabel(label)
+    caption.setObjectName("MetricLabel")
+    output = QLabel(value)
+    output.setObjectName("MetricValue")
+    output.setWordWrap(True)
+
+    layout.addWidget(caption)
+    layout.addWidget(output)
+    return box, output
 
 
 class DashboardPage(QWidget):
@@ -104,151 +143,243 @@ class DashboardPage(QWidget):
         open_voice_audio=None,
     ) -> None:
         super().__init__()
+        self.setObjectName("PageRoot")
         self.controller = controller
         self.open_voice_audio = open_voice_audio
 
-        layout = QVBoxLayout(self)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        container = QWidget()
+        container.setObjectName("PageContent")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(24, 22, 24, 24)
+        layout.setSpacing(14)
+
+        header_row = QHBoxLayout()
+        header_text = QVBoxLayout()
+        header_text.setSpacing(2)
         title, desc = heading(
             "Dashboard",
-            "Conecte a LIVE e acompanhe produto, Brain, comentários e fala atual.",
+            "Acompanhe a LIVE, as decisões da IA e o andamento da apresentação em tempo real.",
         )
-        layout.addWidget(title)
-        layout.addWidget(desc)
+        header_text.addWidget(title)
+        header_text.addWidget(desc)
+        header_row.addLayout(header_text, 1)
 
-        connect_box = group("TikTok LIVE")
-        row = QHBoxLayout(connect_box)
+        self.live_state_badge = QLabel("Aguardando LIVE")
+        self.live_state_badge.setObjectName("StatusInfo")
+        self.live_state_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_row.addWidget(
+            self.live_state_badge,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
+        )
+        layout.addLayout(header_row)
+
+        top_row = QHBoxLayout()
+        top_row.setSpacing(14)
+
+        live_card, live_layout = card(
+            "TikTok LIVE",
+            "Informe o @username da transmissão que será monitorada.",
+        )
+        live_card.setMinimumWidth(330)
         self.username = QLineEdit()
         self.username.setPlaceholderText("@username")
-        self.connect_btn = QPushButton("Conectar")
+        live_layout.addWidget(self.username)
+
+        live_actions = QHBoxLayout()
+        self.connect_btn = QPushButton("Iniciar monitoramento")
+        apply_primary(self.connect_btn)
         self.stop_btn = QPushButton("Parar")
+        apply_danger(self.stop_btn)
         self.stop_btn.setEnabled(False)
-        row.addWidget(self.username, 1)
-        row.addWidget(self.connect_btn)
-        row.addWidget(self.stop_btn)
-        layout.addWidget(connect_box)
+        live_actions.addWidget(self.connect_btn, 1)
+        live_actions.addWidget(self.stop_btn)
+        live_layout.addLayout(live_actions)
 
-        status_box = group("Status")
-        grid = QGridLayout(status_box)
-        self.status = QLabel("Parado")
-        self.viewers = QLabel("—")
-        self.likes = QLabel("—")
-        self.product = QLabel("Nenhum")
-        self.brain = QLabel("—")
-        self.voice = QLabel("—")
-        self.voice_style = QLabel("—")
-        self.presenter_mode = QLabel("Interativo")
-        self.comments_pause = QLabel("0s")
-        labels = [
-            ("LIVE", self.status),
-            ("Viewers", self.viewers),
-            ("Curtidas", self.likes),
-            ("Produto ativo", self.product),
-            ("Brain", self.brain),
-            ("Voz", self.voice),
-            ("Estilo vocal", self.voice_style),
-            ("Modo Presenter", self.presenter_mode),
-            ("Comentários pausados", self.comments_pause),
-        ]
-        for index, (name, widget) in enumerate(labels):
-            card = QLabel(name)
-            card.setStyleSheet("color:#6B7280;font-size:12px;")
-            grid.addWidget(card, index // 3 * 2, index % 3)
-            widget.setStyleSheet("font-size:15px;font-weight:700;")
-            grid.addWidget(widget, index // 3 * 2 + 1, index % 3)
-        layout.addWidget(status_box)
+        self.connection_hint = QLabel(
+            "Conecte uma LIVE para receber métricas e comentários."
+        )
+        self.connection_hint.setObjectName("Muted")
+        self.connection_hint.setWordWrap(True)
+        live_layout.addWidget(self.connection_hint)
+        top_row.addWidget(live_card, 4)
 
-        speech_box = group("Falando agora")
-        speech_layout = QVBoxLayout(speech_box)
+        status_card, status_layout = card(
+            "Status da LIVE",
+            "Visão operacional do Presenter, produto e voz.",
+        )
+        metrics = QGridLayout()
+        metrics.setHorizontalSpacing(10)
+        metrics.setVerticalSpacing(10)
+
+        metric, self.status = metric_block("LIVE", "Parado")
+        metrics.addWidget(metric, 0, 0)
+        metric, self.viewers = metric_block("Viewers")
+        metrics.addWidget(metric, 0, 1)
+        metric, self.likes = metric_block("Curtidas")
+        metrics.addWidget(metric, 0, 2)
+        metric, self.product = metric_block("Produto ativo", "Nenhum")
+        metrics.addWidget(metric, 1, 0)
+        metric, self.brain = metric_block("Brain")
+        metrics.addWidget(metric, 1, 1)
+        metric, self.voice = metric_block("Voz")
+        metrics.addWidget(metric, 1, 2)
+        status_layout.addLayout(metrics)
+
+        status_footer = QHBoxLayout()
+        status_footer.setSpacing(8)
+        self.voice_style = QLabel("Estilo: Automático")
+        self.voice_style.setObjectName("StatusInfo")
+        self.presenter_mode = QLabel("Modo: Interativo")
+        self.presenter_mode.setObjectName("StatusInfo")
+        self.comments_pause = QLabel("Comentários: ativos")
+        self.comments_pause.setObjectName("StatusGood")
+        status_footer.addWidget(self.voice_style)
+        status_footer.addWidget(self.presenter_mode)
+        status_footer.addWidget(self.comments_pause)
+        status_footer.addStretch(1)
+        status_layout.addLayout(status_footer)
+        top_row.addWidget(status_card, 7)
+        layout.addLayout(top_row)
+
+        middle_row = QHBoxLayout()
+        middle_row.setSpacing(14)
+
+        speech_card, speech_layout = card(
+            "Falando agora",
+            "Texto efetivamente enviado para o motor de voz.",
+        )
         self.speech = QTextEdit()
         self.speech.setReadOnly(True)
-        self.speech.setFixedHeight(95)
-        self.speech.setPlaceholderText("A fala atual aparecerá aqui.")
+        self.speech.setMinimumHeight(126)
+        self.speech.setPlaceholderText(
+            "Aguardando o início da apresentação..."
+        )
         speech_layout.addWidget(self.speech)
-        layout.addWidget(speech_box)
+        middle_row.addWidget(speech_card, 4)
 
-        plan_box = group("Andamento da apresentação")
-        plan_grid = QGridLayout(plan_box)
-        self.current_action = QLabel("—")
-        self.next_action = QLabel("—")
-        self.after_action = QLabel("—")
-        for widget in (
-            self.current_action,
-            self.next_action,
-            self.after_action,
-        ):
-            widget.setWordWrap(True)
-            widget.setStyleSheet("font-size:13px;font-weight:600;")
-        plan_grid.addWidget(QLabel("Agora"), 0, 0)
-        plan_grid.addWidget(QLabel("Próximo"), 0, 1)
-        plan_grid.addWidget(QLabel("Depois"), 0, 2)
-        plan_grid.addWidget(self.current_action, 1, 0)
-        plan_grid.addWidget(self.next_action, 1, 1)
-        plan_grid.addWidget(self.after_action, 1, 2)
-        layout.addWidget(plan_box)
+        plan_card, plan_layout = card(
+            "Andamento da apresentação",
+            "O AGCN mantém visível o que está fazendo agora e o que vem em seguida.",
+        )
+        plan_row = QHBoxLayout()
+        plan_row.setSpacing(10)
 
-        columns = QHBoxLayout()
-        comments_box = group("Comentários recentes")
-        comments_layout = QVBoxLayout(comments_box)
+        def add_plan_step(title_text: str, current: bool = False):
+            frame = QFrame()
+            frame.setObjectName("PlanCurrent" if current else "SoftCard")
+            step_layout = QVBoxLayout(frame)
+            step_layout.setContentsMargins(13, 11, 13, 12)
+            step_layout.setSpacing(6)
+            label = QLabel(title_text)
+            label.setObjectName("MetricLabel")
+            value = QLabel("Aguardando decisão")
+            value.setObjectName("ValueStrong")
+            value.setWordWrap(True)
+            value.setMinimumHeight(66)
+            step_layout.addWidget(label)
+            step_layout.addWidget(value, 1)
+            plan_row.addWidget(frame, 1)
+            return value
+
+        self.current_action = add_plan_step("AGORA", True)
+        self.next_action = add_plan_step("PRÓXIMO")
+        self.after_action = add_plan_step("DEPOIS")
+        plan_layout.addLayout(plan_row)
+        middle_row.addWidget(plan_card, 7)
+        layout.addLayout(middle_row)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(14)
+
+        comments_card, comments_layout = card(
+            "Comentários recentes",
+            "Mensagens recebidas da LIVE.",
+        )
         self.comments = QListWidget()
+        self.comments.setObjectName("DataList")
+        self.comments.setMinimumHeight(225)
         comments_layout.addWidget(self.comments)
-        columns.addWidget(comments_box, 1)
+        bottom_row.addWidget(comments_card, 4)
 
-        queue_box = group("Fila / decisão")
-        queue_layout = QVBoxLayout(queue_box)
+        queue_card, queue_layout = card(
+            "Fila / Decisão da IA",
+            "Itens priorizados para resposta ou retomada da venda.",
+        )
         self.queue = QListWidget()
+        self.queue.setObjectName("DataList")
+        self.queue.setMinimumHeight(225)
         queue_layout.addWidget(self.queue)
-        columns.addWidget(queue_box, 1)
+        bottom_row.addWidget(queue_card, 4)
 
-        voice_box = group("Voz e áudio")
-        voice_form = QFormLayout(voice_box)
+        voice_card, voice_layout = card(
+            "Voz e áudio",
+            "Resumo operacional. Os controles completos ficam na aba dedicada.",
+        )
+        voice_grid = QGridLayout()
+        voice_grid.setHorizontalSpacing(10)
+        voice_grid.setVerticalSpacing(8)
+
         self.voice_summary_engine = QLabel("—")
         self.voice_summary_profile = QLabel("—")
         self.voice_summary_speed = QLabel("—")
         self.voice_summary_expression = QLabel("—")
         self.voice_summary_style = QLabel("—")
-        for widget in (
-            self.voice_summary_engine,
-            self.voice_summary_profile,
-            self.voice_summary_speed,
-            self.voice_summary_expression,
-            self.voice_summary_style,
-        ):
+
+        rows = (
+            ("Motor ativo", self.voice_summary_engine),
+            ("Perfil", self.voice_summary_profile),
+            ("Velocidade", self.voice_summary_speed),
+            ("Expressividade", self.voice_summary_expression),
+            ("Estilo", self.voice_summary_style),
+        )
+        for row_index, (label_text, widget) in enumerate(rows):
+            label = QLabel(label_text)
+            label.setObjectName("MetricLabel")
+            widget.setObjectName("ValueStrong")
             widget.setWordWrap(True)
-            widget.setStyleSheet("font-weight:600;")
-        voice_form.addRow("Motor ativo", self.voice_summary_engine)
-        voice_form.addRow("Perfil", self.voice_summary_profile)
-        voice_form.addRow("Velocidade", self.voice_summary_speed)
-        voice_form.addRow("Expressividade", self.voice_summary_expression)
-        voice_form.addRow("Estilo", self.voice_summary_style)
+            voice_grid.addWidget(label, row_index, 0)
+            voice_grid.addWidget(widget, row_index, 1)
+        voice_layout.addLayout(voice_grid)
 
         self.voice_advanced_btn = QPushButton("Ajustes avançados →")
-        self.voice_advanced_btn.setStyleSheet(
-            "padding:10px;font-weight:700;background:#0061FF;color:white;"
-            "border-radius:7px;"
-        )
+        apply_primary(self.voice_advanced_btn)
         if callable(self.open_voice_audio):
             self.voice_advanced_btn.clicked.connect(self.open_voice_audio)
-        voice_form.addRow("", self.voice_advanced_btn)
+        voice_layout.addWidget(self.voice_advanced_btn)
+        bottom_row.addWidget(voice_card, 4)
 
-        self.voice_summary_hint = QLabel(
-            "Configurações completas ficam na aba Voz e áudio."
-        )
-        self.voice_summary_hint.setWordWrap(True)
-        self.voice_summary_hint.setStyleSheet(
-            "color:#6B7280;font-size:11px;"
-        )
-        voice_form.addRow("", self.voice_summary_hint)
-        columns.addWidget(voice_box, 1)
-
-        layout.addLayout(columns, 1)
+        layout.addLayout(bottom_row)
 
         self.diagnostic = QLabel("")
+        self.diagnostic.setObjectName("InfoBanner")
         self.diagnostic.setWordWrap(True)
-        self.diagnostic.setStyleSheet("color:#6B7280;font-size:12px;")
+        self.diagnostic.setVisible(False)
         layout.addWidget(self.diagnostic)
+
+        scroll.setWidget(container)
+        root.addWidget(scroll, 1)
 
         self.connect_btn.clicked.connect(self._connect)
         self.stop_btn.clicked.connect(self._stop)
+
+        self._show_empty_lists()
+
+    def _show_empty_lists(self) -> None:
+        if self.comments.count() == 0:
+            self.comments.addItem(
+                "Aguardando comentários da LIVE..."
+            )
+        if self.queue.count() == 0:
+            self.queue.addItem(
+                "Aguardando decisões do Presenter..."
+            )
 
     def _connect(self) -> None:
         try:
@@ -275,7 +406,23 @@ class DashboardPage(QWidget):
         self.connect_btn.setEnabled(not monitoring)
         self.stop_btn.setEnabled(monitoring)
 
-        self.status.setText(str(data.get("status") or "parado"))
+        status_text = str(data.get("status") or "parado")
+        self.status.setText(status_text.title())
+        self.live_state_badge.setText(
+            "LIVE conectada" if monitoring else "Aguardando LIVE"
+        )
+        self.live_state_badge.setObjectName(
+            "StatusGood" if monitoring else "StatusInfo"
+        )
+        self.live_state_badge.style().unpolish(self.live_state_badge)
+        self.live_state_badge.style().polish(self.live_state_badge)
+
+        self.connection_hint.setText(
+            "Conectado e monitorando comentários em tempo real."
+            if monitoring
+            else "Conecte uma LIVE para receber métricas e comentários."
+        )
+
         self.viewers.setText(
             str(data.get("viewers"))
             if data.get("viewers") is not None
@@ -312,7 +459,9 @@ class DashboardPage(QWidget):
             )
             or "auto"
         )
-        self.voice_style.setText(voice_style_label(current_style))
+        self.voice_style.setText(
+            f"Estilo: {voice_style_label(current_style)}"
+        )
 
         tts_cfg = dict(self.controller.config.get("tts") or {})
         provider_id = str(tts_cfg.get("provider") or "qwen3_hq_auto")
@@ -355,13 +504,17 @@ class DashboardPage(QWidget):
                 voice_style_label(configured_style)
             )
 
-        self.presenter_mode.setText(
+        mode = (
             "Produto"
             if data.get("presenter_mode") == "produto"
             else "Interativo"
         )
+        self.presenter_mode.setText(f"Modo: {mode}")
+        paused = int(data.get("comments_paused_seconds") or 0)
         self.comments_pause.setText(
-            f"{int(data.get('comments_paused_seconds') or 0)}s"
+            f"Comentários: pausados {paused}s"
+            if paused
+            else "Comentários: ativos"
         )
 
         current = dict(data.get("current_speech") or {})
@@ -373,8 +526,13 @@ class DashboardPage(QWidget):
         if fixed_style and current:
             current["voice_style"] = fixed_style
 
-        self.speech.setPlainText(current.get("speech") or "")
-        self.current_action.setText(self._action_text(current))
+        speech = current.get("speech") or ""
+        self.speech.setPlainText(speech)
+        self.current_action.setText(
+            self._action_text(current)
+            if current
+            else "Aguardando início da apresentação"
+        )
 
         queued = [dict(item) for item in (data.get("queue") or [])]
         if fixed_style:
@@ -382,59 +540,87 @@ class DashboardPage(QWidget):
                 item["voice_style"] = fixed_style
         product_locked = (
             data.get("presenter_mode") == "produto"
-            and int(data.get("comments_paused_seconds") or 0) > 0
+            and paused > 0
         )
         if product_locked:
             self.next_action.setText("Continuar falando do produto")
             self.after_action.setText(
-                self._action_text(queued[0]) if queued else "—"
+                self._action_text(queued[0])
+                if queued
+                else "Aguardar nova decisão"
             )
         else:
             self.next_action.setText(
-                self._action_text(queued[0]) if queued else "—"
+                self._action_text(queued[0])
+                if queued
+                else "Aguardar nova decisão"
             )
             self.after_action.setText(
-                self._action_text(queued[1]) if len(queued) > 1 else "—"
+                self._action_text(queued[1])
+                if len(queued) > 1
+                else "Manter fluxo da apresentação"
             )
 
         self.comments.clear()
-        for item in reversed(data.get("comments") or []):
-            user = item.get("user") or "—"
-            text = item.get("text") or ""
-            self.comments.addItem(f"{user}: {text}")
+        comments = list(data.get("comments") or [])
+        if comments:
+            for item in reversed(comments):
+                user = item.get("user") or "—"
+                text = item.get("text") or ""
+                self.comments.addItem(f"{user}  ·  {text}")
+        else:
+            self.comments.addItem(
+                "Aguardando comentários da LIVE..."
+            )
 
         self.queue.clear()
-        for item in data.get("queue") or []:
-            priority = item.get("priority", 0)
-            text = item.get("speech") or item.get("comment") or ""
-            self.queue.addItem(f"[{priority}] {text}")
+        queue = list(data.get("queue") or [])
+        if queue:
+            for item in queue:
+                priority = item.get("priority", 0)
+                text = item.get("comment") or item.get("speech") or ""
+                label = item.get("topic") or item.get("intent") or "decisão"
+                label = str(label).replace("_", " ").title()
+                self.queue.addItem(
+                    f"{label}  ·  prioridade {priority}\n{text}"
+                )
+        else:
+            self.queue.addItem(
+                "Aguardando decisões do Presenter..."
+            )
 
         error = (
             data.get("presenter_worker_error")
             or voice.get("last_error")
             or data.get("error")
-            or data.get("diagnostic")
             or ""
         )
         self.diagnostic.setText(str(error))
+        self.diagnostic.setVisible(bool(error))
 
     @staticmethod
     def _action_text(item: dict) -> str:
         if not item:
             return "—"
         kind = str(item.get("type") or "")
-        topic = str(item.get("topic") or item.get("intent") or "").replace("_", " ")
+        topic = str(
+            item.get("topic") or item.get("intent") or ""
+        ).replace("_", " ")
         style = str(item.get("voice_style") or "").replace("_", " ")
         if kind == "reactive":
             user = str(item.get("user") or "cliente")
             comment = str(item.get("comment") or "").strip()
             base = f"Responder {user}"
             if comment:
-                base += f": {comment}"
+                base += f"\n“{comment}”"
         else:
-            base = f"Produto: {topic}" if topic else "Continuar apresentação"
+            base = (
+                f"Apresentação do produto\n{topic}"
+                if topic
+                else "Continuar apresentação"
+            )
         if style:
-            base += f" · voz: {style}"
+            base += f"\nVoz: {voice_style_label(style)}"
         return base
 
 
