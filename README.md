@@ -94,3 +94,19 @@ O sistema resolve o link, tenta extrair dados estruturados, procura fontes públ
 monta um rascunho com origem/confiança e preserva qualquer campo travado manualmente pelo usuário.
 
 A pesquisa é conservadora: não contorna login, CAPTCHA ou bloqueios de sites.
+
+
+## V0.6.1 — Natural Presenter
+
+A branch `v0.6.1-natural-presenter` ajusta o Presenter para se comportar como apresentadora de LIVE, e não como chatbot:
+
+- pergunta sem resposta conhecida é ignorada silenciosamente;
+- respostas conhecidas são curtas, informais e sem mencionar ficha/cadastro/sistema;
+- no máximo 3 respostas consecutivas a comentários;
+- após a 3ª resposta, 30 segundos obrigatórios falando do produto;
+- comentários continuam sendo analisados e aguardam na fila durante esse intervalo;
+- campos com vários itens (descrição, benefícios etc.) são tratados ponto por ponto;
+- uma fala usa um ponto por vez, sem despejar o bloco inteiro;
+- o teste web mostra o modo produto e o tempo restante para voltar aos comentários.
+
+Essas regras ficam em `core/` e `core/runtime.py`, portanto são compartilhadas pelo protótipo web e pelo futuro aplicativo Windows. A interface Windows final ainda será construída sobre esse mesmo núcleo, sem duplicar a lógica do Presenter.
