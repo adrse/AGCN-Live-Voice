@@ -7,7 +7,7 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório: **75 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **79 passed, 2 warnings**;
 - build Windows via GitHub Actions: **SUCCESS**;
 - dependências Windows: OK;
 - smoke imports: OK;
