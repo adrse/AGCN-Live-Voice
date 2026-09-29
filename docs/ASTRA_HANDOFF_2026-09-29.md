@@ -26,7 +26,7 @@ TikTok LIVE
 -> BrainResult JSON
 -> validação factual
 -> VoiceService
--> TTS local OU premium
+-> TTS neural OpenAI OU ElevenLabs
 -> SoundDeviceAudioSink
 -> VB-CABLE/dispositivo
 -> TikTok LIVE Studio
@@ -67,11 +67,24 @@ Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
 
 ### Voz e áudio
 
+- `core/voice_profiles.py`
+  - dois perfis oficiais: `female_fast` e `male_fast`;
+  - ambos rápidos, proativos e orientados a LIVE commerce;
+  - OpenAI usa vozes-base distintas (`marin` / `cedar`) e instruções distintas.
+
 - `core/tts_providers.py`
-  - TTS local offline via pyttsx3/SAPI;
-  - TTS OpenAI opcional;
-  - fallback premium -> local;
-  - saída normalizada em `AudioChunk`.
+  - OpenAI Neural é o TTS oficial padrão;
+  - velocidade configurável por slider;
+  - não depende das vozes/SAPI do Windows;
+  - `pyttsx3` permanece apenas como código legado não incluído no build oficial.
+
+- `core/neural_tts.py`
+  - ElevenLabs Neural opcional;
+  - suporta `eleven_v3_conversational`;
+  - PCM 24 kHz direto;
+  - speed/stability/similarity/style configuráveis;
+  - IDs feminino/masculino configuráveis.
+
 
 - `core/audio_output.py`
   - lista dispositivos de saída;
@@ -153,7 +166,8 @@ Qwen e API recebem exatamente a mesma PresenterPolicy e os mesmos fatos do produ
 
 `desktop/config.example.json` contém Brain, TTS, áudio e Presenter.
 
-- OpenAI usa `OPENAI_API_KEY`.
+- OpenAI Brain/Voice usa `OPENAI_API_KEY`.
+- ElevenLabs Voice usa `ELEVENLABS_API_KEY`.
 - Provider compatível pode usar `AGCN_LLM_API_KEY`.
 - nenhuma chave deve entrar no Git, config distribuído ou exe.
 
@@ -221,7 +235,7 @@ Após o handoff inicial, também foram concluídos:
 - logging/crash report fica em AppData;
 - ProductStore também grava em AppData, adequado para executável Windows;
 - build Windows automático com smoke da UI e do executável;
-- suíte completa do repositório validada: **75 passed, 2 warnings**.
+- suíte completa do repositório validada após arquitetura neural: **80 passed, 2 warnings**.
 
 ### Build Windows comprovado
 
@@ -254,3 +268,17 @@ Build de produção verificado: `1654d8975bbf7559af8ad8655eff89666cf9e280`.
 
 O foco de amanhã é somente ambiente real/hardware/serviços:
 Ollama + qwen3:4b, API real opcional, áudio real, VB-CABLE, TikTok LIVE Studio, LIVE real e ajustes concretos encontrados nesses testes.
+
+
+### Regra final de voz
+
+As vozes oficiais NÃO podem depender de vozes instaladas no Windows.
+
+O usuário escolhe na própria UI:
+- Feminina — Vendas rápidas;
+- Masculina — Vendas rápidas;
+- velocidade por slider.
+
+OpenAI Neural é o caminho padrão por ter vozes integradas e estáveis sem voice ID externo. ElevenLabs fica disponível para comparação/upgrade, exigindo chave e voice IDs configurados.
+
+O Windows é somente destino do áudio (speakers/VB-CABLE), nunca a origem das vozes oficiais.
