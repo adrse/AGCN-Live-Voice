@@ -58,3 +58,28 @@ Resultado: status/métricas/comentários entram e comentários relevantes chegam
 Fechar e abrir.
 Resultado: produto, provider, voz e device permanecem; secrets não aparecem em logs/repo.
 
+
+
+## P — dois perfis de voz
+Configurações oferece:
+- Feminina — Vendas rápidas;
+- Masculina — Vendas rápidas.
+
+Resultado: os dois perfis funcionam sem alterar regras do Presenter Brain.
+
+## Q — ritmo comercial acelerado
+Testar o mesmo texto nos dois perfis.
+Resultado:
+- fala ágil;
+- pouca pausa;
+- comentário respondido rapidamente;
+- não soa como conversa casual lenta;
+- TTS premium aplica velocidade configurada;
+- TTS local usa rate acelerado.
+
+## R — disponibilidade de vozes locais
+Rodar Doctor em Windows.
+Resultado:
+- informa quantas vozes locais existem;
+- se houver menos de duas, sinaliza pendência;
+- opção premium continua permitindo testar os dois perfis independentemente das vozes SAPI instaladas.
