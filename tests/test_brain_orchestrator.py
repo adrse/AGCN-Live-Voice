@@ -253,3 +253,35 @@ def test_brain_accepts_exact_low_stock_scarcity():
         )
     )
     assert result.speech == "Agora restam 3 unidades."
+
+
+def test_brain_retries_when_response_mentions_internal_registration():
+    fact = "garantia: 1 ano"
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Maria, no cadastro consta garantia de 1 ano.",
+            "topic": "warranty",
+            "used_facts": [fact],
+            "needs_fact": False,
+            "next_sales_thread": "benefits",
+        }),
+        json.dumps({
+            "speech": "Maria, tem sim, garantia de 1 ano.",
+            "topic": "warranty",
+            "used_facts": [fact],
+            "needs_fact": False,
+            "next_sales_thread": "benefits",
+        }),
+    ])
+    brain = PresenterBrain(transport, max_retries=1)
+
+    result = brain.generate(
+        BrainContext(
+            mode="comment_reply",
+            allowed_facts=[fact],
+        )
+    )
+
+    assert result.speech == "Maria, tem sim, garantia de 1 ano."
+    assert len(transport.calls) == 2
+    assert "linguagem interna" in transport.calls[1][1]
