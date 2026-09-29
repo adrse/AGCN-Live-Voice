@@ -1,9 +1,10 @@
-"""Teste manual de voz/dispositivo no Windows.
+"""Teste manual da voz neural local e do dispositivo Windows.
 
 Exemplos:
   python scripts/test_voice.py --list-devices
-  python scripts/test_voice.py --device "CABLE Input" --text "Teste da voz AGCN"
-  python scripts/test_voice.py --provider openai --device "CABLE Input"
+  python scripts/test_voice.py --profile female_fast
+  python scripts/test_voice.py --profile male_fast --speed 1.35
+  python scripts/test_voice.py --device "CABLE Input" --profile female_fast
 """
 
 from __future__ import annotations
@@ -24,16 +25,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument(
-        "--provider",
-        choices=["local", "openai"],
+        "--profile",
+        choices=["female_fast", "male_fast"],
     )
+    parser.add_argument("--speed", type=float)
     parser.add_argument("--device", default="")
-    parser.add_argument("--voice", default="")
     parser.add_argument(
         "--text",
         default=(
             "Teste de voz do AGCN Live Voice. "
-            "Essa fala deve chegar ao dispositivo selecionado."
+            "Essa apresentação é rápida, clara e funciona sem API."
         ),
     )
     parser.add_argument("--list-devices", action="store_true")
@@ -42,8 +43,12 @@ def main() -> int:
     config = json.loads(
         Path(args.config).read_text(encoding="utf-8")
     )
-    if args.provider:
-        config.setdefault("tts", {})["provider"] = args.provider
+    tts_cfg = config.setdefault("tts", {})
+    tts_cfg["provider"] = "kokoro_local"
+    if args.profile:
+        tts_cfg["profile"] = args.profile
+    if args.speed is not None:
+        tts_cfg["speed"] = args.speed
 
     sink = SoundDeviceAudioSink(
         volume=float(
@@ -69,10 +74,7 @@ def main() -> int:
     if not ok:
         return 2
 
-    chunk = tts.synthesize(
-        args.text,
-        voice=args.voice or (config.get("tts") or {}).get("voice") or None,
-    )
+    chunk = tts.synthesize(args.text)
     print(
         f"Áudio: {chunk.sample_rate} Hz, "
         f"{chunk.channels} canal(is), {len(chunk.data)} bytes PCM"
