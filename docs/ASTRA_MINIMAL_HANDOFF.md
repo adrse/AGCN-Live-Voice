@@ -78,6 +78,25 @@ Persistência:
 
 Produto ativo continua sendo a fonte da verdade.
 
+## Perfis de voz obrigatórios
+
+Existem dois perfis:
+- `female_fast` — Feminina — Vendas rápidas;
+- `male_fast` — Masculina — Vendas rápidas.
+
+Os dois usam o mesmo Presenter Brain e a mesma PresenterPolicy. Só muda a vocalização.
+
+Regras:
+- ritmo rápido;
+- energia de live commerce;
+- pouca pausa;
+- comentário respondido imediatamente;
+- resposta curta e volta rápida à venda;
+- nenhuma voz deve soar como conversa casual lenta.
+
+No TTS OpenAI, os perfis usam vozes-base distintas, instruções de estilo distintas e velocidade padrão 1.28x.
+No TTS local, o AGCN procura uma voz compatível entre as vozes instaladas no Windows e usa rate acelerado. O Doctor avisa se houver menos de duas vozes locais instaladas.
+
 ## Testes reais que ainda importam
 
 No PC real, validar:
