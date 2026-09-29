@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - astra-handoff-2026-09-29
+    paths:
+      - "core/**"
+      - "desktop/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "requirements-desktop.txt"
+      - ".github/workflows/test-presenter-brain.yml"
   workflow_dispatch:
 
 concurrency:
