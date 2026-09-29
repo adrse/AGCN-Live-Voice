@@ -26,11 +26,13 @@ class VoiceService:
         sink: AudioSink,
         *,
         default_voice: str | None = None,
+        style_selection: str = "auto",
         max_queue: int = 30,
     ) -> None:
         self.tts = tts
         self.sink = sink
         self.default_voice = default_voice
+        self.style_selection = str(style_selection or "auto").strip().casefold()
         self.queue: queue.PriorityQueue[VoiceJob] = queue.PriorityQueue(
             maxsize=max_queue
         )
@@ -141,9 +143,14 @@ class VoiceService:
 
             self.current_job = job
             try:
+                metadata = dict(job.metadata)
+                if self.style_selection not in {"", "auto"}:
+                    metadata["voice_style"] = self.style_selection
+                    job.metadata["voice_style"] = self.style_selection
+
                 configure = getattr(self.tts, "configure_for_job", None)
                 if callable(configure):
-                    configure(job.metadata)
+                    configure(metadata)
                 chunk = self.tts.synthesize(
                     job.text,
                     voice=job.voice or self.default_voice,
