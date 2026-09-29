@@ -1,7 +1,7 @@
 # Critérios de aceitação — AGCN Live Voice MVP
 
 ## A — Qwen sem API
-Produto cadastrado + Ollama/Qwen + Kokoro local.
+Produto cadastrado + Ollama/Qwen + Qwen3-TTS HQ local.
 Resultado: Brain e voz funcionam sem qualquer API.
 
 ## B — fala contínua
@@ -48,7 +48,7 @@ Lista devices; escolha persiste; Testar Voz toca no device; presenter usa mesmo 
 
 ## M — falha API
 API do Brain falha/timeout.
-Resultado: UI não trava; Qwen local continua disponível e a voz Kokoro continua funcionando normalmente.
+Resultado: UI não trava; Qwen local continua disponível e a voz local continua funcionando normalmente.
 
 ## N — TikTok real
 Conecta username de LIVE ativa.
@@ -74,13 +74,22 @@ Resultado:
 - pouca pausa;
 - comentário respondido rapidamente;
 - não soa como conversa casual lenta;
-- slider de velocidade altera a velocidade do Kokoro local.
+- slider de velocidade altera a velocidade final do Qwen3-TTS, preservando pitch.
 
-## R — voz funciona sem API e sem vozes do Windows
-Rodar Doctor em Windows e desconectar qualquer API de voz.
+## R — voz HQ funciona sem API e sem vozes do Windows
+Rodar Doctor em Windows sem API de voz.
 Resultado:
-- Dora e Alex sintetizam PT-BR localmente;
-- o modelo ONNX e as vozes estão no pacote;
+- Vivian sintetiza Portuguese localmente;
+- Ryan sintetiza Portuguese localmente;
+- talker/codec Q8 estão no Voice Pack HQ;
 - não depende de SAPI/vozes instaladas;
 - não depende de OpenAI/ElevenLabs;
-- Windows participa somente como dispositivo de saída/VB-CABLE.
+- Windows participa somente como computação local + saída/VB-CABLE.
+
+## S — fallback explícito
+Remover temporariamente o Voice Pack HQ.
+Resultado:
+- programa não quebra;
+- Doctor informa HQ indisponível;
+- Kokoro Dora/Alex assume;
+- usuário consegue distinguir que está em fallback.
