@@ -207,6 +207,18 @@ def build_brain_context(
         or ""
     )
 
+    allowed_facts = build_allowed_facts(product)
+
+    # Prova social só pode usar compras realmente confirmadas pela memória.
+    try:
+        purchase_count = int(memory.get("recent_purchase_count") or 0)
+    except Exception:
+        purchase_count = 0
+    if purchase_count > 0:
+        allowed_facts.append(
+            f"compras confirmadas recentemente: {purchase_count}"
+        )
+
     return BrainContext(
         mode=mode,
         product=permanent,
@@ -218,5 +230,5 @@ def build_brain_context(
         recent_facts=list(recent_facts or [])[-12:],
         sales_thread=sales_thread,
         planner_topic=str(planner_topic or decision.get("topic") or ""),
-        allowed_facts=build_allowed_facts(product),
+        allowed_facts=allowed_facts,
     )
