@@ -8,8 +8,9 @@ Branch: astra-handoff-2026-09-29
 ## Estado já verificado antes do handoff
 
 - suíte completa do repositório após os perfis de voz: **85 passed, 2 warnings**;
-- smoke Windows real de TTS local: **Dora PT-BR OK + Alex PT-BR OK, sem API**;
-- build Windows com Kokoro/Dora/Alex embarcados: **SUCCESS**;
+- Qwen3-TTS 1.7B HQ: **Vivian + Ryan sintetizaram Português no Windows, sem API**;
+- build Windows HQ com Voice Pack Q8 embarcado: **SUCCESS**;
+- Kokoro Dora/Alex continua validado como fallback local;
 - dependências Windows: OK;
 - smoke imports: OK;
 - smoke da UI PySide6: OK;
@@ -115,9 +116,11 @@ No PC real, validar:
 2. `qwen3:4b` instalado.
 3. Qwen responde com produto cadastrado.
 4. API OpenAI real somente se for usada para melhorar a inteligência.
-5. Dora local realmente toca sem API.
-6. Alex local realmente toca sem API.
-7. `CABLE Input` aparece e recebe o áudio.
+5. Vivian toca pelo Qwen3-TTS HQ sem API.
+6. Ryan toca pelo Qwen3-TTS HQ sem API.
+7. Dashboard mostra Qwen3 HQ como motor realmente ativo.
+8. Kokoro assume somente se o Voice Pack HQ for removido/falhar.
+9. `CABLE Input` aparece e recebe o áudio.
 8. TikTok LIVE Studio recebe o VB-CABLE.
 9. TikTokMonitor conecta a uma LIVE real.
 10. comentário de compra/preço entra na prioridade.
@@ -205,22 +208,29 @@ A API OpenAI só interessa ao Presenter Brain.
 Provider oficial: `qwen3_hq_auto` (Qwen3-TTS HQ -> fallback Kokoro).
 
 
-## Build offline final validado
+## Builds validados
 
-Workflow Windows validado:
-- dependências Kokoro/ONNX: OK;
-- download de modelo/vozes: OK;
-- Dora PT-BR offline: OK;
-- Alex PT-BR offline: OK;
-- UI: OK;
+Build leve/fallback:
+- Kokoro Dora/Alex: OK;
+- artifact: `AGCN-Live-Voice-Windows`.
+
+Build HQ definitivo:
+- qwentts.cpp compilado no Windows: OK;
+- Qwen3-TTS 1.7B CustomVoice Q8: OK;
+- Vivian em Português sem API: OK;
+- Ryan em Português sem API: OK;
+- instruções de estilo brasileiro/live commerce: implementadas;
+- Voice Pack HQ copiado para `_internal/voice_hq`: OK;
 - PyInstaller: OK;
-- modelo e voices dentro do pacote: OK;
-- executável abriu sem crash imediato: OK;
-- ZIP gerado: OK.
+- executável abriu sem crash: OK;
+- pacote HQ publicado: OK.
 
-Artifact: `AGCN-Live-Voice-Windows`
-Workflow run: `36506324783`
-Build SHA: `cd7c7747f0457b60d9dbfb2595bdc58a5a9af38c`
+Artifact: `AGCN-Live-Voice-Windows-HQ`
+Artifact ID: `11008264976`
+Tamanho: `2.679.645.484 bytes`
+Digest: `sha256:d622525b85b5155979d77a6696c18003256a86a799d5b1d2b561c989c11bf816`
+Workflow run: `36510038423`
+Build SHA: `98509848070e001988eaaa3add6c93b3c5cdc1ab`
 
 
 ## Voice Pack HQ
@@ -230,12 +240,5 @@ Arquivos principais:
 - `voice_hq/models/qwen-talker-1.7b-customvoice-Q8_0.gguf`;
 - `voice_hq/models/qwen-tokenizer-12hz-Q8_0.gguf`.
 
-O workflow `Build Windows HQ Voice` deve:
-1. compilar qwentts.cpp;
-2. baixar os pesos Q8;
-3. sintetizar Vivian em Português;
-4. sintetizar Ryan em Português;
-5. adicionar o pack à distribuição;
-6. publicar `AGCN-Live-Voice-Windows-HQ`.
-
-Se esse workflow estiver verde, não reimplementar voz.
+O workflow `Build Windows HQ Voice` já passou integralmente no run `36510038423`.
+Não reimplementar a voz. Amanhã apenas ouvir/avaliar no PC real e medir latência no hardware alvo.
