@@ -2,6 +2,7 @@ import io
 import wave
 
 from core.integration_contracts import AudioChunk
+from core.speech_text import normalize_ptbr_for_tts
 from core.tts_providers import FallbackTTSProvider, wav_bytes_to_chunk
 from core.voice_service import VoiceService
 
@@ -44,6 +45,9 @@ class FakeTTS:
 
 
 class FakeSink:
+    def __init__(self):
+        self.stop_calls = 0
+
     def list_devices(self):
         return ["fake"]
 
@@ -54,7 +58,7 @@ class FakeSink:
         pass
 
     def stop(self):
-        pass
+        self.stop_calls += 1
 
 
 def test_wav_bytes_to_audio_chunk():
@@ -130,3 +134,27 @@ def test_voice_service_manual_style_overrides_automatic_metadata():
 
     assert job.metadata["voice_style"] == "suspense_reveal"
     assert tts.configured[-1]["voice_style"] == "suspense_reveal"
+
+
+
+def test_brl_is_spoken_as_reais_not_currency_symbol():
+    assert normalize_ptbr_for_tts("Agora é R$ 49,90.") == (
+        "Agora é 49 reais e 90 centavos."
+    )
+    assert normalize_ptbr_for_tts("De R$ 199 por R$ 149,50.") == (
+        "De 199 reais por 149 reais e 50 centavos."
+    )
+
+
+def test_voice_service_can_interrupt_current_proactive_audio():
+    sink = FakeSink()
+    service = VoiceService(FakeTTS(), sink)
+    service.current_job = service.enqueue(
+        "fala proativa",
+        priority=30,
+        metadata={"type": "proactive"},
+    )
+    service.queue.get_nowait()
+
+    assert service.interrupt_proactive() is True
+    assert sink.stop_calls == 1

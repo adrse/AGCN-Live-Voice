@@ -41,6 +41,7 @@ class ProductKnowledge:
         "additional_info": "informações adicionais",
         "shipping_info": "frete e entrega",
         "coupon": "cupom",
+        "discount": "desconto",
         "live_offer_text": "oferta da LIVE",
     }
 
@@ -50,6 +51,7 @@ class ProductKnowledge:
         "category": ["category"],
         "availability": ["stock"],
         "shipping": ["shipping_info"],
+        "coupon": ["coupon", "discount", "live_offer_text"],
         "warranty": ["warranty"],
         "compatibility": ["compatibility", "additional_info"],
         "included_items": ["included_items", "additional_info"],

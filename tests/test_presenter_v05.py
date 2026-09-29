@@ -82,3 +82,29 @@ def test_memory_records_topic():
     })
     assert memory.current_topic == "price"
     assert memory.seconds_since_speech() < 1
+
+
+
+def test_live_greeting_is_recognized_as_engagement():
+    item = CommentIntelligence().analyze("Maria", "boa noite")
+    assert item is not None
+    assert item["intent"] == "engagement"
+
+
+def test_coupon_question_uses_registered_coupon():
+    presenter = PresenterV2({
+        "name": "Produto X",
+        "coupon": "CUPOM10",
+    })
+    result = presenter.test_comment("Ana", "tem cupom?")
+    speech = (result.get("speech") or {}).get("speech", "")
+    assert "CUPOM10" in speech
+
+
+def test_presenter_default_watchdog_keeps_live_cadence_tight():
+    presenter = PresenterV2({
+        "name": "Produto X",
+        "description": "Produto de teste",
+    })
+    assert presenter.watchdog.target_seconds == 2.5
+    assert presenter.watchdog.hard_seconds == 4.0

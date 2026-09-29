@@ -344,3 +344,41 @@ def test_legacy_presenter_known_answer_is_natural_without_internal_language():
     assert "cadastrad" not in speech
     assert "ficha" not in speech
     assert "sistema" not in speech
+
+
+
+def test_direct_commercial_question_can_interrupt_proactive_speech(tmp_path):
+    store = ProductStore(tmp_path / "products.json")
+    store.add(
+        name="Produto Teste",
+        description="Produto cadastrado.",
+        current_price="49,90",
+    )
+    runtime = AGCNVoiceRuntime(store)
+    runtime.monitor = type(
+        "ActiveMonitor",
+        (),
+        {
+            "snapshot": lambda self: {
+                "monitoring": True,
+                "status": "ativo",
+            },
+            "stop": lambda self: {"ok": True},
+        },
+    )()
+
+    runtime.current_speech = {
+        "type": "proactive",
+        "priority": 30,
+        "speech": "fala proativa",
+    }
+    runtime.current_speech_until = time.time() + 20
+    runtime.presenter.fusion.window_seconds = 0
+    runtime.presenter.ingest_comment("Maria", "quanto custa?")
+
+    with runtime.lock:
+        runtime._tick_presenter_locked()
+
+    assert runtime.current_speech["type"] == "reactive"
+    assert runtime.current_speech["intent"] == "price"
+    runtime.close()
