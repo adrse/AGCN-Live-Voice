@@ -6,6 +6,7 @@ from typing import Any
 
 from core.audio_output import SoundDeviceAudioSink
 from core.brain_factory import build_brain_provider
+from core.diagnostics import diagnostics_text, run_diagnostics
 from core.product_store import ProductStore
 from core.runtime import AGCNVoiceRuntime
 from core.secret_store import has_secret, set_secret
@@ -108,6 +109,13 @@ class DesktopController:
     def brain_health(self) -> tuple[bool, str]:
         provider = build_brain_provider(self.config)
         return provider.healthcheck()
+
+    def diagnostics(self) -> tuple[bool, str]:
+        result = run_diagnostics(
+            self.config,
+            product_store=self.product_store,
+        )
+        return bool(result.get("ready_for_live")), diagnostics_text(result)
 
     def list_audio_devices(self) -> list[str]:
         return list(SoundDeviceAudioSink().list_devices())
