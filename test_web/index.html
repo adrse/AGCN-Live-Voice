@@ -179,7 +179,7 @@ pre{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-
     </nav>
 
     <div class="side-bottom">
-      <span>v0.4.1</span><span class="dot"></span><span>Ambiente de teste</span>
+      <span>v0.5.0</span><span class="dot"></span><span>Presenter Behavior</span>
     </div>
   </aside>
 
@@ -487,8 +487,19 @@ function renderDecision(data){
 
 function renderSpeech(data){
   const s=data.current_speech;
+  const paused=Number(data.comments_paused_seconds||0);
+
   $("#speech").textContent=s?s.speech:"Aguardando próxima decisão...";
-  $("#speechState").textContent=s?"● Gerando fala":"● Em espera";
+
+  if(paused>0){
+    $("#speechState").textContent="● Modo produto • comentários em "+paused+"s";
+  }else if(s?.type==="reactive"){
+    $("#speechState").textContent="● Respondendo comentário";
+  }else if(s?.type==="proactive"){
+    $("#speechState").textContent="● Apresentando produto";
+  }else{
+    $("#speechState").textContent="● Em espera";
+  }
 
   const q=Array.isArray(data.queue)?data.queue:[];
   $("#nextSpeeches").innerHTML=q.length ? q.slice(0,3).map((i,index)=>
