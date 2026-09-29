@@ -145,6 +145,30 @@ class PresenterV2:
             )
         return item
 
+    def force_proactive(self) -> dict | None:
+        """Gera uma fala de produto mesmo quando há comentários na fila.
+
+        Usado pelo runtime durante a janela obrigatória de foco no produto.
+        Comentários continuam aguardando, mas não dominam a LIVE.
+        """
+        topic = self.planner.choose_proactive_topic(
+            self.guard,
+            self.memory,
+        )
+        decision = self.decision_engine.proactive(
+            topic,
+            priority=36,
+        )
+        plan = self.planner.plan(
+            decision,
+            self.guard,
+            self.memory,
+        )
+        item = self._render_plan(plan)
+        if item:
+            self.memory.remember_speech(item)
+        return item
+
     def next_speech(self) -> dict | None:
         self.process_pending_comments()
         if not self.queue:
@@ -189,7 +213,8 @@ class PresenterV2:
             self.memory.remember_speech(item)
 
         return {
-            "ok": bool(item),
+            "ok": True,
+            "ignored": not bool(item),
             "analyzed": analyzed,
             "decision": decision,
             "plan": plan,
@@ -258,21 +283,13 @@ class PresenterV2:
                     else f"É {brand}."
                 )
             else:
-                speech = (
-                    f"{user}, essa marca eu não tenho confirmada aqui."
-                    if user
-                    else "Essa marca eu não tenho confirmada aqui."
-                )
+                speech = None
         elif intent == "price":
             anchor = self.persuasion.price_anchor()
             if anchor:
                 speech = f"{user}, {anchor}" if user else anchor
             else:
-                speech = (
-                    f"{user}, o preço não está cadastrado aqui pra eu te confirmar agora."
-                    if user
-                    else "O preço não está cadastrado aqui pra eu confirmar agora."
-                )
+                speech = None
         elif intent == "buying_intent":
             speech = self.persuasion.buying_intent_response(
                 user,
@@ -363,42 +380,9 @@ class PresenterV2:
         plan: dict,
         name: str,
     ) -> str:
-        if plan.get("type") != "reactive":
-            return speech
-
-        if not plan.get("interrupt"):
-            return speech
-
-        resume = plan.get("resume_topic")
-        current = plan.get("topic")
-
-        if not resume or resume == current:
-            return speech
-
-        if self.memory.recently_used_tactic(
-            "resume_" + str(resume),
-            within=18,
-        ):
-            return speech
-
-        phrases = {
-            "benefits": "Mas ó, voltando aqui: olha o que ele entrega.",
-            "pain_solution": "Mas ó, voltando: é justamente aí que ele ajuda.",
-            "differentials": "Mas voltando aqui, olha esse diferencial.",
-            "price_value": "Mas ó, voltando no preço, presta atenção nisso.",
-            "bundle_value": "Mas voltando no kit, olha tudo que vem.",
-            "usage": "Mas ó, no dia a dia funciona assim.",
-            "scarcity": "Mas voltando aqui, olha o estoque e a oferta agora.",
-            "trust": "Mas ó, voltando no produto.",
-            "product_recap": f"Mas voltando no {name}, deixa eu te mostrar o principal.",
-        }
-
-        line = phrases.get(str(resume))
-        if not line:
-            return speech
-
-        self.memory.remember_tactic("resume_" + str(resume))
-        return f"{speech} {line}"
+        # O retorno ao produto acontece como uma fala própria do Presenter.
+        # Assim a resposta ao espectador fica curta e natural.
+        return speech
 
     def _fact_answer(
         self,
@@ -412,69 +396,50 @@ class PresenterV2:
         comment=None,
     ):
         items = [
-            as_text(x)
+            self._casual_fact(x)
             for x in (fact_items or [])
             if as_text(x)
         ]
-        value = as_text(fact)
-        label = as_text(fact_label)
-
-        if intent == "benefits" and items:
-            chosen = random.sample(
-                items,
-                k=min(2, len(items)),
-            )
-            if len(chosen) == 1:
-                value = chosen[0]
-            else:
-                value = f"{chosen[0]}. E também {chosen[1]}"
-        address = f"{user}, " if user else ""
+        value = self._casual_fact(fact)
         question = str(comment or "").casefold().strip()
+        address = f"{user}, " if user else ""
 
-        if value:
-            negative = any(
-                marker in value.casefold()
-                for marker in ("não ", "nao ", "sem ")
-            )
+        # Um fato por resposta. Se o campo tem vários tópicos, nunca despeja
+        # a lista inteira no espectador.
+        if items:
+            value = items[0]
 
-            if question.startswith(("tem ", "vem ", "possui ")):
-                if negative:
-                    return f"{address}não. {value}."
-                return f"{address}tem sim. {value}."
+        # Pergunta cuja resposta não está na ficha: silêncio. Ela não entra na
+        # fila de fala e a apresentadora continua vendendo o produto.
+        if not value:
+            return None
 
-            if question.startswith(("serve ", "funciona ")):
-                if negative:
-                    return f"{address}não. {value}."
-                return f"{address}serve sim. {value}."
+        negative = any(
+            marker in value.casefold()
+            for marker in ("não ", "nao ", "sem ")
+        )
 
-            if "qual" in question or "quanto" in question or "quantos" in question:
-                if label:
-                    return random.choice([
-                        f"{address}{value}.",
-                        f"{address}é {value}.",
-                        f"{address}{label}: {value}.",
-                    ])
-                return f"{address}{value}."
+        if question.startswith(("tem ", "vem ", "possui ")):
+            if negative:
+                return f"{address}não. {value}."
+            if value.casefold().startswith("tem "):
+                tail = value[4:].strip()
+                return f"{address}tem sim, {tail}."
+            if intent == "warranty" and "garantia" in value.casefold():
+                return f"{address}tem sim, {value}."
+            return f"{address}tem sim. {value}."
 
-            if label:
-                return random.choice([
-                    f"{address}{value}.",
-                    f"{address}{label}: {value}.",
-                ])
+        if question.startswith(("serve ", "funciona ")):
+            if negative:
+                return f"{address}não. {value}."
+            if value.casefold().startswith("funciona "):
+                return f"{address}sim, {value}."
+            return f"{address}serve sim. {value}."
 
+        if "qual" in question or "quanto" in question or "quantos" in question or "quantas" in question:
             return f"{address}{value}."
 
-        if intent in {"direct_question", "technical_question"}:
-            return random.choice([
-                f"{address}isso aí eu não tenho confirmado aqui, então não vou te falar no chute.",
-                f"{address}esse detalhe eu não tenho aqui certinho. Melhor não inventar.",
-                f"{address}isso eu não tenho confirmado na ficha, então prefiro não arriscar.",
-            ])
-
-        return random.choice([
-            f"{address}essa informação eu não tenho aqui confirmada.",
-            f"{address}isso aí eu não tenho na ficha ainda.",
-        ])
+        return f"{address}{value}."
 
     def _objection_text(self, user, name):
         return self.persuasion.objection_response(
@@ -484,6 +449,11 @@ class PresenterV2:
         )
 
     def _append_value_if_useful(self, speech, plan, name):
+        # Resposta de comentário é curta. A venda continua em falas próprias,
+        # em vez de anexar um mini-pitch a cada pergunta.
+        if plan.get("type") == "reactive":
+            return speech
+
         if "expand_with_value" not in plan.get("steps", []):
             return speech
 
@@ -543,12 +513,17 @@ class PresenterV2:
             return strategic
 
         if topic == "benefits":
-            value = as_text(self.guard.get("benefits"))
-            if value:
+            entries = self.guard.knowledge.entries(
+                self.guard.get("benefits")
+            )
+            if entries:
+                value = self._casual_fact(
+                    entries[self.memory.proactive_cursor() % len(entries)]
+                )
                 return random.choice([
-                    f"Pra quem chegou agora, olha só: {value}.",
-                    f"Ó, pra quem caiu aqui agora: {value}.",
-                    f"Quem chegou agora, presta atenção nisso: {value}.",
+                    f"Olha só: {value}.",
+                    f"Ó, presta atenção nisso: {value}.",
+                    f"Uma coisa boa dele: {value}.",
                 ])
 
         if topic in {"problems_solved", "pain_solution"}:
@@ -607,12 +582,18 @@ class PresenterV2:
             if offer:
                 return f"Pra quem estiver avaliando o {name}, {offer}"
 
-        desc = as_text(self.product.get("description"))
-        if desc:
+        desc_items = self.guard.knowledge.entries(
+            self.product.get("description")
+        )
+        if desc_items:
+            cursor = self.memory.proactive_cursor()
+            desc = self._casual_fact(
+                desc_items[cursor % len(desc_items)]
+            )
             options = [
-                f"Pra quem chegou agora, ó: {desc}",
-                f"Se você acabou de entrar, presta atenção nisso aqui: {desc}",
-                f"Rapidinho pra quem caiu na LIVE agora: {desc}",
+                f"Ó, uma coisa legal dele: {desc}.",
+                f"Olha isso aqui: {desc}.",
+                f"E tem mais: {desc}.",
             ]
             return random.choice(options)
 
