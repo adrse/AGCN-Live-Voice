@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -79,6 +81,8 @@ class DashboardPage(QWidget):
         self.product = QLabel("Nenhum")
         self.brain = QLabel("—")
         self.voice = QLabel("—")
+        self.presenter_mode = QLabel("Interativo")
+        self.comments_pause = QLabel("0s")
         labels = [
             ("LIVE", self.status),
             ("Viewers", self.viewers),
@@ -86,6 +90,8 @@ class DashboardPage(QWidget):
             ("Produto ativo", self.product),
             ("Brain", self.brain),
             ("Voz", self.voice),
+            ("Modo Presenter", self.presenter_mode),
+            ("Comentários pausados", self.comments_pause),
         ]
         for index, (name, widget) in enumerate(labels):
             card = QLabel(name)
@@ -176,6 +182,15 @@ class DashboardPage(QWidget):
             )
         )
 
+        self.presenter_mode.setText(
+            "Produto"
+            if data.get("presenter_mode") == "produto"
+            else "Interativo"
+        )
+        self.comments_pause.setText(
+            f"{int(data.get('comments_paused_seconds') or 0)}s"
+        )
+
         current = data.get("current_speech") or {}
         self.speech.setPlainText(current.get("speech") or "")
 
@@ -201,6 +216,94 @@ class DashboardPage(QWidget):
         self.diagnostic.setText(str(error))
 
 
+class DescriptionPointsEditor(QWidget):
+    """Editor visual: cada ponto de descrição é cadastrado separadamente."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.rows: list[tuple[QWidget, QLineEdit]] = []
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(6)
+
+        self.rows_layout = QVBoxLayout()
+        self.rows_layout.setSpacing(6)
+        root.addLayout(self.rows_layout)
+
+        self.add_btn = QPushButton("+ Adicionar descrição")
+        self.add_btn.clicked.connect(lambda: self.add_point(""))
+        root.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self.add_point("")
+
+    def add_point(self, value: str = "") -> None:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        edit = QLineEdit()
+        edit.setPlaceholderText(
+            "Ex.: bateria de até 6 dias"
+        )
+        edit.setText(str(value or "").strip())
+
+        remove = QPushButton("×")
+        remove.setFixedWidth(34)
+        remove.setToolTip("Remover este ponto")
+        remove.clicked.connect(
+            lambda _=False, target=row: self._remove_row(target)
+        )
+
+        layout.addWidget(edit, 1)
+        layout.addWidget(remove)
+        self.rows_layout.addWidget(row)
+        self.rows.append((row, edit))
+
+    def _remove_row(self, target: QWidget) -> None:
+        if len(self.rows) == 1:
+            self.rows[0][1].clear()
+            return
+
+        remaining = []
+        for row, edit in self.rows:
+            if row is target:
+                row.setParent(None)
+                row.deleteLater()
+                continue
+            remaining.append((row, edit))
+        self.rows = remaining
+
+    def values(self) -> list[str]:
+        return [
+            edit.text().strip()
+            for _, edit in self.rows
+            if edit.text().strip()
+        ]
+
+    def text(self) -> str:
+        return "\n".join(self.values())
+
+    def set_text(self, value) -> None:
+        for row, _ in self.rows:
+            row.setParent(None)
+            row.deleteLater()
+        self.rows = []
+
+        if isinstance(value, (list, tuple, set)):
+            values = [str(x).strip() for x in value if str(x).strip()]
+        else:
+            values = [
+                x.strip()
+                for x in re.split(r"[\n;|]+", str(value or ""))
+                if x.strip()
+            ]
+
+        for item in values or [""]:
+            self.add_point(item)
+
+
 class ProductPage(QWidget):
     PERMANENT = [
         ("product_url", "Link do produto"),
@@ -208,7 +311,7 @@ class ProductPage(QWidget):
         ("brand", "Marca"),
         ("model", "Modelo"),
         ("category", "Categoria"),
-        ("description", "Descrição"),
+        ("description", "Descrição por tópicos"),
         ("key_benefits", "Benefícios"),
         ("problems_solved", "Problemas que resolve"),
         ("differentials", "Diferenciais"),
@@ -237,7 +340,7 @@ class ProductPage(QWidget):
         super().__init__()
         self.controller = controller
         self.current_id: str | None = None
-        self.fields: dict[str, QLineEdit | QTextEdit] = {}
+        self.fields: dict[str, QWidget] = {}
 
         root = QVBoxLayout(self)
         title, desc = heading(
@@ -266,8 +369,9 @@ class ProductPage(QWidget):
         permanent_box = group("Ficha do produto")
         permanent_form = QFormLayout(permanent_box)
         for field, label in self.PERMANENT:
-            if field in {
-                "description",
+            if field == "description":
+                widget = DescriptionPointsEditor()
+            elif field in {
                 "key_benefits",
                 "problems_solved",
                 "differentials",
@@ -312,12 +416,17 @@ class ProductPage(QWidget):
 
     @staticmethod
     def _get_text(widget) -> str:
+        if isinstance(widget, DescriptionPointsEditor):
+            return widget.text()
         if isinstance(widget, QTextEdit):
             return widget.toPlainText().strip()
         return widget.text().strip()
 
     @staticmethod
     def _set_text(widget, value) -> None:
+        if isinstance(widget, DescriptionPointsEditor):
+            widget.set_text(value)
+            return
         text = "" if value is None else str(value)
         if isinstance(widget, QTextEdit):
             widget.setPlainText(text)
