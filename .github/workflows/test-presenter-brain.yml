@@ -1,12 +1,10 @@
 name: AGCN Full Test Suite
-# branch validation: cadence/comments/currency v2
 
 on:
   push:
     branches:
       - main
       - astra-handoff-2026-09-29
-      - fix/live-cadence-comments-currency
     paths:
       - "core/**"
       - "desktop/**"
