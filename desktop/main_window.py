@@ -1017,12 +1017,12 @@ class VoiceAudioPage(QWidget):
         stack.setSpacing(14)
 
         engine_box = group("Motor de voz e interpretação")
-        engine_form = QFormLayout(engine_box)
-        engine_form.setFieldGrowthPolicy(
+        self.engine_form = QFormLayout(engine_box)
+        self.engine_form.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
-        engine_form.setHorizontalSpacing(18)
-        engine_form.setVerticalSpacing(10)
+        self.engine_form.setHorizontalSpacing(18)
+        self.engine_form.setVerticalSpacing(10)
 
         self.voice_engine = QComboBox()
         self.voice_engine.addItem(
@@ -1143,19 +1143,19 @@ class VoiceAudioPage(QWidget):
         self.voice_hint.setWordWrap(True)
         self.voice_hint.setStyleSheet("color:#6B7280;font-size:12px;")
 
-        engine_form.addRow("Motor", self.voice_engine)
-        engine_form.addRow("Modelo Gemini", self.gemini_model)
-        engine_form.addRow("Chave Gemini", self.gemini_key)
-        engine_form.addRow("", self.gemini_status)
-        engine_form.addRow("Modelo OpenAI Live", self.openai_live_model)
-        engine_form.addRow("Modo OpenAI Live", self.openai_live_mode)
-        engine_form.addRow("Chave OpenAI", self.openai_key)
-        engine_form.addRow("", self.openai_live_status)
-        engine_form.addRow("Perfil de voz", self.voice_profile)
-        engine_form.addRow("Velocidade", speed_row)
-        engine_form.addRow("Expressividade", expression_row)
-        engine_form.addRow("Estilo", self.voice_style_combo)
-        engine_form.addRow("", self.voice_hint)
+        self.engine_form.addRow("Motor", self.voice_engine)
+        self.engine_form.addRow("Modelo Gemini", self.gemini_model)
+        self.engine_form.addRow("Chave Gemini", self.gemini_key)
+        self.engine_form.addRow("", self.gemini_status)
+        self.engine_form.addRow("Modelo OpenAI Live", self.openai_live_model)
+        self.engine_form.addRow("Modo OpenAI Live", self.openai_live_mode)
+        self.engine_form.addRow("Chave OpenAI", self.openai_key)
+        self.engine_form.addRow("", self.openai_live_status)
+        self.engine_form.addRow("Perfil de voz", self.voice_profile)
+        self.engine_form.addRow("Velocidade", speed_row)
+        self.engine_form.addRow("Expressividade", expression_row)
+        self.engine_form.addRow("Estilo", self.voice_style_combo)
+        self.engine_form.addRow("", self.voice_hint)
 
         self.fallback_hint = QLabel(
             "Fallback automático: Gemini/OpenAI Live → Qwen Local HQ → "
@@ -1163,7 +1163,7 @@ class VoiceAudioPage(QWidget):
         )
         self.fallback_hint.setWordWrap(True)
         self.fallback_hint.setObjectName("InfoBanner")
-        engine_form.addRow("Continuidade", self.fallback_hint)
+        self.engine_form.addRow("Continuidade", self.fallback_hint)
         stack.addWidget(engine_box)
 
         test_box = group("Teste e saída de áudio")
@@ -1378,19 +1378,31 @@ class VoiceAudioPage(QWidget):
                 str(exc),
             )
 
+    def _set_provider_row_visible(self, widget, visible: bool) -> None:
+        widget.setVisible(visible)
+        label = self.engine_form.labelForField(widget)
+        if label is not None:
+            label.setVisible(visible)
+
     def _update_voice_provider_controls(self) -> None:
         provider = self.voice_engine.currentData()
         is_gemini = provider == "gemini_premium"
         is_openai_live = provider == "openai_live"
 
-        self.gemini_model.setEnabled(is_gemini)
-        self.gemini_key.setEnabled(is_gemini)
-        self.gemini_status.setEnabled(is_gemini)
+        for widget in (
+            self.gemini_model,
+            self.gemini_key,
+            self.gemini_status,
+        ):
+            self._set_provider_row_visible(widget, is_gemini)
 
-        self.openai_live_model.setEnabled(is_openai_live)
-        self.openai_live_mode.setEnabled(is_openai_live)
-        self.openai_key.setEnabled(is_openai_live)
-        self.openai_live_status.setEnabled(is_openai_live)
+        for widget in (
+            self.openai_live_model,
+            self.openai_live_mode,
+            self.openai_key,
+            self.openai_live_status,
+        ):
+            self._set_provider_row_visible(widget, is_openai_live)
 
     def _devices(self) -> None:
         try:
