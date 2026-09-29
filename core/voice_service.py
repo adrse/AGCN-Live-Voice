@@ -136,6 +136,9 @@ class VoiceService:
 
             self.current_job = job
             try:
+                configure = getattr(self.tts, "configure_for_job", None)
+                if callable(configure):
+                    configure(job.metadata)
                 chunk = self.tts.synthesize(
                     job.text,
                     voice=job.voice or self.default_voice,
