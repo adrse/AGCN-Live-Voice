@@ -26,7 +26,7 @@ TikTok LIVE
 -> BrainResult JSON
 -> validação factual
 -> VoiceService
--> Kokoro-82M PT-BR local (Dora/Alex)
+-> Qwen3-TTS 1.7B HQ local (Vivian/Ryan) -> fallback Kokoro
 -> SoundDeviceAudioSink
 -> VB-CABLE/dispositivo
 -> TikTok LIVE Studio
@@ -67,8 +67,17 @@ Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
 
 ### Voz e áudio
 
+- `core/local_qwen3_tts.py`
+  - TTS principal de qualidade máxima;
+  - Qwen3-TTS 1.7B CustomVoice Q8 via qwentts.cpp/GGML;
+  - Vivian feminina / Ryan masculina;
+  - servidor local residente em localhost;
+  - Português;
+  - slider aplicado por FFmpeg/atempo;
+  - zero API externa durante síntese.
+
 - `core/local_kokoro_tts.py`
-  - TTS oficial do produto;
+  - fallback local leve;
   - Kokoro-82M ONNX local;
   - PT-BR;
   - `pf_dora` feminina;
@@ -77,8 +86,10 @@ Produto manual -> ProductStore -> BrainContext -> ALLOWED_FACTS.
   - zero chamadas de rede durante síntese.
 
 - `core/tts_providers.py`
-  - `kokoro_local` é o provider padrão;
-  - APIs de voz não são requisito do produto.
+  - `qwen3_hq_auto` é o provider padrão;
+  - tenta Qwen3-TTS HQ primeiro;
+  - cai para Kokoro somente se HQ estiver ausente/falhar;
+  - APIs de voz não são requisito.
 
 - `scripts/smoke_kokoro.py`
   - sintetiza Dora e Alex em PT-BR no Windows CI;
@@ -188,9 +199,10 @@ Não reescrever a arquitetura. Primeiro auditar e executar.
 1. Rodar toda a suíte e corrigir regressões.
 2. Testar Ollama/Qwen real em Windows.
 3. Testar API real e fallback para local.
-4. Testar Dora e Alex locais no Windows sem API.
-5. Ajustar velocidade ideal pelo slider.
-6. Testar listagem/seleção de device e VB-CABLE.
+4. Testar Vivian e Ryan no Qwen3-TTS HQ sem API.
+5. Confirmar na Dashboard que o motor ativo é Qwen HQ, não fallback.
+6. Ajustar velocidade ideal pelo slider.
+7. Testar listagem/seleção de device e VB-CABLE.
 7. Ligar PresenterV3 + VoiceService definitivamente às telas.
 8. Completar Dashboard, Produto e Configurações.
 9. Garantir persistência das configurações e secrets fora do arquivo público.
@@ -296,3 +308,17 @@ Mesmo sem nenhuma chave:
 - áudio continua indo para VB-CABLE.
 
 Não substituir Kokoro local por OpenAI TTS, ElevenLabs ou vozes do Windows como requisito.
+
+
+### Voice Pack HQ
+
+Distribuição HQ usa:
+- `qwen-talker-1.7b-customvoice-Q8_0.gguf`;
+- `qwen-tokenizer-12hz-Q8_0.gguf`;
+- `tts-server.exe` compilado de qwentts.cpp;
+- FFmpeg local para velocidade.
+
+Workflow: `Build Windows HQ Voice`.
+Script dev: `scripts/setup_qwen3_hq_voice.ps1`.
+
+Kokoro continua obrigatório como fallback, mas NÃO é a voz de qualidade máxima.
