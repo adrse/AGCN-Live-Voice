@@ -1,8 +1,9 @@
 # Dependências do programa Windows.
-# As vozes oficiais são neurais e não dependem das vozes/SAPI do Windows.
+# As duas vozes oficiais do AGCN são neurais, locais e independentes de API.
 TikTokLive==7.0.1
 PySide6>=6.7,<7
 sounddevice>=0.5,<1
-numpy>=1.24,<3
+numpy>=2.0.2,<3
 requests>=2.31,<3
 keyring>=25,<26
+kokoro-onnx==0.6.1
