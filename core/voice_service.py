@@ -122,6 +122,7 @@ class VoiceService:
                 else None
             ),
             "tts": self.tts.name,
+            "style_selection": self.style_selection,
             "current_style": (
                 self.current_job.metadata.get("voice_style")
                 if self.current_job
