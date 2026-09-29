@@ -15,9 +15,17 @@ def test_product_store_flow():
             current_price="149,90",
             discount="25",
             description="Teste A",
+            description_points=[
+                "Bateria dura 6 dias",
+                "Garantia de 1 ano",
+            ],
         )
         assert store.active()["id"] == p1["id"]
         assert store.active()["current_price"] == 149.90
+        assert store.active()["description_points"] == [
+            "Bateria dura 6 dias",
+            "Garantia de 1 ano",
+        ]
 
         p2 = store.add(
             name="Produto B",
@@ -39,6 +47,7 @@ def test_product_store_flow():
         context = store.presenter_context()
         assert context["ready"] is True
         assert context["product"]["name"] == "Produto B"
+        assert "description_points" in context["product"]
 
         assert store.delete(p2["id"]) is True
         assert len(store.list()) == 1
