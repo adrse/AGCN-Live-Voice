@@ -47,10 +47,9 @@ def test_local_brain_assets_are_self_contained(tmp_path):
     pack = tmp_path / "brain_local"
     (pack / "bin").mkdir(parents=True)
     (pack / "models").mkdir(parents=True)
-    (pack / "bin" / "llama-server").write_bytes(b"engine")
-    (pack / "models" / "Qwen3-4B-Q4_K_M.gguf").write_bytes(b"model")
-
     transport = LlamaCppLocalTransport(pack_dir=pack)
+    transport.engine_path.write_bytes(b"engine")
+    transport.model_path.write_bytes(b"model")
     ok, detail = transport.assets_status()
 
     assert ok is True
@@ -61,14 +60,13 @@ def test_local_brain_uses_openai_compatible_schema(tmp_path, monkeypatch):
     pack = tmp_path / "brain_local"
     (pack / "bin").mkdir(parents=True)
     (pack / "models").mkdir(parents=True)
-    (pack / "bin" / "llama-server").write_bytes(b"engine")
-    (pack / "models" / "Qwen3-4B-Q4_K_M.gguf").write_bytes(b"model")
-
     session = FakeSession()
     transport = LlamaCppLocalTransport(
         pack_dir=pack,
         session=session,
     )
+    transport.engine_path.write_bytes(b"engine")
+    transport.model_path.write_bytes(b"model")
     monkeypatch.setattr(transport, "_start_server", lambda: None)
 
     output = transport.complete(
