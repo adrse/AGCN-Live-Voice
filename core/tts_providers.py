@@ -16,6 +16,7 @@ from typing import Any
 import requests
 
 from core.integration_contracts import AudioChunk, TTSProvider
+from core.local_kokoro_tts import KokoroLocalTTSProvider
 from core.neural_tts import ElevenLabsTTSProvider
 from core.secret_store import get_secret
 from core.voice_profiles import get_voice_profile
@@ -352,8 +353,16 @@ def _build_elevenlabs(
 def build_tts_provider(config: dict | None = None) -> TTSProvider:
     config = dict(config or {})
     cfg = dict(config.get("tts") or config)
-    provider = str(cfg.get("provider") or "openai").casefold()
+    provider = str(cfg.get("provider") or "kokoro_local").casefold()
     profile = get_voice_profile(cfg.get("profile"))
+
+    if provider in {"kokoro_local", "local_neural", "agcn_local"}:
+        local_cfg = dict(cfg.get("kokoro") or {})
+        return KokoroLocalTTSProvider(
+            profile_id=profile["id"],
+            speed=_selected_speed(cfg, profile),
+            model_dir=local_cfg.get("model_dir") or None,
+        )
 
     if provider in {"openai", "neural", "premium"}:
         return _build_openai(cfg, profile)
