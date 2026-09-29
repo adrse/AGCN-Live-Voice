@@ -20,6 +20,14 @@ STYLE_LIBRARY = {
         "Sound genuinely happy and celebratory, with a smile in the voice. "
         "Keep it quick and natural; do not overact."
     ),
+    "excited": (
+        "Sound visibly excited and enthusiastic, with bright pitch movement "
+        "and lively energy. Keep diction clear and believable."
+    ),
+    "suspense_reveal": (
+        "Lower the energy briefly and create suspense, almost like a controlled "
+        "whisper, then lift the energy on the reveal. Stay intelligible."
+    ),
     "urgent_grounded": (
         "Create controlled urgency and momentum. Slightly increase intensity "
         "and pace, with confident emphasis. Never sound panicked or theatrical."
