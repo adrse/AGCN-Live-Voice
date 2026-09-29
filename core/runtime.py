@@ -81,6 +81,7 @@ class AGCNVoiceRuntime:
         product = self.store.add(
             name=payload.get("name"),
             description=payload.get("description", ""),
+            description_points=payload.get("description_points") or [],
             regular_price=payload.get("regular_price"),
             current_price=payload.get("current_price"),
             discount=payload.get("discount"),
