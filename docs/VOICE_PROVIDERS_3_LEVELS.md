@@ -53,12 +53,10 @@ Gemini 3.8 TTS -> AudioSink.
 Fallback:
 Gemini -> Qwen3-TTS HQ -> Kokoro.
 
-## Nível 3 — OpenAI Live / Realtime
+## Nível 3 — OpenAI Live / GPT-Live 1
 
-Este nível é diferente de um TTS comum porque o modelo de voz também possui
-capacidade conversacional.
-
-Mesmo assim, a arquitetura do AGCN deve permanecer externa e visível.
+O motor principal desta opção é `gpt-live-1`, usado para a experiência vocal
+mais natural/expressiva. A inteligência comercial continua fora dele.
 
 ### Regra
 
@@ -72,33 +70,31 @@ O AGCN continua decidindo:
 5. qual é a próxima ação;
 6. quando deve falar.
 
-A sessão de voz recebe um TurnPlan estruturado com:
-- action;
-- approved_speech ou missão restrita;
-- allowed_facts;
-- comment;
-- topic;
-- tactic;
-- voice_style;
-- priority;
-- sales_thread.
+### Modo implementado — strict_speech
 
-### Modo recomendado para produção
+Fluxo:
+Presenter -> BrainResult validado -> VoiceJob -> GPT-Live 1 -> transcript guard
+-> AudioSink.
 
-`strict_speech`:
 - AGCN/Brain gera e valida o texto;
-- OpenAI Live apenas interpreta/fala o texto;
-- máxima previsibilidade factual;
-- fila e próxima ação continuam totalmente visíveis.
+- GPT-Live recebe uma instrução de atuação + o texto aprovado;
+- o áudio é bufferizado antes de tocar;
+- a transcrição devolvida pelo GPT-Live é normalizada e comparada ao texto
+  aprovado;
+- se o modelo alterar a fala, o áudio é bloqueado;
+- erro ou divergência aciona fallback OpenAI Live -> Qwen HQ -> Kokoro;
+- Marin é o perfil feminino padrão e Cedar o masculino;
+- cada fala usa uma sessão curta e independente nesta primeira versão, evitando
+  contaminação de contexto entre falas;
+- fila, ação atual, próxima ação e estilo continuam pertencendo ao AGCN.
 
-### Modo experimental
+### Modo experimental — guided_agent
 
-`guided_agent`:
+Ainda não implementado:
 - AGCN fornece missão + fatos permitidos;
-- o modelo pode formular a resposta dentro desse limite;
-- exige monitoramento de transcript/tool calls e guardrails adicionais;
-- não deve ser o padrão inicial porque o áudio pode começar antes de uma
-  validação textual completa.
+- GPT-Live pode formular a fala dentro desse limite;
+- exige sessão persistente, transcript/tool monitoring e guardrails adicionais;
+- só deve ser habilitado depois da validação do modo controlado.
 
 ## Fallback sugerido
 
@@ -116,7 +112,7 @@ A LIVE não deve ficar muda por indisponibilidade de uma API.
 
 1. Validar acusticamente Qwen expressivo no Windows.
 2. Validar Gemini real com API key e comparar Flash-Lite vs Flash.
-3. Criar/fechar contrato provider-neutro de VoiceTurn/TurnPlan.
-4. Implementar OpenAI Live/Realtime em strict_speech.
-5. Só depois avaliar guided_agent.
-6. Refinar no Windows a comparação A/B dos três motores.
+3. Validar GPT-Live 1 real com OPENAI_API_KEY no modo strict_speech.
+4. Comparar Qwen vs Gemini vs GPT-Live usando o mesmo texto e estilo.
+5. Só depois avaliar guided_agent/sessão persistente.
+6. Refinar a interface com comparação A/B dos três motores.
