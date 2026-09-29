@@ -1,140 +1,108 @@
-# Prompt para Astra 6 — auditar, integrar e finalizar o AGCN Live Voice
+# Prompt para Astra 6 Ultra — finalizar AGCN Live Voice
 
-Você está assumindo o repositório privado `adrse/AGCN-Live-Voice`.
+Repositório privado: `adrse/AGCN-Live-Voice`
+Branch: `astra-handoff-2026-09-29`
 
-Trabalhe na branch `astra-handoff-2026-09-29`.
+## PRIMEIRO PASSO — economize contexto
 
-Leia nesta ordem:
-1. `docs/ASTRA_HANDOFF_2026-09-29.md`
-2. `docs/PRESENTER_BRAIN_SPEC.md`
-3. `core/presenter_policy.py`
-4. `core/brain_context_builder.py`
-5. `core/model_transports.py`
-6. `core/brain_orchestrator.py`
-7. `core/brain_factory.py`
-8. `core/presenter_v3.py`
-9. `core/tts_providers.py`
-10. `core/audio_output.py`
-11. `core/voice_service.py`
-12. `core/voice_factory.py`
-13. `core/runtime.py`
-14. `desktop/config_store.py`
-15. `core/comment_selection_policy.py`
-16. `desktop/config.example.json`
-17. `docs/DESKTOP_MVP_SPEC.md`
-18. `docs/ACCEPTANCE_TESTS_MVP.md`
-19. testes existentes.
+Leia SOMENTE:
+1. `docs/ASTRA_MINIMAL_HANDOFF.md`
+2. rode `powershell -ExecutionPolicy Bypass -File scripts\ultra_preflight.ps1`
 
-MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
+Não reestude o projeto inteiro.
+Não reescreva módulos verdes.
+Abra outros arquivos somente quando um teste real apontar falha concreta.
 
-## Decisões que NÃO devem ser revertidas
-
-- sem avatar/MuseTalk;
-- sem player/playlist de vídeo no AGCN;
-- vídeo fica no TikTok LIVE Studio/OBS;
-- cadastro manual do produto é essencial e é a fonte da verdade;
-- Qwen/Ollama local é o Brain padrão;
-- API é alternativa opcional;
-- Qwen e API usam a MESMA PresenterPolicy;
-- nenhum provider pode ter prompt comercial próprio;
-- nenhum texto bruto de LLM vai direto ao TTS;
-- TTS local padrão + premium opcional;
-- áudio sai no device escolhido/VB-CABLE;
-- nenhum secret embutido.
-
-## Já implementado — audite antes de alterar
+## O que já está resolvido
 
 Brain:
-- Ollama/Qwen real;
-- OpenAI Responses API;
-- provider OpenAI-compatible;
-- JSON Schema;
-- factory e fallback;
-- BrainContext derivado do produto ativo;
-- PresenterV3;
-- validação de fatos e alegações sensíveis.
+- Qwen/Ollama local;
+- API opcional;
+- mesma PresenterPolicy;
+- BrainContext baseado no produto ativo;
+- BrainResult JSON;
+- validação factual;
+- fallback local.
 
 Voz:
-- TTS local pyttsx3/SAPI;
-- TTS OpenAI opcional;
-- fallback TTS;
-- SoundDeviceAudioSink;
-- listagem/seleção de device;
-- VoiceService com fila prioritária;
-- VoiceFactory.
+- principal: Qwen3-TTS 1.7B CustomVoice Q8 LOCAL;
+- feminina: Vivian;
+- masculina: Ryan;
+- instruções de estilo Brazilian Portuguese/live commerce;
+- slider 0,80x–1,60x;
+- fallback: Kokoro Dora/Alex;
+- nenhuma API de voz necessária;
+- Dashboard mostra qual motor realmente falou.
 
-Configuração:
-- `desktop/config_store.py` já persiste em `%APPDATA%/AGCN Live Voice/config.json`;
-- faz merge com defaults públicos;
-- remove chaves/tokens/secrets antes de salvar.
+Build HQ já validado:
+- workflow: `Build Windows HQ Voice`;
+- run: `36510038423`;
+- artifact: `AGCN-Live-Voice-Windows-HQ`;
+- Vivian sintetizou Português sem API: OK;
+- Ryan sintetizou Português sem API: OK;
+- .exe abriu: OK;
+- suíte: 85 passed, 2 warnings.
 
-Runtime:
-- pode receber Brain e Voice reais;
-- fala aprovada é enfileirada para TTS;
-- resposta prioritária remove proativos pendentes;
-- frase que já está tocando termina antes da resposta;
-- TikTokMonitor e ProductStore antigos são preservados.
+Cadastro manual do produto continua obrigatório e é a fonte da verdade.
 
-Laboratórios:
-- `scripts/test_brain.py`;
-- `scripts/test_voice.py`.
-
-Testes:
-- `tests/test_brain_orchestrator.py`;
-- `tests/test_model_transports.py`;
-- `tests/test_brain_context_builder.py`;
-- `tests/test_brain_factory.py`;
-- `tests/test_presenter_v3.py`;
-- `tests/test_tts_voice_service.py`;
-- demais testes históricos;
-- CI `.github/workflows/test-presenter-brain.yml`.
-
-## Fluxo final esperado
+## Arquitetura congelada
 
 TikTok LIVE
--> comentário/métricas
--> filtro + prioridade
+-> comentários/métricas
+-> Comment Intelligence/Fusion
 -> Decision Engine
 -> Speech Planner
 -> produto ativo + memória
 -> PresenterPolicy
--> Qwen/API
+-> Qwen local OU API
 -> BrainResult JSON
 -> validação factual
 -> VoiceService
--> TTS
+-> Qwen3-TTS HQ local
+-> fallback Kokoro
 -> dispositivo/VB-CABLE
 -> TikTok LIVE Studio.
 
-Sem comentário relevante, o sistema continua falando do produto.
-Com comentário prioritário, responde e retoma a venda.
-Produto e condições comerciais são a única fonte de fatos.
+## Não alterar
 
-## Trabalho de amanhã
+- sem avatar/MuseTalk;
+- sem player de vídeo no AGCN;
+- vídeo fica no TikTok LIVE Studio/OBS;
+- não usar OpenAI/ElevenLabs para voz principal;
+- API serve apenas para melhorar a inteligência;
+- Qwen e API usam a mesma política;
+- não inventar preço, estoque, frete, cupom, garantia, compatibilidade ou especificações;
+- não colocar secrets no repo/exe/config público.
 
-1. Rode toda a suíte e corrija qualquer regressão.
-2. Teste Qwen/Ollama real no Windows.
-3. Teste OpenAI Responses API real e fallback.
-4. Faça testes agressivos de factualidade/alucinação.
-5. Teste TTS local e TTS premium reais.
-6. Teste SoundDevice + VB-CABLE.
-7. Integre o runtime às telas reais.
-8. Termine Dashboard, Produto e Configurações.
-9. Faça Configurações permitir escolher Brain, modelo, TTS, voz, device e testar cada item.
-10. Garanta persistência local segura.
-11. Teste cadastro/ativação/troca de produto.
-12. Teste TikTokMonitor real e fala contínua.
-13. Valide resposta a comentários + retomada.
-14. Gere e teste o .exe.
+## Missão de amanhã
 
-Não gaste tempo com vídeo, avatar, mobile, pagamentos ou pesquisa automática.
+Não desenvolver novamente o que já está verde.
 
-Ao terminar entregue:
-- arquivos alterados;
-- testes e resultados;
-- Qwen real testado;
-- API real testada;
-- TTS/device/VB-CABLE testados;
-- pendências reais;
-- caminho do .exe;
-- instruções mínimas para instalar Ollama/Qwen e VB-CABLE.
+Validar no PC real:
+1. Ollama + `qwen3:4b`;
+2. produto cadastrado;
+3. Qwen fala usando fatos do produto;
+4. Vivian e Ryan HQ realmente tocam;
+5. medir latência do Qwen3-TTS no hardware alvo;
+6. confirmar que Dashboard mostra Qwen HQ, não fallback;
+7. selecionar VB-CABLE;
+8. confirmar áudio chegando ao TikTok LIVE Studio;
+9. conectar a uma LIVE real;
+10. validar comentários prioritários;
+11. validar retomada da venda após resposta;
+12. testar API opcional apenas como Brain;
+13. corrigir somente falhas concretas;
+14. entregar o programa final.
+
+Se o hardware não sustentar Qwen3-TTS 1.7B em latência aceitável, NÃO remova a arquitetura HQ. Documente a limitação e use o fallback automático já existente.
+
+## Saída
+
+Entregar somente:
+- executável/pacote final;
+- testes reais que passaram;
+- latência observada;
+- dependências externas necessárias;
+- pendências comprovadas.
+
+Não produzir revisão teórica longa.
