@@ -75,6 +75,13 @@ class CommentIntelligence:
             intent, topic = "buying_intent", "buying"
 
         elif any(k in t for k in (
+            "quanto dura", "dura quanto", "autonomia",
+            "tempo de bateria", "tempo da bateria",
+            "carregamento", "carrega"
+        )):
+            intent, topic = "battery", "battery"
+
+        elif any(k in t for k in (
             "quanto", "preço", "preco", "valor", "custa", "por quanto"
         )):
             intent, topic = "price", "price"
