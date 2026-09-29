@@ -22,13 +22,23 @@ from core.product_profile import (
 
 
 def default_store_file() -> Path:
-    project_root = Path(__file__).resolve().parents[1]
-    data_dir = Path(
-        os.getenv(
-            "AGCN_DATA_DIR",
-            project_root / "data" / "runtime",
-        )
-    )
+    explicit = os.getenv("AGCN_DATA_DIR")
+    if explicit:
+        data_dir = Path(explicit)
+    else:
+        appdata = os.getenv("APPDATA")
+        if appdata:
+            data_dir = (
+                Path(appdata)
+                / "AGCN Live Voice"
+                / "data"
+            )
+        else:
+            data_dir = (
+                Path.home()
+                / ".agcn-live-voice"
+                / "data"
+            )
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir / "products.json"
 
