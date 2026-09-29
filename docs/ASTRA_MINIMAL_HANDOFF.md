@@ -7,7 +7,7 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório após os perfis de voz: **79 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **80 passed, 2 warnings**;
 - build Windows via GitHub Actions: **SUCCESS**;
 - dependências Windows: OK;
 - smoke imports: OK;
@@ -94,8 +94,7 @@ Regras:
 - resposta curta e volta rápida à venda;
 - nenhuma voz deve soar como conversa casual lenta.
 
-No TTS OpenAI, os perfis usam vozes-base distintas, instruções de estilo distintas e velocidade padrão 1.28x.
-No TTS local, o AGCN procura uma voz compatível entre as vozes instaladas no Windows e usa rate acelerado. O Doctor avisa se houver menos de duas vozes locais instaladas.
+No TTS oficial, as vozes são neurais e independentes das vozes instaladas no Windows. OpenAI Neural é o padrão, com `marin` e `cedar` como vozes-base recomendadas pela documentação oficial para melhor qualidade. ElevenLabs Neural é uma alternativa configurável. A velocidade é controlada por slider na UI.
 
 ## Testes reais que ainda importam
 
@@ -104,8 +103,8 @@ No PC real, validar:
 2. `qwen3:4b` instalado.
 3. Qwen responde com produto cadastrado.
 4. API OpenAI real, se for usada.
-5. TTS local realmente toca.
-6. TTS premium, se for usado.
+5. OpenAI Neural realmente toca nos dois perfis.
+6. ElevenLabs Neural, se configurado.
 7. `CABLE Input` aparece e recebe o áudio.
 8. TikTok LIVE Studio recebe o VB-CABLE.
 9. TikTokMonitor conecta a uma LIVE real.
@@ -154,7 +153,7 @@ Diagnóstico:
 - Qwen local é padrão;
 - API é opcional;
 - mesma PresenterPolicy para todos os Brains;
-- TTS local padrão e premium opcional;
+- TTS neural é padrão; vozes do Windows não são requisito;
 - resposta prioritária espera a frase atual terminar e entra antes de proativos pendentes;
 - nenhum segredo em JSON/Git/exe;
 - preço/estoque/frete/especificações nunca podem ser inventados.
