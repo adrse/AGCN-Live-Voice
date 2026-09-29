@@ -1,7 +1,7 @@
-"""Presenter V3: mesma lógica de LIVE, fala realizada por Presenter Brain.
+"""Presenter V3: mesma lógica de LIVE para Qwen local e APIs.
 
-Comment Intelligence/Decision/Speech Planner continuam determinísticos.
-Qwen/API apenas transformam a missão + fatos em fala natural estruturada.
+O sistema decide quando responder, quais fatos existem e quando voltar ao
+produto. O Brain apenas transforma a missão autorizada em fala natural.
 """
 
 from __future__ import annotations
@@ -23,6 +23,27 @@ from core.speech_planner import SpeechPlanner
 
 
 class PresenterV3:
+    MAX_REACTIVE_QUEUE = 40
+
+    # Perguntas factuais só chegam ao Brain quando existe resposta cadastrada.
+    # Se não existe fato, o comentário é silenciosamente ignorado.
+    FACT_REQUIRED_INTENTS = {
+        "safety_or_critical",
+        "price",
+        "availability",
+        "compatibility",
+        "technical_question",
+        "shipping",
+        "warranty",
+        "brand",
+        "included_items",
+        "size",
+        "battery",
+        "benefits",
+        "usage",
+        "direct_question",
+    }
+
     def __init__(self, product: dict | None, brain: BrainProvider) -> None:
         self.product = dict(product or {})
         self.brain = brain
@@ -72,6 +93,34 @@ class PresenterV3:
         self.fusion.add(analyzed)
         return analyzed
 
+    def _plan_is_answerable(self, plan: dict) -> bool:
+        if plan.get("type") == "proactive":
+            return True
+        intent = str(plan.get("intent") or "")
+        if intent not in self.FACT_REQUIRED_INTENTS:
+            return True
+        return bool(plan.get("has_fact"))
+
+    def _push(self, item: dict) -> None:
+        heapq.heappush(
+            self.queue,
+            (-item["priority"], next(self.counter), item),
+        )
+        if len(self.queue) <= self.MAX_REACTIVE_QUEUE:
+            return
+
+        # Descarta o item menos importante quando a LIVE recebe uma avalanche
+        # de perguntas. A fila nunca cresce indefinidamente.
+        worst = max(
+            range(len(self.queue)),
+            key=lambda i: (
+                self.queue[i][0],
+                self.queue[i][1],
+            ),
+        )
+        self.queue.pop(worst)
+        heapq.heapify(self.queue)
+
     def process_pending_comments(self) -> list[dict]:
         created = []
         for group in self.fusion.ready_groups():
@@ -79,12 +128,14 @@ class PresenterV3:
                 group, self.memory.snapshot()
             )
             plan = self.planner.plan(decision, self.guard, self.memory)
+
+            # Regra V0.6.1: pergunta sem resposta conhecida não vira fala.
+            if not self._plan_is_answerable(plan):
+                continue
+
             item = self._generate_item(plan)
             if item:
-                heapq.heappush(
-                    self.queue,
-                    (-item["priority"], next(self.counter), item),
-                )
+                self._push(item)
                 created.append(item)
         return created
 
@@ -107,10 +158,25 @@ class PresenterV3:
         plan = self.planner.plan(decision, self.guard, self.memory)
         item = self._generate_item(plan)
         if item:
-            heapq.heappush(
-                self.queue,
-                (-item["priority"], next(self.counter), item),
-            )
+            self._push(item)
+        return item
+
+    def force_proactive(self) -> dict | None:
+        """Gera fala de produto mesmo quando há comentários esperando.
+
+        É usado pelo runtime durante a janela obrigatória de foco no produto.
+        """
+        topic = self.planner.choose_proactive_topic(
+            self.guard, self.memory
+        )
+        decision = self.decision_engine.proactive(topic, priority=36)
+        plan = self.planner.plan(decision, self.guard, self.memory)
+        item = self._generate_item(plan)
+        if item:
+            self.memory.remember_speech(item)
+            for fact in item.get("used_facts") or []:
+                if fact:
+                    self.recent_facts.append(str(fact))
         return item
 
     def next_speech(self) -> dict | None:
@@ -131,10 +197,12 @@ class PresenterV3:
         analyzed = self.intelligence.analyze(user, text)
         if not analyzed:
             return {
-                "ok": False,
-                "message": "Comentário sem intenção comercial reconhecida.",
+                "ok": True,
+                "ignored": True,
+                "message": "Comentário ignorado.",
                 "analyzed": None,
                 "speech": None,
+                "memory": self.memory.snapshot(),
             }
 
         self.recent_comments.append(
@@ -154,6 +222,19 @@ class PresenterV3:
             group, self.memory.snapshot()
         )
         plan = self.planner.plan(decision, self.guard, self.memory)
+
+        if not self._plan_is_answerable(plan):
+            return {
+                "ok": True,
+                "ignored": True,
+                "analyzed": analyzed,
+                "decision": decision,
+                "plan": plan,
+                "speech": None,
+                "memory": self.memory.snapshot(),
+                "brain_error": None,
+            }
+
         item = self._generate_item(plan)
         if item:
             self.memory.remember_speech(item)
@@ -161,7 +242,8 @@ class PresenterV3:
                 self.recent_facts.append(str(fact))
 
         return {
-            "ok": bool(item),
+            "ok": True,
+            "ignored": not bool(item),
             "analyzed": analyzed,
             "decision": decision,
             "plan": plan,
@@ -233,6 +315,11 @@ class PresenterV3:
             self.last_brain_error = str(exc)
             return None
 
+        # Segunda barreira: se qualquer Brain detectar que faltou fato,
+        # a fala é descartada. Qwen local e API obedecem à mesma regra.
+        if result.needs_fact:
+            return None
+
         return {
             "type": plan.get("type"),
             "intent": plan.get("intent"),
@@ -250,7 +337,7 @@ class PresenterV3:
             ),
             "next_sales_thread": result.next_sales_thread,
             "used_facts": list(result.used_facts),
-            "needs_fact": result.needs_fact,
+            "needs_fact": False,
             "brain": self.brain.name,
             "created_at": time.time(),
         }
