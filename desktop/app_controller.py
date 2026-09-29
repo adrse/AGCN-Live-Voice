@@ -19,14 +19,24 @@ class DesktopController:
         self.config_store = ConfigStore()
         self.config = self.config_store.load()
         self.product_store = ProductStore()
+        self.voice_init_error = ""
         self.runtime = self._build_runtime()
 
     def _build_runtime(self) -> AGCNVoiceRuntime:
-        return AGCNVoiceRuntime(
-            self.product_store,
-            brain_config=self.config,
-            voice_config=self.config,
-        )
+        try:
+            return AGCNVoiceRuntime(
+                self.product_store,
+                brain_config=self.config,
+                voice_config=self.config,
+            )
+        except Exception as exc:
+            # O programa deve abrir mesmo antes da primeira chave de voz.
+            self.voice_init_error = str(exc)
+            return AGCNVoiceRuntime(
+                self.product_store,
+                brain_config=self.config,
+                voice_config=None,
+            )
 
     def close(self) -> None:
         self.runtime.close()
@@ -88,9 +98,12 @@ class DesktopController:
         patch: dict[str, Any],
         *,
         openai_key: str | None = None,
+        elevenlabs_key: str | None = None,
     ) -> dict:
         if openai_key is not None:
             set_secret("OPENAI_API_KEY", openai_key)
+        if elevenlabs_key is not None:
+            set_secret("ELEVENLABS_API_KEY", elevenlabs_key)
 
         was_live = bool(
             self.runtime.snapshot().get("monitoring")
@@ -100,11 +113,15 @@ class DesktopController:
 
         self.runtime.close()
         self.config = self.config_store.update(patch)
+        self.voice_init_error = ""
         self.runtime = self._build_runtime()
         return self.config
 
     def api_key_saved(self) -> bool:
         return has_secret("OPENAI_API_KEY")
+
+    def elevenlabs_key_saved(self) -> bool:
+        return has_secret("ELEVENLABS_API_KEY")
 
     def brain_health(self) -> tuple[bool, str]:
         provider = build_brain_provider(self.config)
