@@ -38,10 +38,28 @@ def as_text(value) -> str:
 
 
 class PresenterV2:
-    """Presenter Behavior V1 — ainda sem LLM/TTS.
+    """Presenter determinístico legado.
 
-    O foco é comportamento, memória, timing, fatos e variedade.
+    Mesmo sem Brain, segue a regra atual: pergunta factual sem resposta
+    conhecida é ignorada silenciosamente.
     """
+
+    FACT_REQUIRED_INTENTS = {
+        "safety_or_critical",
+        "price",
+        "availability",
+        "compatibility",
+        "technical_question",
+        "shipping",
+        "warranty",
+        "brand",
+        "included_items",
+        "size",
+        "battery",
+        "benefits",
+        "usage",
+        "direct_question",
+    }
 
     def __init__(self, product: dict | None):
         self.product = dict(product or {})
@@ -241,6 +259,16 @@ class PresenterV2:
 
     def _render_plan(self, plan: dict) -> dict | None:
         intent = plan.get("intent")
+
+        # Compatibilidade com a regra do Presenter V3: não verbalizar ausência
+        # de dado. A pergunta simplesmente não entra na fila de fala.
+        if (
+            plan.get("type") != "proactive"
+            and intent in self.FACT_REQUIRED_INTENTS
+            and not plan.get("has_fact")
+        ):
+            return None
+
         user = self._display_user(plan)
         name = self.product.get("name") or "produto"
         fact = plan.get("fact")
@@ -258,21 +286,13 @@ class PresenterV2:
                     else f"A marca é {brand}."
                 )
             else:
-                speech = (
-                    f"{user}, essa marca eu não tenho confirmada aqui."
-                    if user
-                    else "Essa marca eu não tenho confirmada aqui."
-                )
+                return None
         elif intent == "price":
             anchor = self.persuasion.price_anchor()
             if anchor:
                 speech = f"{user}, {anchor}" if user else anchor
             else:
-                speech = (
-                    f"{user}, o preço não está cadastrado aqui pra eu te confirmar agora."
-                    if user
-                    else "O preço não está cadastrado aqui pra eu confirmar agora."
-                )
+                return None
         elif intent == "buying_intent":
             speech = self.persuasion.buying_intent_response(
                 user,
@@ -464,17 +484,8 @@ class PresenterV2:
 
             return f"{address}{value}."
 
-        if intent in {"direct_question", "technical_question"}:
-            return random.choice([
-                f"{address}isso aí eu não tenho confirmado aqui, então não vou te falar no chute.",
-                f"{address}esse detalhe eu não tenho aqui certinho. Melhor não inventar.",
-                f"{address}isso eu não tenho confirmado na ficha, então prefiro não arriscar.",
-            ])
-
-        return random.choice([
-            f"{address}essa informação eu não tenho aqui confirmada.",
-            f"{address}isso aí eu não tenho na ficha ainda.",
-        ])
+        # Nunca verbaliza que falta informação interna.
+        return None
 
     def _objection_text(self, user, name):
         return self.persuasion.objection_response(
