@@ -189,6 +189,8 @@ class AGCNVoiceRuntime:
 
     def _ensure_presenter_worker(self) -> None:
         if self.presenter_thread and self.presenter_thread.is_alive():
+            if self.presenter_stop_event.is_set():
+                self.presenter_stop_event.clear()
             return
 
         self.presenter_stop_event.clear()
