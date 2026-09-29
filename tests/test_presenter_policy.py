@@ -8,6 +8,11 @@ def test_policy_contains_core_live_rules():
     assert "FALA PROATIVA" in instruction
     assert "RETOMADA APÓS INTERRUPÇÃO" in instruction
     assert "ANTI-REPETIÇÃO" in instruction
+    assert "POSTURA DE VENDEDOR" in instruction
+    assert "grounded_scarcity" in instruction
+    assert "price_anchor" in instruction
+    assert "pain_relief" in instruction
+    assert "social_proof" in instruction
 
 
 def test_turn_payload_contains_selected_comment_and_memory():
