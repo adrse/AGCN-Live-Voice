@@ -23,17 +23,18 @@ class FakeBrain:
         return self.result
 
 
-def test_factory_builds_local_qwen():
+def test_factory_builds_bundled_local_qwen():
     provider = build_brain_provider({
         "brain": {
             "provider": "qwen_local",
-            "ollama": {
-                "base_url": "http://127.0.0.1:11434",
-                "model": "qwen3:4b",
+            "local_brain": {
+                "pack_dir": "brain_local",
+                "model_file": "Qwen3-4B-Q4_K_M.gguf",
             },
         }
     })
-    assert "qwen3:4b" in provider.name
+    assert "Qwen3-4B" in provider.name
+    assert "llama.cpp" in provider.name
 
 
 def test_openai_requires_key_when_no_fallback(monkeypatch):

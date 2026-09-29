@@ -137,7 +137,12 @@ class DesktopController:
 
     def brain_health(self) -> tuple[bool, str]:
         provider = build_brain_provider(self.config)
-        return provider.healthcheck()
+        try:
+            return provider.healthcheck()
+        finally:
+            close = getattr(provider, "close", None)
+            if callable(close):
+                close()
 
     def diagnostics(self) -> tuple[bool, str]:
         result = run_diagnostics(

@@ -49,7 +49,11 @@ def test_builtin_defaults_use_local_voice_without_api(tmp_path):
         defaults_path=missing_defaults,
     )
     loaded = store.load()
-    assert loaded["brain"]["provider"] == "qwen_local"
+    assert loaded["brain"]["provider"] == "agcn_local"
+    assert (
+        loaded["brain"]["local_brain"]["model_file"]
+        == "Qwen3-4B-Q4_K_M.gguf"
+    )
     assert loaded["tts"]["provider"] == "qwen3_hq_auto"
     assert loaded["tts"]["profile"] == "female_fast"
     assert loaded["tts"]["speed"] == 1.28

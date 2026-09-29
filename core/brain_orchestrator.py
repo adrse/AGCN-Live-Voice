@@ -322,6 +322,11 @@ class PresenterBrain:
     def healthcheck(self) -> tuple[bool, str]:
         return self.transport.healthcheck()
 
+    def close(self) -> None:
+        close = getattr(self.transport, "close", None)
+        if callable(close):
+            close()
+
     def generate(self, context: BrainContext) -> BrainResult:
         system_instruction = build_system_instruction()
         base_payload = build_turn_payload(context)

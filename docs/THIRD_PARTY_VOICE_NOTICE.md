@@ -49,3 +49,20 @@ Esta pendência jurídica não impede testes técnicos do MVP, mas deve ser reso
 - licença indicada: Apache-2.0.
 
 A revisão final de distribuição deve incluir também avisos/licenças de GGML e demais dependências do motor nativo.
+
+
+## Qwen3-4B — Brain local
+- função: Presenter Brain local do AGCN;
+- upstream/pesos: Qwen/Qwen3-4B-GGUF;
+- quantização usada no pacote completo: Q4_K_M;
+- licença indicada pelo upstream: Apache-2.0.
+
+## llama.cpp
+- função: runtime C/C++ que executa o Qwen3-4B localmente;
+- upstream: ggml-org/llama.cpp;
+- licença indicada pelo upstream: MIT;
+- a licença é copiada para o diretório `brain_local/licenses` no build completo.
+
+O instalador completo também deve preservar os avisos e arquivos de licença
+dos modelos e runtimes que redistribui. Esta documentação técnica não substitui
+a revisão jurídica final antes da comercialização.
