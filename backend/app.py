@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.runtime import AGCNVoiceRuntime
 
@@ -28,7 +28,7 @@ class LiveStartRequest(BaseModel):
 class ProductRequest(BaseModel):
     name: str
     description: str = ""
-    description_points: list[str] = []
+    description_points: list[str] = Field(default_factory=list)
     regular_price: str | float | None = None
     current_price: str | float | None = None
     discount: str | float | None = None
