@@ -19,6 +19,7 @@ class CommentIntelligence:
         "compatibility": 91,
         "technical_question": 90,
         "shipping": 89,
+        "coupon": 89,
         "warranty": 88,
         "brand": 86,
         "included_items": 85,
@@ -40,6 +41,7 @@ class CommentIntelligence:
         "compatibility": "Compatibilidade",
         "technical_question": "Pergunta técnica",
         "shipping": "Frete / entrega",
+        "coupon": "Cupom / desconto",
         "warranty": "Garantia",
         "brand": "Marca",
         "included_items": "Itens inclusos",
@@ -68,9 +70,10 @@ class CommentIntelligence:
             intent, topic = "safety_or_critical", "safety"
 
         elif any(k in t for k in (
-            "eu quero", "quero comprar", "como compra", "como comprar",
-            "manda o link", "cadê o link", "cade o link", "onde compra",
-            "onde comprar", "coloquei no carrinho"
+            "eu quero", "quero comprar", "quero um", "vou comprar",
+            "vou levar", "como compra", "como comprar", "manda o link",
+            "cadê o link", "cade o link", "onde compra", "onde comprar",
+            "coloquei no carrinho", "já tá no carrinho", "ja ta no carrinho"
         )):
             intent, topic = "buying_intent", "buying"
 
@@ -107,6 +110,12 @@ class CommentIntelligence:
 
         elif any(k in t for k in ("frete", "entrega", "chega", "envio")):
             intent, topic = "shipping", "shipping"
+
+        elif any(k in t for k in (
+            "cupom", "desconto", "tem promoção", "tem promocao",
+            "tem oferta", "qual a oferta"
+        )):
+            intent, topic = "coupon", "coupon"
 
         elif any(k in t for k in ("garantia", "garantido")):
             intent, topic = "warranty", "warranty"
@@ -158,7 +167,8 @@ class CommentIntelligence:
             "benefício", "beneficio", "vantagens", "vantagem",
             "o que ele tem de bom", "o que tem de bom",
             "qual o benefício", "qual o beneficio",
-            "quais as vantagens", "qual vantagem"
+            "quais as vantagens", "qual vantagem", "vale a pena",
+            "é bom", "e bom"
         )):
             intent, topic = "benefits", "benefits"
 
@@ -188,7 +198,9 @@ class CommentIntelligence:
                 intent, topic = "direct_question", "general"
             elif any(k in t for k in (
                 "amei", "lindo", "gostei", "top", "perfeito",
-                "maravilhoso", "bom demais"
+                "maravilhoso", "bom demais", "oi", "olá", "ola",
+                "bom dia", "boa tarde", "boa noite", "salve",
+                "manda salve", "cheguei"
             )):
                 intent, topic = "engagement", "engagement"
 
