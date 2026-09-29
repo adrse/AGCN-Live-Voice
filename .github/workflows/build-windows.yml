@@ -65,7 +65,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --add-data "models\kokoro;models\kokoro" --collect-all TikTokLive --collect-all keyring --collect-all kokoro_onnx --collect-all espeakng_loader --collect-all phonemizer --collect-all onnxruntime desktop\main.py
+          pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --add-data "models\kokoro;models\kokoro" --collect-all TikTokLive --collect-all keyring --collect-all kokoro_onnx --collect-all espeakng_loader --collect-all phonemizer --collect-all onnxruntime --collect-all imageio_ffmpeg desktop\main.py
 
       - name: Verify build
         shell: pwsh
