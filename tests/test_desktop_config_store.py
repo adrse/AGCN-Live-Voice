@@ -56,3 +56,10 @@ def test_builtin_defaults_use_local_voice_without_api(tmp_path):
     assert loaded["tts"]["qwen3_hq"]["expressive"] is True
     assert loaded["tts"]["qwen3_hq"]["expression_strength"] == 1.0
     assert loaded["tts"]["qwen3_hq"]["voice_style"] == "auto"
+    assert loaded["tts"]["voice_style"] == "auto"
+    assert loaded["tts"]["expression_strength"] == 1.0
+    assert (
+        loaded["tts"]["gemini"]["model"]
+        == "gemini-3.8-flash-lite-tts"
+    )
+    assert loaded["tts"]["gemini"]["api_key_env"] == "GEMINI_API_KEY"
