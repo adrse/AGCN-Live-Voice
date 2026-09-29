@@ -7,7 +7,7 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório após os perfis de voz: **85 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **91 passed, 2 warnings**;
 - Qwen3-TTS 1.7B HQ: **Vivian + Ryan sintetizaram Português no Windows, sem API**;
 - build Windows HQ com Voice Pack Q8 embarcado: **SUCCESS**;
 - Kokoro Dora/Alex continua validado como fallback local;
@@ -20,7 +20,7 @@ Branch: astra-handoff-2026-09-29
 - ZIP Windows gerado e publicado como artifact;
 - artifact validado: `AGCN-Live-Voice-Windows`;
 - build validado no commit de produção `1654d8975bbf7559af8ad8655eff89666cf9e280`;
-- mudanças posteriores ao commit acima são somente testes/workflow, sem alteração do código de produção.
+- comportamento natural V0.6.1 foi consolidado na arquitetura Windows completa; não usar branches experimentais como fonte.
 
 ## Regra de trabalho para economizar Ultra
 
@@ -286,3 +286,36 @@ Voz principal:
 
 Fallback:
 - Kokoro Dora/Alex apenas se o Voice Pack HQ estiver indisponível.
+
+
+## Comportamento Presenter consolidado
+
+Esta branch já incorporou as correções de comportamento que antes estavam espalhadas em V0.5/V0.6.1.
+
+Regras obrigatórias, aplicadas ANTES do Brain e portanto iguais para Qwen local e API:
+- no máximo 3 respostas reativas consecutivas;
+- depois, 30 segundos obrigatórios falando do produto;
+- comentários continuam chegando e aguardam na fila durante esses 30 segundos;
+- pergunta factual sem resposta cadastrada é silenciosamente ignorada;
+- pergunta desconhecida NÃO deve gerar "não está cadastrado", "não consta" ou fala equivalente;
+- respostas factuais são curtas, informais e diretas;
+- não colar benefício/CTA automático após toda pergunta;
+- "quanto dura a bateria?" é bateria, não preço;
+- descrição é cadastrada por tópicos e o Presenter usa um ponto por vez;
+- fila reativa é limitada;
+- estoque numérico sozinho não autoriza falsa escassez;
+- needs_fact não contorna validação de números/fatos.
+
+Interface Windows:
+- editor "+ Adicionar descrição";
+- modo Presenter Produto/Interativo;
+- contador de segundos até comentários voltarem;
+- Vivian/Ryan e slider de velocidade permanecem.
+
+Web lab sincronizado:
+- https://agcnlive.up.railway.app
+- serve apenas para testar fluxo/comportamento; voz do navegador NÃO é Vivian/Ryan real.
+
+Validação da consolidação:
+- AGCN Full Test Suite: **91 passed, 2 warnings**;
+- run verde: `36527827725`.
