@@ -192,3 +192,120 @@ def test_recent_purchase_count_becomes_authorized_social_proof():
     )
 
     assert "compras confirmadas recentemente: 2" in context.allowed_facts
+
+
+def test_benefits_and_problems_are_atomic_but_included_items_stay_grouped():
+    facts = build_allowed_facts({
+        "name": "Fone X",
+        "key_benefits": "Áudio claro\nSem fio\nConfortável",
+        "problems_solved": "Ficar preso a fios\nChamadas com áudio ruim",
+        "included_items": "Fone; estojo; cabo",
+    })
+
+    benefits = [x for x in facts if x.startswith("benefícios:")]
+    problems = [x for x in facts if x.startswith("problemas que resolve:")]
+    included = [x for x in facts if x.startswith("itens inclusos:")]
+
+    assert benefits == [
+        "benefícios: Áudio claro",
+        "benefícios: Sem fio",
+        "benefícios: Confortável",
+    ]
+    assert problems == [
+        "problemas que resolve: Ficar preso a fios",
+        "problemas que resolve: Chamadas com áudio ruim",
+    ]
+    assert included == ["itens inclusos: Fone; estojo; cabo"]
+
+
+def test_benefit_turn_exposes_only_selected_subset_to_brain():
+    planner = SpeechPlanner()
+    memory = MemoryManager()
+    memory.proactive_turns = 1
+    product = {
+        "name": "Fone X",
+        "key_benefits": (
+            "Áudio claro\n"
+            "Sem fio\n"
+            "Confortável\n"
+            "Pareamento fácil\n"
+            "Estojo compacto"
+        ),
+    }
+    guard = SalesGuard(product)
+    decision = {
+        "type": "proactive",
+        "intent": "proactive",
+        "topic": "benefits",
+        "priority": 30,
+        "user": None,
+        "comment": None,
+    }
+
+    plan = planner.plan(decision, guard, memory)
+    selected = plan["selected_facts"]["key_benefits"]
+
+    assert 1 <= len(selected) <= 3
+    assert len(selected) < 5
+
+    context = build_brain_context(
+        product=product,
+        mode="proactive",
+        decision=plan,
+        planner_topic="benefits",
+        memory_snapshot=memory.snapshot(),
+    )
+    visible_benefits = [
+        x for x in context.allowed_facts
+        if x.startswith("benefícios:")
+    ]
+
+    assert visible_benefits == [
+        f"benefícios: {item}"
+        for item in selected
+    ]
+
+
+def test_pain_solution_turn_limits_problems_and_supporting_benefits():
+    planner = SpeechPlanner()
+    memory = MemoryManager()
+    memory.proactive_turns = 2
+    product = {
+        "name": "Fone X",
+        "key_benefits": "Sem fio\nÁudio claro\nConfortável",
+        "problems_solved": (
+            "Ficar preso a fios\n"
+            "Chamadas com áudio ruim\n"
+            "Desconforto em uso prolongado"
+        ),
+    }
+    guard = SalesGuard(product)
+    decision = {
+        "type": "proactive",
+        "intent": "proactive",
+        "topic": "pain_solution",
+        "priority": 30,
+        "user": None,
+        "comment": None,
+    }
+
+    plan = planner.plan(decision, guard, memory)
+    context = build_brain_context(
+        product=product,
+        mode="proactive",
+        decision=plan,
+        planner_topic="pain_solution",
+        memory_snapshot=memory.snapshot(),
+    )
+
+    visible_problems = [
+        x for x in context.allowed_facts
+        if x.startswith("problemas que resolve:")
+    ]
+    visible_benefits = [
+        x for x in context.allowed_facts
+        if x.startswith("benefícios:")
+    ]
+
+    assert 1 <= len(visible_problems) <= 2
+    assert 1 <= len(visible_benefits) <= 2
