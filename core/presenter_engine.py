@@ -463,7 +463,7 @@ class PresenterEngine:
             ])
 
         if fact and price:
-            templates.append(f"Ó, {fact} E hoje {price.lower()}")
+            templates.append(f"Ó, {fact} {price}")
 
         templates.extend([
             f"Quem tá chegando agora, eu tô mostrando o {name}.",
