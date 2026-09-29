@@ -750,36 +750,59 @@ class ProductPage(QWidget):
 
     def __init__(self, controller: DesktopController) -> None:
         super().__init__()
+        self.setObjectName("PageRoot")
         self.controller = controller
         self.current_id: str | None = None
         self.fields: dict[str, QWidget] = {}
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(24, 22, 24, 24)
+        root.setSpacing(14)
         title, desc = heading(
             "Produto",
-            "O produto ativo é a fonte da verdade para Qwen e API.",
+            "Cadastre os fatos que o Presenter pode usar. O produto ativo é a fonte da verdade para todos os motores.",
         )
         root.addWidget(title)
         root.addWidget(desc)
 
+        selector_card, selector_layout = card(
+            "Produto ativo",
+            "Selecione um cadastro existente ou crie um novo produto para esta LIVE.",
+        )
         top = QHBoxLayout()
         self.product_combo = QComboBox()
-        self.new_btn = QPushButton("Novo")
+        self.new_btn = QPushButton("Novo produto")
         self.activate_btn = QPushButton("Ativar")
         self.delete_btn = QPushButton("Excluir")
+        apply_ghost(self.new_btn)
+        apply_primary(self.activate_btn)
+        apply_danger(self.delete_btn)
         top.addWidget(self.product_combo, 1)
         top.addWidget(self.new_btn)
         top.addWidget(self.activate_btn)
         top.addWidget(self.delete_btn)
-        root.addLayout(top)
+        selector_layout.addLayout(top)
+        root.addWidget(selector_card)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         container = QWidget()
+        container.setObjectName("PageContent")
         stack = QVBoxLayout(container)
+        stack.setContentsMargins(0, 0, 4, 0)
+        stack.setSpacing(14)
 
         permanent_box = group("Ficha do produto")
         permanent_form = QFormLayout(permanent_box)
+        permanent_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        permanent_form.setHorizontalSpacing(18)
+        permanent_form.setVerticalSpacing(10)
         for field, label in self.PERMANENT:
             if field == "description":
                 widget = PointsEditor(
@@ -811,6 +834,11 @@ class ProductPage(QWidget):
 
         live_box = group("Condições desta LIVE")
         live_form = QFormLayout(live_box)
+        live_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        live_form.setHorizontalSpacing(18)
+        live_form.setVerticalSpacing(10)
         for field, label in self.LIVE:
             widget = QLineEdit()
             self.fields[field] = widget
@@ -822,10 +850,7 @@ class ProductPage(QWidget):
         stack.addWidget(live_box)
 
         self.save_btn = QPushButton("Salvar e usar este produto")
-        self.save_btn.setStyleSheet(
-            "padding:12px;font-weight:700;background:#0061FF;color:white;"
-            "border-radius:7px;"
-        )
+        apply_primary(self.save_btn)
         stack.addWidget(self.save_btn)
         stack.addStretch(1)
         scroll.setWidget(container)
@@ -965,9 +990,12 @@ class ProductPage(QWidget):
 class VoiceAudioPage(QWidget):
     def __init__(self, controller: DesktopController) -> None:
         super().__init__()
+        self.setObjectName("PageRoot")
         self.controller = controller
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(24, 22, 24, 24)
+        root.setSpacing(14)
         title, desc = heading(
             "Voz e áudio",
             "Configure o motor, interpretação, teste e saída de áudio. "
@@ -978,11 +1006,23 @@ class VoiceAudioPage(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         container = QWidget()
+        container.setObjectName("PageContent")
         stack = QVBoxLayout(container)
+        stack.setContentsMargins(0, 0, 4, 0)
+        stack.setSpacing(14)
 
         engine_box = group("Motor de voz e interpretação")
         engine_form = QFormLayout(engine_box)
+        engine_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        engine_form.setHorizontalSpacing(18)
+        engine_form.setVerticalSpacing(10)
 
         self.voice_engine = QComboBox()
         self.voice_engine.addItem(
@@ -1122,15 +1162,17 @@ class VoiceAudioPage(QWidget):
             "Kokoro. Se uma API falhar, a LIVE tenta continuar com voz local."
         )
         self.fallback_hint.setWordWrap(True)
-        self.fallback_hint.setStyleSheet(
-            "padding:9px;background:#EFF6FF;color:#1E3A8A;"
-            "border-radius:7px;"
-        )
+        self.fallback_hint.setObjectName("InfoBanner")
         engine_form.addRow("Continuidade", self.fallback_hint)
         stack.addWidget(engine_box)
 
         test_box = group("Teste e saída de áudio")
         test_form = QFormLayout(test_box)
+        test_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        test_form.setHorizontalSpacing(18)
+        test_form.setVerticalSpacing(10)
         self.voice_test_text = QLineEdit()
         self.voice_test_text.setText(
             "Gente, presta atenção nessa oferta porque esse produto "
@@ -1143,7 +1185,9 @@ class VoiceAudioPage(QWidget):
         self.device = QComboBox()
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
+        apply_ghost(self.refresh_devices_btn)
         self.test_voice_btn = QPushButton("Ouvir teste com estes ajustes")
+        apply_primary(self.test_voice_btn)
         test_form.addRow("Texto de teste", self.voice_test_text)
         test_form.addRow("Saída de áudio", self.device)
 
@@ -1154,10 +1198,7 @@ class VoiceAudioPage(QWidget):
         stack.addWidget(test_box)
 
         self.save_btn = QPushButton("Salvar Voz e áudio")
-        self.save_btn.setStyleSheet(
-            "padding:12px;font-weight:700;background:#0061FF;color:white;"
-            "border-radius:7px;"
-        )
+        apply_primary(self.save_btn)
         stack.addWidget(self.save_btn)
         stack.addStretch(1)
         scroll.setWidget(container)
@@ -1413,9 +1454,12 @@ class VoiceAudioPage(QWidget):
 class SettingsPage(QWidget):
     def __init__(self, controller: DesktopController) -> None:
         super().__init__()
+        self.setObjectName("PageRoot")
         self.controller = controller
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(24, 22, 24, 24)
+        root.setSpacing(14)
         title, desc = heading(
             "Configurações",
             "Configure o Presenter Brain e o diagnóstico geral. "
@@ -1425,7 +1469,13 @@ class SettingsPage(QWidget):
         root.addWidget(desc)
 
         brain_box = group("Presenter Brain")
+        brain_box.setMaximumWidth(920)
         brain_form = QFormLayout(brain_box)
+        brain_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        brain_form.setHorizontalSpacing(18)
+        brain_form.setVerticalSpacing(10)
         self.brain_provider = QComboBox()
         self.brain_provider.addItems(
             ["qwen_local", "openai", "openai_compatible"]
@@ -1450,7 +1500,9 @@ class SettingsPage(QWidget):
 
         brain_actions = QHBoxLayout()
         self.test_brain_btn = QPushButton("Testar Brain")
+        apply_ghost(self.test_brain_btn)
         self.doctor_btn = QPushButton("Diagnóstico completo")
+        apply_ghost(self.doctor_btn)
         self.key_status = QLabel("")
         brain_actions.addWidget(self.test_brain_btn)
         brain_actions.addWidget(self.doctor_btn)
@@ -1459,10 +1511,8 @@ class SettingsPage(QWidget):
         root.addWidget(brain_box)
 
         self.save_btn = QPushButton("Salvar configurações do Brain")
-        self.save_btn.setStyleSheet(
-            "padding:12px;font-weight:700;background:#0061FF;color:white;"
-            "border-radius:7px;"
-        )
+        self.save_btn.setMaximumWidth(920)
+        apply_primary(self.save_btn)
         root.addWidget(self.save_btn)
         root.addStretch(1)
 
