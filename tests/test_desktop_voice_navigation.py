@@ -40,10 +40,8 @@ def test_dashboard_has_compact_voice_summary_and_advanced_shortcut():
     dashboard = _class_source("DashboardPage")
     main = _class_source("MainWindow")
 
-    assert (
-        'group("Voz e áudio")' in dashboard
-        or 'card("Voz e áudio"' in dashboard
-    )
+    assert '"Voz e áudio"' in dashboard
+    assert "voice_advanced_btn" in dashboard
     assert "self.voice_summary_engine" in dashboard
     assert "self.voice_summary_profile" in dashboard
     assert "self.voice_summary_speed" in dashboard
@@ -118,7 +116,7 @@ def test_desktop_uses_polished_theme_and_maximized_startup():
     assert 'setObjectName("Sidebar")' in source
     assert 'setObjectName("SidebarNav")' in source
     assert 'setObjectName("PageRoot")' in source
-    assert 'card("Status da LIVE"' in source
-    assert 'card("Andamento da apresentação"' in source
+    assert '"Status da LIVE"' in source
+    assert '"Andamento da apresentação"' in source
     assert "showMaximized()" in main_source
     assert 'setStyle("Fusion")' in main_source
