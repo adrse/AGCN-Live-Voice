@@ -82,10 +82,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path "brain_local\bin" | Out-Null
           New-Item -ItemType Directory -Force -Path "brain_local\models" | Out-Null
           New-Item -ItemType Directory -Force -Path "brain_local\licenses" | Out-Null
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest" -Headers @{"User-Agent"="AGCN-Live-Voice-Build"}
-          $asset = $release.assets | Where-Object { $_.name -match "bin-win-cpu-x64\.zip$" } | Select-Object -First 1
-          if (-not $asset) { throw "llama.cpp Windows x64 CPU asset not found" }
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "llama-win-x64.zip"
+          $llamaTag = "b11264"
+          $llamaAsset = "llama-b11264-bin-win-cpu-x64.zip"
+          $llamaUrl = "https://github.com/ggml-org/llama.cpp/releases/download/$llamaTag/$llamaAsset"
+          Write-Host "Using pinned llama.cpp runtime: $llamaTag / $llamaAsset"
+          curl.exe -L --fail --retry 3 $llamaUrl -o "llama-win-x64.zip"
+          if ((Get-Item "llama-win-x64.zip").Length -lt 10000000) { throw "llama.cpp runtime download is unexpectedly small" }
           Expand-Archive -Path "llama-win-x64.zip" -DestinationPath "llama_release" -Force
           $server = Get-ChildItem "llama_release" -Recurse -Filter "llama-server.exe" | Select-Object -First 1
           if (-not $server) { throw "llama-server.exe not found in release" }
