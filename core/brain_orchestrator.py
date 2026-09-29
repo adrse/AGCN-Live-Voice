@@ -204,6 +204,38 @@ def validate_sensitive_claims(
     return True, ""
 
 
+def validate_public_language(
+    result: BrainResult,
+    context: BrainContext,
+) -> tuple[bool, str]:
+    """Bloqueia linguagem que revela bastidores internos ao espectador."""
+    speech = _fold(result.speech)
+    forbidden = (
+        "nao esta cadastrado",
+        "nao esta cadastrada",
+        "esta cadastrado",
+        "esta cadastrada",
+        "no cadastro",
+        "na ficha",
+        "segundo o sistema",
+        "de acordo com o sistema",
+        "base de dados",
+        "banco de dados",
+        "informacao fornecida",
+        "informacoes fornecidas",
+        "contexto fornecido",
+        "eu nao tenho aqui confirmado",
+        "eu nao tenho confirmado aqui",
+    )
+    if any(marker in speech for marker in forbidden):
+        return (
+            False,
+            "linguagem interna/robótica detectada; responda de forma natural "
+            "sem mencionar cadastro, ficha, sistema, base ou contexto",
+        )
+    return True, ""
+
+
 def validate_repetition(
     result: BrainResult,
     context: BrainContext,
@@ -277,6 +309,7 @@ class PresenterBrain:
         self.validators = [
             validate_reported_facts,
             validate_sensitive_claims,
+            validate_public_language,
             validate_repetition,
             *(validators or []),
         ]
