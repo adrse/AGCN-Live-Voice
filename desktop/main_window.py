@@ -1713,7 +1713,34 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(0)
 
         outer.addWidget(sidebar)
-        outer.addWidget(self.pages, 1)
+
+        content = QWidget()
+        content.setObjectName("AppRoot")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        top_bar = QFrame()
+        top_bar.setObjectName("TopBar")
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(20, 10, 22, 10)
+        top_bar_layout.setSpacing(10)
+
+        self.top_connection = QLabel("Aguardando LIVE")
+        self.top_connection.setObjectName("StatusInfo")
+        self.top_live = QLabel("TikTok LIVE · não conectado")
+        self.top_live.setObjectName("Muted")
+        self.top_voice = QLabel("Voz · carregando")
+        self.top_voice.setObjectName("Muted")
+
+        top_bar_layout.addWidget(self.top_connection)
+        top_bar_layout.addWidget(self.top_live)
+        top_bar_layout.addStretch(1)
+        top_bar_layout.addWidget(self.top_voice)
+
+        content_layout.addWidget(top_bar)
+        content_layout.addWidget(self.pages, 1)
+        outer.addWidget(content, 1)
 
         self.setStyleSheet(APP_STYLESHEET)
 
@@ -1733,9 +1760,40 @@ class MainWindow(QMainWindow):
 
     def refresh(self) -> None:
         try:
-            self.dashboard.refresh(self.controller.snapshot())
+            data = self.controller.snapshot()
+            self.dashboard.refresh(data)
+            self._refresh_top_bar(data)
         except Exception as exc:
             self.dashboard.diagnostic.setText(str(exc))
+            self.dashboard.diagnostic.setVisible(True)
+
+    def _refresh_top_bar(self, data: dict) -> None:
+        monitoring = bool(data.get("monitoring"))
+        username = str(data.get("username") or "").strip()
+        self.top_connection.setText(
+            "●  Conectado" if monitoring else "●  Aguardando LIVE"
+        )
+        self.top_connection.setObjectName(
+            "StatusGood" if monitoring else "StatusInfo"
+        )
+        self.top_connection.style().unpolish(self.top_connection)
+        self.top_connection.style().polish(self.top_connection)
+
+        self.top_live.setText(
+            f"TikTok LIVE · {username}"
+            if username
+            else "TikTok LIVE · não conectado"
+        )
+        voice = data.get("voice") or {}
+        tts_cfg = dict(self.controller.config.get("tts") or {})
+        provider = (
+            voice.get("active_provider")
+            or voice.get("tts")
+            or voice_provider_label(
+                str(tts_cfg.get("provider") or "qwen3_hq_auto")
+            )
+        )
+        self.top_voice.setText(f"Voz · {provider}")
 
     def closeEvent(self, event) -> None:
         try:
