@@ -40,15 +40,21 @@ BUILTIN_DEFAULTS = {
     },
     "tts": {
         "provider": "local",
-        "voice": "",
+        "profile": "female_fast",
+        "voice_override": "",
         "fallback_local": True,
-        "local": {"rate": 190, "volume": 1.0},
+        "local": {
+            "rate_override": None,
+            "volume": 1.0,
+        },
         "api": {
             "base_url": "https://api.openai.com/v1",
             "model": "gpt-4o-mini-tts",
-            "voice": "coral",
             "api_key_env": "OPENAI_API_KEY",
             "timeout_seconds": 45,
+            "voice_override": "",
+            "speed_override": None,
+            "instructions_override": "",
         },
     },
     "audio": {
