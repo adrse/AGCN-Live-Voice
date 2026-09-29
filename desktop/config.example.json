@@ -21,10 +21,16 @@
     }
   },
   "tts": {
-    "provider": "kokoro_local",
+    "provider": "qwen3_hq_auto",
     "profile": "female_fast",
     "speed": 1.28,
     "voice_override": "",
+    "qwen3_hq": {
+      "pack_dir": "",
+      "port": 18765,
+      "startup_timeout_seconds": 120,
+      "request_timeout_seconds": 60
+    },
     "kokoro": {
       "model_dir": ""
     }
