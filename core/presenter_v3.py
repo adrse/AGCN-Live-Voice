@@ -53,7 +53,7 @@ class PresenterV3:
         self.fusion = CommentFusion(window_seconds=0.9)
         self.decision_engine = DecisionEngine()
         self.planner = SpeechPlanner()
-        self.watchdog = SilenceWatchdog(target_seconds=8.0, hard_seconds=10.0)
+        self.watchdog = SilenceWatchdog(target_seconds=2.5, hard_seconds=4.0)
         self.queue = []
         self.counter = itertools.count()
         self.plan_queue = []
