@@ -1001,7 +1001,6 @@ class SettingsPage(QWidget):
 
     def _test_voice(self) -> None:
         try:
-            self._apply_settings_before_test()
             ok, message = self.controller.test_voice(
                 config_override=self._patch()
             )
