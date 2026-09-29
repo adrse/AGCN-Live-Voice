@@ -7,9 +7,9 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório após os perfis de voz: **80 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **82 passed, 2 warnings**;
 - smoke Windows real de TTS local: **Dora PT-BR OK + Alex PT-BR OK, sem API**;
-- build Windows via GitHub Actions: **SUCCESS**;
+- build Windows com Kokoro/Dora/Alex embarcados: **SUCCESS**;
 - dependências Windows: OK;
 - smoke imports: OK;
 - smoke da UI PySide6: OK;
@@ -195,3 +195,21 @@ Não gastar tokens integrando OpenAI TTS/ElevenLabs TTS.
 A API OpenAI só interessa ao Presenter Brain.
 
 Provider oficial de voz: `kokoro_local`.
+
+
+## Build offline final validado
+
+Workflow Windows validado:
+- dependências Kokoro/ONNX: OK;
+- download de modelo/vozes: OK;
+- Dora PT-BR offline: OK;
+- Alex PT-BR offline: OK;
+- UI: OK;
+- PyInstaller: OK;
+- modelo e voices dentro do pacote: OK;
+- executável abriu sem crash imediato: OK;
+- ZIP gerado: OK.
+
+Artifact: `AGCN-Live-Voice-Windows`
+Workflow run: `36506324783`
+Build SHA: `cd7c7747f0457b60d9dbfb2595bdc58a5a9af38c`
