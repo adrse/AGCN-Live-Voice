@@ -10,13 +10,17 @@ from core.presenter_v2 import PresenterV2
 from core.presenter_v3 import PresenterV3
 from core.product_store import ProductStore
 from core.tiktok_monitor import TikTokMonitor
+from core.voice_factory import build_voice_service
+from core.voice_service import VoiceService
 
 
 class AGCNVoiceRuntime:
-    """Runtime da LIVE.
+    """Runtime integrado da LIVE.
 
-    Sem brain_config mantém o PresenterV2 determinístico para compatibilidade.
-    Com brain_config/brain_provider usa PresenterV3 com Qwen ou API real.
+    - sem brain_config: mantém PresenterV2 para compatibilidade;
+    - com brain_config: usa PresenterV3 + Qwen/API;
+    - com voice_config/voice_service: fala aprovada entra na fila TTS e sai
+      pelo dispositivo de áudio escolhido (incluindo VB-CABLE).
     """
 
     def __init__(
@@ -25,6 +29,8 @@ class AGCNVoiceRuntime:
         *,
         brain_provider: BrainProvider | None = None,
         brain_config: dict | None = None,
+        voice_service: VoiceService | None = None,
+        voice_config: dict | None = None,
     ):
         self.store = store or ProductStore()
         self.lock = threading.RLock()
@@ -35,6 +41,7 @@ class AGCNVoiceRuntime:
         self.speeches_generated = 0
         self.proactive_generated = 0
         self.interruptions = 0
+        self.voice_jobs = 0
 
         self.last_comment = None
         self.last_decision = None
@@ -44,6 +51,10 @@ class AGCNVoiceRuntime:
         self.brain_provider = brain_provider
         if self.brain_provider is None and brain_config is not None:
             self.brain_provider = build_brain_provider(brain_config)
+
+        self.voice_service = voice_service
+        if self.voice_service is None and voice_config is not None:
+            self.voice_service = build_voice_service(voice_config)
 
         active = self.store.active_for_presenter() or {}
         self.presenter = self._new_presenter(active)
@@ -186,10 +197,42 @@ class AGCNVoiceRuntime:
                 "ok": False,
                 "message": "Cadastre e ative um produto antes de iniciar.",
             }
-        return self.monitor.start(username)
+
+        if self.voice_service is not None:
+            self.voice_service.start()
+
+        result = self.monitor.start(username)
+        if not result.get("ok", True) and self.voice_service is not None:
+            self.voice_service.stop()
+        return result
 
     def stop(self) -> dict:
-        return self.monitor.stop()
+        result = self.monitor.stop()
+        if self.voice_service is not None:
+            self.voice_service.stop()
+        return result
+
+    def _queue_voice(self, item: dict) -> None:
+        if self.voice_service is None:
+            return
+
+        if item.get("type") == "reactive":
+            # Não corta a frase já sendo reproduzida; apenas remove proativos
+            # que ainda aguardavam na fila para responder o chat em seguida.
+            self.voice_service.clear_pending(proactive_only=True)
+
+        self.voice_service.enqueue(
+            item["speech"],
+            priority=int(item.get("priority", 30)),
+            metadata={
+                "type": item.get("type"),
+                "intent": item.get("intent"),
+                "topic": item.get("topic"),
+                "user": item.get("user"),
+                "comment": item.get("comment"),
+            },
+        )
+        self.voice_jobs += 1
 
     def _tick_presenter_locked(self):
         self._sync_active_product_locked()
@@ -215,6 +258,8 @@ class AGCNVoiceRuntime:
                 and queue[0].get("priority", 0)
                 > self.current_speech.get("priority", 0)
             ):
+                # Marca a prioridade para a próxima fala, mas o VoiceService
+                # deixa o segmento de áudio corrente terminar naturalmente.
                 self.current_speech_until = 0.0
                 self.interruptions += 1
             else:
@@ -237,7 +282,13 @@ class AGCNVoiceRuntime:
         if item.get("type") == "reactive":
             self.last_decision = item
 
-        # Temporário: duração textual. Será substituída pelo playback TTS real.
+        try:
+            self._queue_voice(item)
+        except Exception as exc:
+            item["voice_error"] = str(exc)
+
+        # Estimativa apenas para scheduling/UI. Playback real é controlado
+        # pelo VoiceService quando configurado.
         duration = min(
             12.0,
             max(2.5, len(item["speech"]) / 16.0),
@@ -251,11 +302,19 @@ class AGCNVoiceRuntime:
             live = self.monitor.snapshot()
             active = self.store.active() or {}
             presenter_state = self.presenter.snapshot()
+            voice_state = (
+                self.voice_service.snapshot()
+                if self.voice_service is not None
+                else None
+            )
 
             data = {
                 **live,
                 "version": (
-                    "0.7-llm-brain"
+                    "0.8-brain-voice"
+                    if self.brain_provider is not None
+                    and self.voice_service is not None
+                    else "0.7-llm-brain"
                     if self.brain_provider is not None
                     else "0.6-presenter-brain"
                 ),
@@ -265,6 +324,9 @@ class AGCNVoiceRuntime:
                     if self.brain_provider is not None
                     else "deterministic-v2"
                 ),
+                "voice_enabled": self.voice_service is not None,
+                "voice": voice_state,
+                "voice_jobs": self.voice_jobs,
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
@@ -307,6 +369,7 @@ class AGCNVoiceRuntime:
         presenter = data.get("presenter") or {}
         memory = presenter.get("memory") or {}
         watchdog = presenter.get("watchdog") or {}
+        voice = data.get("voice") or {}
 
         checks = {
             "LIVE conectou": bool(
@@ -338,6 +401,7 @@ class AGCNVoiceRuntime:
             f"Room ID: {data.get('room_id') or 'NÃO RECEBIDO'}",
             f"Produto ativo: {product.get('name') or 'NÃO CARREGADO'}",
             f"Brain: {data.get('brain_provider', '—')}",
+            f"Voz: {voice.get('tts') or ('DESATIVADA' if not data.get('voice_enabled') else '—')}",
             "",
             "CHECKLIST:",
         ]
@@ -354,6 +418,7 @@ class AGCNVoiceRuntime:
             f"Itens enfileirados: {data.get('items_queued', 0)}",
             f"Falas geradas: {data.get('speeches_generated', 0)}",
             f"Falas proativas: {data.get('proactive_generated', 0)}",
+            f"Jobs de voz: {data.get('voice_jobs', 0)}",
             f"Interrupções prioritárias: {data.get('interruptions', 0)}",
             f"Silêncio atual: {memory.get('seconds_since_speech', '—')}s",
             f"Watchdog: {watchdog.get('status', '—')}",
@@ -376,6 +441,8 @@ class AGCNVoiceRuntime:
             f"Diagnóstico TikTok: {data.get('diagnostic', '—')}",
         ]
 
+        if voice.get("last_error"):
+            lines += ["", f"ERRO DE VOZ: {voice.get('last_error')}"]
         if data.get("error"):
             lines += ["", f"ERRO: {data.get('error')}"]
 
