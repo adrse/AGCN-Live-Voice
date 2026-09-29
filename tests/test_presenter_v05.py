@@ -68,7 +68,10 @@ def test_presenter_answers_brand_directly():
         presenter.memory,
     )
     item = presenter._render_plan(plan)
-    assert "a marca é AGCN" in item["speech"]
+    speech = item["speech"].casefold()
+    assert "agcn" in speech
+    assert "cadastr" not in speech
+    assert len(speech) < 80
 
 
 def test_memory_records_topic():
