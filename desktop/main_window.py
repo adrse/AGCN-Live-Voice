@@ -480,7 +480,7 @@ class SettingsPage(QWidget):
         voice_form = QFormLayout(voice_box)
 
         self.voice_engine = QLabel(
-            "AGCN Local Neural — Kokoro PT-BR (offline, sem API)"
+            "AGCN Neural HQ — Qwen3-TTS 1.7B (offline, fallback Kokoro)"
         )
         self.voice_engine.setStyleSheet("font-weight:700;color:#111827;")
 
@@ -595,13 +595,19 @@ class SettingsPage(QWidget):
                 },
             },
             "tts": {
-                "provider": "kokoro_local",
+                "provider": "qwen3_hq_auto",
                 "profile": (
                     self.voice_profile.currentData()
                     or "female_fast"
                 ),
                 "speed": self.speed_slider.value() / 100.0,
                 "voice_override": "",
+                "qwen3_hq": {
+                    "pack_dir": "",
+                    "port": 18765,
+                    "startup_timeout_seconds": 120,
+                    "request_timeout_seconds": 60,
+                },
                 "kokoro": {
                     "model_dir": "",
                 },
