@@ -34,7 +34,7 @@ def main() -> int:
         "--text",
         default=(
             "Teste de voz do AGCN Live Voice. "
-            "Essa apresentação é rápida, clara e funciona sem API."
+            "Essa apresentação usa a voz neural local de alta qualidade e funciona sem API."
         ),
     )
     parser.add_argument("--list-devices", action="store_true")
@@ -44,7 +44,7 @@ def main() -> int:
         Path(args.config).read_text(encoding="utf-8")
     )
     tts_cfg = config.setdefault("tts", {})
-    tts_cfg["provider"] = "kokoro_local"
+    tts_cfg["provider"] = "qwen3_hq_auto"
     if args.profile:
         tts_cfg["profile"] = args.profile
     if args.speed is not None:
