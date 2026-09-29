@@ -346,14 +346,27 @@ class AGCNVoiceRuntime:
         ):
             return
 
-        # Comentários continuam sendo processados mesmo durante a janela de
-        # produto. Eles aguardam na fila; não dominam a LIVE.
-        created = self.presenter.process_pending_comments()
-        if created:
-            self.items_queued += len(created)
-
         now = time.time()
         product_window = self._product_window_active(now)
+        comments_locked = bool(self.forced_product_until)
+
+        # No modo produto, comentários continuam sendo recebidos/classificados,
+        # mas não gastam Brain/API. PresenterV3 transforma em planos pendentes;
+        # Presenter legado apenas deixa o CommentFusion aguardar.
+        if comments_locked:
+            collect = getattr(
+                self.presenter,
+                "collect_pending_comments",
+                None,
+            )
+            if callable(collect):
+                collect()
+            created = []
+        else:
+            created = self.presenter.process_pending_comments()
+            if created:
+                self.items_queued += len(created)
+
         queue = self.presenter.queue_snapshot()
 
         if self.current_speech and now < self.current_speech_until:
