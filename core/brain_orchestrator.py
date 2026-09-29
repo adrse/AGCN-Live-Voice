@@ -10,6 +10,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Callable
+from difflib import SequenceMatcher
 
 from core.integration_contracts import BrainContext, BrainResult, TextModelTransport
 from core.presenter_policy import build_system_instruction, build_turn_payload
@@ -110,9 +111,24 @@ def validate_sensitive_claims(
             "desconto",
         ),
         (
-            ("estoque", "restam", "ultima unidade", "ultimas unidades"),
-            ("estoque:",),
-            "estoque",
+            (
+                "estoque",
+                "restam",
+                "resta ",
+                "ultima unidade",
+                "ultimas unidades",
+                "poucas unidades",
+                "ta acabando",
+                "esta acabando",
+                "esgot",
+                "nao tem pra todo mundo",
+            ),
+            (
+                "estoque:",
+                "texto da oferta da live:",
+                "observacao promocional:",
+            ),
+            "escassez/estoque",
         ),
         (
             ("frete", "entrega gratis", "frete gratis"),
@@ -156,6 +172,22 @@ def validate_sensitive_claims(
         ):
             return False, "alegação de resistência à água sem fato autorizado"
 
+    exclusivity_markers = (
+        "exclusiva da live",
+        "exclusivo da live",
+        "so na live",
+        "somente na live",
+        "so aqui na live",
+    )
+    if any(marker in speech for marker in exclusivity_markers):
+        if not any(
+            fact.startswith("oferta ativa na live:")
+            or fact.startswith("texto da oferta da live:")
+            or fact.startswith("observacao promocional:")
+            for fact in reported
+        ):
+            return False, "exclusividade da LIVE sem fato autorizado"
+
     # Números explícitos normalmente são especificação, preço, desconto,
     # estoque, medida ou autonomia. Se aparecem na fala, devem existir em algum
     # fato autorizado, inclusive em respostas marcadas needs_fact.
@@ -172,6 +204,67 @@ def validate_sensitive_claims(
     return True, ""
 
 
+def validate_repetition(
+    result: BrainResult,
+    context: BrainContext,
+) -> tuple[bool, str]:
+    """Impede fala proativa quase igual à fala anterior.
+
+    O prompt ajuda, mas esta barreira é determinística: se o modelo repetir
+    abertura/estrutura muito parecida, pedimos outra formulação.
+    """
+    if context.mode != "proactive":
+        return True, ""
+
+    speech = _fold(result.speech)
+    speech = re.sub(r"[^a-z0-9\s]", " ", speech)
+    speech = re.sub(r"\s+", " ", speech).strip()
+    if not speech:
+        return True, ""
+
+    current_words = speech.split()
+    recent = list(context.recent_speeches or [])[-4:]
+
+    for previous in reversed(recent):
+        prev = _fold(previous)
+        prev = re.sub(r"[^a-z0-9\s]", " ", prev)
+        prev = re.sub(r"\s+", " ", prev).strip()
+        if not prev:
+            continue
+
+        prev_words = prev.split()
+        ratio = SequenceMatcher(None, speech, prev).ratio()
+
+        current_set = {
+            w for w in current_words
+            if len(w) >= 4
+        }
+        previous_set = {
+            w for w in prev_words
+            if len(w) >= 4
+        }
+        union = current_set | previous_set
+        jaccard = (
+            len(current_set & previous_set) / len(union)
+            if union else 0.0
+        )
+
+        same_opening = (
+            len(current_words) >= 3
+            and len(prev_words) >= 3
+            and current_words[:3] == prev_words[:3]
+        )
+
+        if same_opening or ratio >= 0.72 or jaccard >= 0.78:
+            return (
+                False,
+                "fala muito parecida com uma fala recente; "
+                "mude a abertura, estrutura e ângulo comercial",
+            )
+
+    return True, ""
+
+
 class PresenterBrain:
     def __init__(
         self,
@@ -184,6 +277,7 @@ class PresenterBrain:
         self.validators = [
             validate_reported_facts,
             validate_sensitive_claims,
+            validate_repetition,
             *(validators or []),
         ]
         self.max_retries = max(0, int(max_retries))
