@@ -19,10 +19,10 @@ Leia nesta ordem:
 12. `core/voice_factory.py`
 13. `core/runtime.py`
 14. `core/comment_selection_policy.py`
-15. `desktop/config.example.json`
-16. `docs/DESKTOP_MVP_SPEC.md`
-17. `docs/ACCEPTANCE_TESTS_MVP.md`
-18. testes existentes.
+16. `desktop/config.example.json`
+17. `docs/DESKTOP_MVP_SPEC.md`
+18. `docs/ACCEPTANCE_TESTS_MVP.md`
+19. testes existentes.
 
 MISSÃO: entregar o programa Windows funcional **AGCN Live Voice — Sua voz inteligente para vender ao vivo.**
 
@@ -61,6 +61,11 @@ Voz:
 - listagem/seleção de device;
 - VoiceService com fila prioritária;
 - VoiceFactory.
+
+Configuração:
+- `desktop/config_store.py` já persiste em `%APPDATA%/AGCN Live Voice/config.json`;
+- faz merge com defaults públicos;
+- remove chaves/tokens/secrets antes de salvar.
 
 Runtime:
 - pode receber Brain e Voice reais;
