@@ -19,7 +19,15 @@ class AGCNVoiceRuntime:
 
     O Presenter roda em worker próprio. Isso evita travar a UI enquanto
     Qwen/API/TTS trabalham.
+
+    Regra de cadência:
+    - no máximo 3 respostas consecutivas;
+    - depois, 30s obrigatórios falando do produto;
+    - perguntas continuam entrando na fila durante essa janela.
     """
+
+    MAX_REACTIVE_BURST = 3
+    FORCED_PRODUCT_SECONDS = 30.0
 
     def __init__(
         self,
@@ -45,6 +53,9 @@ class AGCNVoiceRuntime:
         self.last_decision = None
         self.current_speech = None
         self.current_speech_until = 0.0
+        self.reactive_streak = 0
+        self.forced_product_start_at = 0.0
+        self.forced_product_until = 0.0
 
         self.brain_provider = brain_provider
         if self.brain_provider is None and brain_config is not None:
@@ -93,6 +104,9 @@ class AGCNVoiceRuntime:
                 self.current_speech = None
                 self.current_speech_until = 0.0
                 self.last_decision = None
+                self.reactive_streak = 0
+                self.forced_product_start_at = 0.0
+                self.forced_product_until = 0.0
 
             self.product_signature = signature
 
@@ -267,6 +281,61 @@ class AGCNVoiceRuntime:
         )
         self.voice_jobs += 1
 
+    def _product_window_active(self, now: float | None = None) -> bool:
+        now = time.time() if now is None else now
+
+        if self.forced_product_until and now >= self.forced_product_until:
+            self.reactive_streak = 0
+            self.forced_product_start_at = 0.0
+            self.forced_product_until = 0.0
+            return False
+
+        return bool(
+            self.forced_product_start_at
+            and self.forced_product_start_at <= now < self.forced_product_until
+        )
+
+    def _seconds_until_comments(self, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        if not self.forced_product_until:
+            return 0
+        if now < self.forced_product_start_at:
+            return int(round(
+                (self.forced_product_start_at - now)
+                + self.FORCED_PRODUCT_SECONDS
+            ))
+        if self._product_window_active(now):
+            return max(0, int(round(self.forced_product_until - now)))
+        return 0
+
+    def _schedule_product_window_after(self, speech_until: float) -> None:
+        self.forced_product_start_at = speech_until
+        self.forced_product_until = speech_until + self.FORCED_PRODUCT_SECONDS
+
+    def _forced_proactive(self) -> dict | None:
+        force = getattr(self.presenter, "force_proactive", None)
+        if callable(force):
+            return force()
+
+        # Compatibilidade com Presenter determinístico legado.
+        topic = self.presenter.planner.choose_proactive_topic(
+            self.presenter.guard,
+            self.presenter.memory,
+        )
+        decision = self.presenter.decision_engine.proactive(topic, priority=36)
+        plan = self.presenter.planner.plan(
+            decision,
+            self.presenter.guard,
+            self.presenter.memory,
+        )
+        renderer = getattr(self.presenter, "_render_plan", None)
+        if callable(renderer):
+            item = renderer(plan)
+            if item:
+                self.presenter.memory.remember_speech(item)
+            return item
+        return None
+
     def _tick_presenter_locked(self):
         self._sync_active_product_locked()
 
@@ -277,14 +346,21 @@ class AGCNVoiceRuntime:
         ):
             return
 
+        # Comentários continuam sendo processados mesmo durante a janela de
+        # produto. Eles aguardam na fila; não dominam a LIVE.
         created = self.presenter.process_pending_comments()
         if created:
             self.items_queued += len(created)
 
-        queue = self.presenter.queue_snapshot()
         now = time.time()
+        product_window = self._product_window_active(now)
+        queue = self.presenter.queue_snapshot()
 
         if self.current_speech and now < self.current_speech_until:
+            # Durante os 30s de produto, nenhuma pergunta interrompe.
+            if product_window or self.reactive_streak >= self.MAX_REACTIVE_BURST:
+                return
+
             if (
                 queue
                 and queue[0].get("priority", 0) >= 90
@@ -297,13 +373,22 @@ class AGCNVoiceRuntime:
                 return
 
         self.current_speech = None
+        now = time.time()
+        product_window = self._product_window_active(now)
 
-        proactive = self.presenter.maybe_proactive()
-        if proactive:
-            self.proactive_generated += 1
-            self.items_queued += 1
+        if product_window:
+            # Foco absoluto no produto. A fila reativa fica intacta.
+            item = self._forced_proactive()
+            if item:
+                self.proactive_generated += 1
+        else:
+            proactive = self.presenter.maybe_proactive()
+            if proactive:
+                self.proactive_generated += 1
+                self.items_queued += 1
 
-        item = self.presenter.next_speech()
+            item = self.presenter.next_speech()
+
         if not item:
             return
 
@@ -312,6 +397,11 @@ class AGCNVoiceRuntime:
 
         if item.get("type") == "reactive":
             self.last_decision = item
+            self.reactive_streak += 1
+        elif not product_window:
+            # Uma fala espontânea de produto quebra uma sequência curta de
+            # perguntas antes de chegar ao limite.
+            self.reactive_streak = 0
 
         try:
             self._queue_voice(item)
@@ -323,6 +413,13 @@ class AGCNVoiceRuntime:
             max(2.5, len(item["speech"]) / 16.0),
         )
         self.current_speech_until = now + duration
+
+        if (
+            item.get("type") == "reactive"
+            and self.reactive_streak >= self.MAX_REACTIVE_BURST
+            and not self.forced_product_until
+        ):
+            self._schedule_product_window_after(self.current_speech_until)
 
     def snapshot(self) -> dict:
         """Snapshot somente-leitura: nunca chama LLM/TTS."""
@@ -369,6 +466,14 @@ class AGCNVoiceRuntime:
                 "speeches_generated": self.speeches_generated,
                 "proactive_generated": self.proactive_generated,
                 "interruptions": self.interruptions,
+                "presenter_mode": (
+                    "produto"
+                    if self._product_window_active()
+                    else "interativo"
+                ),
+                "comments_paused_seconds": self._seconds_until_comments(),
+                "reactive_streak": self.reactive_streak,
+                "max_reactive_burst": self.MAX_REACTIVE_BURST,
                 "last_comment": (
                     dict(self.last_comment)
                     if self.last_comment
@@ -438,6 +543,9 @@ class AGCNVoiceRuntime:
             f"Brain: {data.get('brain_provider', '—')}",
             f"Voz: {voice.get('tts') or ('DESATIVADA' if not data.get('voice_enabled') else '—')}",
             f"Worker: {'ATIVO' if data.get('presenter_worker_running') else 'PARADO'}",
+            f"Modo: {data.get('presenter_mode', '—')}",
+            f"Respostas seguidas: {data.get('reactive_streak', 0)}/{data.get('max_reactive_burst', 3)}",
+            f"Comentários pausados: {data.get('comments_paused_seconds', 0)}s",
             "",
             "CHECKLIST:",
         ]
