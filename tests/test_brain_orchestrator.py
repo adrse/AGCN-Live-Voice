@@ -173,3 +173,83 @@ def test_needs_fact_does_not_bypass_numeric_validation():
         raise AssertionError(
             "needs_fact não pode liberar número inventado"
         )
+
+
+def test_brain_retries_when_proactive_opening_repeats():
+    fact = "benefícios: áudio claro"
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Olha esse fone, o áudio claro faz diferença no dia a dia.",
+            "topic": "benefits",
+            "used_facts": [fact],
+            "needs_fact": False,
+            "next_sales_thread": "usage",
+        }),
+        json.dumps({
+            "speech": "Pra ouvir no dia a dia, o áudio claro ajuda bastante.",
+            "topic": "benefits",
+            "used_facts": [fact],
+            "needs_fact": False,
+            "next_sales_thread": "usage",
+        }),
+    ])
+    brain = PresenterBrain(transport, max_retries=1)
+    result = brain.generate(
+        BrainContext(
+            mode="proactive",
+            recent_speeches=[
+                "Olha esse fone, a bateria dele ajuda bastante no dia a dia."
+            ],
+            allowed_facts=[fact],
+        )
+    )
+
+    assert result.speech.startswith("Pra ouvir")
+    assert len(transport.calls) == 2
+    assert "fala muito parecida" in transport.calls[1][1]
+
+
+def test_brain_rejects_fake_scarcity_without_fact():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Corre que está acabando!",
+            "topic": "scarcity",
+            "used_facts": [],
+            "needs_fact": False,
+            "next_sales_thread": "",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+
+    try:
+        brain.generate(
+            BrainContext(
+                mode="proactive",
+                allowed_facts=["nome: Produto X"],
+            )
+        )
+    except BrainOutputError:
+        pass
+    else:
+        raise AssertionError("deveria rejeitar escassez inventada")
+
+
+def test_brain_accepts_exact_low_stock_scarcity():
+    transport = FakeTransport([
+        json.dumps({
+            "speech": "Agora restam 3 unidades.",
+            "topic": "scarcity",
+            "used_facts": ["estoque: 3"],
+            "needs_fact": False,
+            "next_sales_thread": "benefits",
+        })
+    ])
+    brain = PresenterBrain(transport, max_retries=0)
+
+    result = brain.generate(
+        BrainContext(
+            mode="proactive",
+            allowed_facts=["estoque: 3"],
+        )
+    )
+    assert result.speech == "Agora restam 3 unidades."
