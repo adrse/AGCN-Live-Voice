@@ -14,7 +14,7 @@ python -c "import core.runtime, core.presenter_v3, core.tts_providers, core.audi
 if errorlevel 1 goto :fail
 
 echo [3/4] Compilando...
-pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --collect-all TikTokLive --collect-all keyring --collect-all pyttsx3 --hidden-import pyttsx3.drivers --hidden-import pyttsx3.drivers.sapi5 desktop\main.py
+pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --collect-all TikTokLive --collect-all keyring desktop\main.py
 if errorlevel 1 goto :fail
 
 echo [4/4] Validando arquivo...
