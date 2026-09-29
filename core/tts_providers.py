@@ -301,7 +301,8 @@ def _build_openai(cfg: dict, profile: dict) -> OpenAITTSProvider:
         ),
         model=str(api.get("model") or "gpt-4o-mini-tts"),
         default_voice=str(
-            api.get("voice_override")
+            cfg.get("voice_override")
+            or api.get("voice_override")
             or profile["openai_voice"]
         ),
         base_url=str(
