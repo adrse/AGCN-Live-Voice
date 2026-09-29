@@ -562,6 +562,7 @@ class AGCNVoiceRuntime:
             f"Produto ativo: {product.get('name') or 'NÃO CARREGADO'}",
             f"Brain: {data.get('brain_provider', '—')}",
             f"Voz: {voice.get('tts') or ('DESATIVADA' if not data.get('voice_enabled') else '—')}",
+            f"Estilo vocal: {voice.get('current_style') or (data.get('current_speech') or {}).get('voice_style') or '—'}",
             f"Worker: {'ATIVO' if data.get('presenter_worker_running') else 'PARADO'}",
             f"Modo: {data.get('presenter_mode', '—')}",
             f"Respostas seguidas: {data.get('reactive_streak', 0)}/{data.get('max_reactive_burst', 3)}",
