@@ -1,6 +1,10 @@
 import io
 import wave
 
+from core.local_kokoro_tts import (
+    KokoroLocalTTSProvider,
+    PROFILE_VOICES,
+)
 from core.neural_tts import ElevenLabsTTSProvider
 from core.tts_providers import OpenAITTSProvider, build_tts_provider
 from core.voice_profiles import get_voice_profile, list_voice_profiles
@@ -55,12 +59,33 @@ def test_two_required_fast_voice_profiles_exist():
     assert profiles["male_fast"]["openai_speed"] > 1.0
 
 
-def test_profiles_have_distinct_premium_base_voices():
-    female = get_voice_profile("female_fast")
-    male = get_voice_profile("male_fast")
-    assert female["openai_voice"] != male["openai_voice"]
-    assert "feminina" in female["openai_instructions"].casefold()
-    assert "masculina" in male["openai_instructions"].casefold()
+def test_official_local_ptbr_voices_are_distinct():
+    assert PROFILE_VOICES["female_fast"] == "pf_dora"
+    assert PROFILE_VOICES["male_fast"] == "pm_alex"
+    assert PROFILE_VOICES["female_fast"] != PROFILE_VOICES["male_fast"]
+
+
+def test_default_tts_is_local_kokoro_without_api():
+    provider = build_tts_provider({
+        "tts": {
+            "provider": "kokoro_local",
+            "profile": "male_fast",
+            "speed": 1.31,
+        }
+    })
+    assert isinstance(provider, KokoroLocalTTSProvider)
+    assert provider.voice_id == "pm_alex"
+    assert provider.speed == 1.31
+
+
+def test_kokoro_healthcheck_reports_missing_assets(tmp_path):
+    provider = KokoroLocalTTSProvider(
+        profile_id="female_fast",
+        model_dir=tmp_path,
+    )
+    ok, detail = provider.healthcheck()
+    assert ok is False
+    assert "ausentes" in detail
 
 
 def test_openai_tts_sends_speed_and_fast_sales_instructions():
@@ -98,16 +123,3 @@ def test_elevenlabs_tts_uses_pcm_and_clamps_speed():
     _, kwargs = session.calls[0]
     assert kwargs["params"]["output_format"] == "pcm_24000"
     assert kwargs["json"]["voice_settings"]["speed"] == 1.2
-
-
-def test_local_legacy_is_explicit_not_default():
-    provider = build_tts_provider({
-        "tts": {
-            "provider": "local_legacy",
-            "profile": "male_fast",
-            "local_legacy": {"volume": 1.0},
-        }
-    })
-    profile = get_voice_profile("male_fast")
-    assert provider.rate == profile["local_rate"]
-    assert provider.profile_label == profile["label"]
