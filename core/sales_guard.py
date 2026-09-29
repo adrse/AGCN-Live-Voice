@@ -44,14 +44,57 @@ class SalesGuard:
         return str(text or "Oferta cadastrada para esta LIVE.").strip()
 
     def grounded_urgency(self) -> list[str]:
-        """Retorna apenas urgência explicitamente cadastrada.
+        """Retorna somente sinais de urgência comercial verificáveis.
 
-        Um número de estoque, sozinho, NÃO significa escassez. Isso evita
-        frases como "está acabando" quando existem muitas unidades.
+        Estoque baixo real (1 a 10 unidades) pode ser verbalizado pelo número
+        exato. Estoque alto não autoriza "está acabando". Oferta/nota
+        promocional também só entra quando foi cadastrada para esta LIVE.
         """
-        reasons = []
+        reasons: list[str] = []
+
+        stock = self.get("stock")
+        if stock is not None:
+            try:
+                stock_n = int(float(stock))
+                if 1 <= stock_n <= 10:
+                    reasons.append(f"stock:{stock_n}")
+            except Exception:
+                pass
+
         if self.live_offer():
             reasons.append("live_offer")
+
+        note = str(self.product.get("promotion_note") or "").strip()
+        folded = (
+            note.casefold()
+            .replace("á", "a")
+            .replace("à", "a")
+            .replace("ã", "a")
+            .replace("â", "a")
+            .replace("é", "e")
+            .replace("ê", "e")
+            .replace("í", "i")
+            .replace("ó", "o")
+            .replace("ô", "o")
+            .replace("õ", "o")
+            .replace("ú", "u")
+            .replace("ç", "c")
+        )
+        urgency_markers = (
+            "ultima",
+            "resta",
+            "relampago",
+            "termina",
+            "encerra",
+            "so hoje",
+            "exclusiv",
+            "esgot",
+            "carrinho",
+            "limitad",
+        )
+        if note and any(marker in folded for marker in urgency_markers):
+            reasons.append("promotion_note")
+
         return reasons
 
     def fact_for_topic(self, topic: str):
