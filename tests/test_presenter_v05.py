@@ -37,7 +37,8 @@ def test_sales_guard_allows_grounded_urgency():
         "live_offer": True,
         "live_offer_text": "Preço especial confirmado durante esta LIVE.",
     })
-    assert "stock:3" in guard.grounded_urgency()
+    assert "stock:3" not in guard.grounded_urgency()
+    assert "live_offer" in guard.grounded_urgency()
     assert guard.can_claim("scarcity") is True
     assert guard.can_claim("live_exclusive") is True
 
