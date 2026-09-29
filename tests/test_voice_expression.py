@@ -78,3 +78,14 @@ def test_qwen_expression_can_be_disabled(tmp_path):
     })
     assert style == "sales_energy"
     assert provider.active_instructions == provider.base_instructions
+
+
+def test_explicit_suspense_style_is_available():
+    style, instruction = build_voice_instructions(
+        "Brazilian Portuguese sales presenter.",
+        {"voice_style": "suspense_reveal"},
+        strength=1.0,
+    )
+    assert style == "suspense_reveal"
+    assert "suspense" in instruction.casefold()
+    assert "whisper" in instruction.casefold()
