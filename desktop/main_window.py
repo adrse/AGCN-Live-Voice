@@ -629,8 +629,18 @@ class SettingsPage(QWidget):
                 str(exc),
             )
 
+    def _apply_settings_before_test(self) -> None:
+        key = self.api_key.text()
+        self.controller.save_settings(
+            self._patch(),
+            openai_key=key if key else None,
+        )
+        if key:
+            self.api_key.clear()
+
     def _test_brain(self) -> None:
         try:
+            self._apply_settings_before_test()
             ok, message = self.controller.brain_health()
             QMessageBox.information(
                 self,
@@ -667,6 +677,7 @@ class SettingsPage(QWidget):
 
     def _test_voice(self) -> None:
         try:
+            self._apply_settings_before_test()
             ok, message = self.controller.test_voice()
             QMessageBox.information(
                 self,
