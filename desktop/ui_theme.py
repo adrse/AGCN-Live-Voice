@@ -60,6 +60,11 @@ QFrame#Card {
     border-radius: 15px;
 }
 
+QFrame#TopBar {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E3E9F2;
+}
+
 QFrame#SoftCard {
     background: #F8FAFD;
     border: 1px solid #E7ECF4;
