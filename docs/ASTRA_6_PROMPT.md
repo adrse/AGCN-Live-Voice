@@ -18,7 +18,8 @@ Leia nesta ordem:
 11. `core/voice_service.py`
 12. `core/voice_factory.py`
 13. `core/runtime.py`
-14. `core/comment_selection_policy.py`
+14. `desktop/config_store.py`
+15. `core/comment_selection_policy.py`
 16. `desktop/config.example.json`
 17. `docs/DESKTOP_MVP_SPEC.md`
 18. `docs/ACCEPTANCE_TESTS_MVP.md`
