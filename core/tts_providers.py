@@ -17,6 +17,7 @@ import requests
 
 from core.integration_contracts import AudioChunk, TTSProvider
 from core.local_kokoro_tts import KokoroLocalTTSProvider
+from core.local_qwen3_tts import Qwen3HQLocalTTSProvider
 from core.neural_tts import ElevenLabsTTSProvider
 from core.secret_store import get_secret
 from core.voice_profiles import get_voice_profile
@@ -353,8 +354,45 @@ def _build_elevenlabs(
 def build_tts_provider(config: dict | None = None) -> TTSProvider:
     config = dict(config or {})
     cfg = dict(config.get("tts") or config)
-    provider = str(cfg.get("provider") or "kokoro_local").casefold()
+    provider = str(cfg.get("provider") or "qwen3_hq_auto").casefold()
     profile = get_voice_profile(cfg.get("profile"))
+
+    if provider in {"qwen3_hq_auto", "qwen3_auto", "agcn_hq"}:
+        hq_cfg = dict(cfg.get("qwen3_hq") or {})
+        primary = Qwen3HQLocalTTSProvider(
+            profile_id=profile["id"],
+            speed=_selected_speed(cfg, profile),
+            pack_dir=hq_cfg.get("pack_dir") or None,
+            port=int(hq_cfg.get("port", 18765)),
+            startup_timeout_seconds=float(
+                hq_cfg.get("startup_timeout_seconds", 120)
+            ),
+            request_timeout_seconds=float(
+                hq_cfg.get("request_timeout_seconds", 60)
+            ),
+        )
+        local_cfg = dict(cfg.get("kokoro") or {})
+        fallback = KokoroLocalTTSProvider(
+            profile_id=profile["id"],
+            speed=_selected_speed(cfg, profile),
+            model_dir=local_cfg.get("model_dir") or None,
+        )
+        return FallbackTTSProvider(primary, fallback)
+
+    if provider in {"qwen3_hq", "quality_max", "maximum"}:
+        hq_cfg = dict(cfg.get("qwen3_hq") or {})
+        return Qwen3HQLocalTTSProvider(
+            profile_id=profile["id"],
+            speed=_selected_speed(cfg, profile),
+            pack_dir=hq_cfg.get("pack_dir") or None,
+            port=int(hq_cfg.get("port", 18765)),
+            startup_timeout_seconds=float(
+                hq_cfg.get("startup_timeout_seconds", 120)
+            ),
+            request_timeout_seconds=float(
+                hq_cfg.get("request_timeout_seconds", 60)
+            ),
+        )
 
     if provider in {"kokoro_local", "local_neural", "agcn_local"}:
         local_cfg = dict(cfg.get("kokoro") or {})
