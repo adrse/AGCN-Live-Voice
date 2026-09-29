@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from core.integration_contracts import AudioSink, TTSProvider
+from core.speech_text import normalize_ptbr_for_tts
 
 
 @dataclass(order=True)
@@ -96,6 +97,19 @@ class VoiceService:
             self.queue.put_nowait(job)
         return removed
 
+    def interrupt_proactive(self) -> bool:
+        """Interrompe áudio proativo atual para responder um comentário."""
+        interrupted = False
+        current = self.current_job
+        if current and current.metadata.get("type") == "proactive":
+            try:
+                self.sink.stop()
+                interrupted = True
+            except Exception:
+                pass
+        self.clear_pending(proactive_only=True)
+        return interrupted
+
     def stop(self) -> None:
         self.stop_event.set()
         try:
@@ -152,8 +166,9 @@ class VoiceService:
                 configure = getattr(self.tts, "configure_for_job", None)
                 if callable(configure):
                     configure(metadata)
+                spoken_text = normalize_ptbr_for_tts(job.text)
                 chunk = self.tts.synthesize(
-                    job.text,
+                    spoken_text,
                     voice=job.voice or self.default_voice,
                 )
                 if self.stop_event.is_set():
