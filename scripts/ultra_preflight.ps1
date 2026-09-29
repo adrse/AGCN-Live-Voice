@@ -44,7 +44,15 @@ if ($ollama) {
 }
 
 Write-Host ""
-Write-Host "[7] Voz local e audio"
+Write-Host "[6.5] Voice Pack HQ"
+$hqPack = Join-Path $env:LOCALAPPDATA "AGCN Live Voice\voice_hq"
+if (!(Test-Path (Join-Path $hqPack "bin\tts-server.exe"))) {
+    Write-Host "PENDENTE: Voice Pack HQ nao instalado."
+    Write-Host "Execute: powershell -ExecutionPolicy Bypass -File scripts\setup_qwen3_hq_voice.ps1"
+}
+
+Write-Host ""
+Write-Host "[7] Voz HQ local e audio"
 python scripts\test_voice.py --list-devices
 python scripts\test_voice.py --profile female_fast --speed 1.28
 python scripts\test_voice.py --profile male_fast --speed 1.28
