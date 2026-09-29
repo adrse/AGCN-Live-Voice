@@ -1,0 +1,42 @@
+import json
+
+from desktop.config_store import ConfigStore
+
+
+def test_config_store_merges_defaults_and_strips_secrets(tmp_path):
+    defaults = tmp_path / "defaults.json"
+    user = tmp_path / "config.json"
+
+    defaults.write_text(
+        json.dumps({
+            "brain": {
+                "provider": "qwen_local",
+                "ollama": {"model": "qwen3:4b"},
+            },
+            "audio": {"volume": 1.0},
+        }),
+        encoding="utf-8",
+    )
+
+    store = ConfigStore(path=user, defaults_path=defaults)
+    saved = store.save({
+        "brain": {
+            "provider": "openai",
+            "api_key": "NAO_PODE_SALVAR",
+            "api": {
+                "api_key_env": "OPENAI_API_KEY",
+                "token": "SEGREDO",
+            },
+        },
+        "audio": {"output_device": "CABLE Input"},
+    })
+
+    assert "api_key" not in saved["brain"]
+    assert "token" not in saved["brain"]["api"]
+
+    loaded = store.load()
+    assert loaded["brain"]["provider"] == "openai"
+    assert loaded["brain"]["ollama"]["model"] == "qwen3:4b"
+    assert loaded["brain"]["api"]["api_key_env"] == "OPENAI_API_KEY"
+    assert loaded["audio"]["volume"] == 1.0
+    assert loaded["audio"]["output_device"] == "CABLE Input"
