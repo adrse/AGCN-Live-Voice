@@ -134,3 +134,20 @@ def test_brain_settings_no_longer_own_voice_controls():
     assert hasattr(window.voice_audio_page, "voice_test_text")
 
     window.close()
+
+
+def test_voice_and_general_settings_patches_are_separated():
+    _app()
+    controller = FakeController()
+    window = MainWindow(controller)
+
+    voice_patch = window.voice_audio_page._patch()
+    brain_patch = window.settings_page._patch()
+
+    assert set(voice_patch) == {"tts", "audio"}
+    assert "brain" not in voice_patch
+    assert set(brain_patch) == {"brain"}
+    assert "tts" not in brain_patch
+    assert "audio" not in brain_patch
+
+    window.close()
