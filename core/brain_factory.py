@@ -5,11 +5,11 @@ Configuração decide o transporte; PresenterPolicy e validação continuam igua
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from core.brain_orchestrator import PresenterBrain
 from core.integration_contracts import BrainContext, BrainProvider, BrainResult
+from core.secret_store import get_secret
 from core.model_transports import (
     OllamaTransport,
     OpenAICompatibleChatTransport,
@@ -99,7 +99,7 @@ def _build_local(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
 def _build_openai(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
     api = dict(cfg.get("api") or {})
     key_env = str(api.get("api_key_env") or "OPENAI_API_KEY")
-    api_key = str(os.getenv(key_env) or "")
+    api_key = get_secret(key_env)
 
     return PresenterBrain(
         OpenAIResponsesTransport(
@@ -127,7 +127,7 @@ def _build_compatible(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
 
     return PresenterBrain(
         OpenAICompatibleChatTransport(
-            api_key=str(os.getenv(key_env) or ""),
+            api_key=get_secret(key_env),
             model=str(api.get("model") or "").strip(),
             base_url=str(api.get("base_url") or "").strip(),
             timeout_seconds=float(
