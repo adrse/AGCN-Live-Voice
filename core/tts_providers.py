@@ -291,7 +291,10 @@ class FallbackTTSProvider:
             return chunk
         except Exception:
             chunk = self.fallback.synthesize(text, voice=voice)
-            self.last_provider = self.fallback.name
+            self.last_provider = (
+                getattr(self.fallback, "last_provider", "")
+                or self.fallback.name
+            )
             return chunk
 
     def close(self) -> None:
