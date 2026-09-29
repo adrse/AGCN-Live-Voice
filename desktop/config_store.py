@@ -39,23 +39,36 @@ BUILTIN_DEFAULTS = {
         },
     },
     "tts": {
-        "provider": "local",
+        "provider": "openai",
         "profile": "female_fast",
+        "speed": 1.28,
         "voice_override": "",
-        "fallback_local": True,
-        "local": {
-            "rate_override": None,
-            "volume": 1.0,
-        },
-        "api": {
+        "openai": {
             "base_url": "https://api.openai.com/v1",
             "model": "gpt-4o-mini-tts",
             "api_key_env": "OPENAI_API_KEY",
             "timeout_seconds": 45,
             "voice_override": "",
-            "speed_override": None,
             "instructions_override": "",
         },
+        "elevenlabs": {
+            "base_url": "https://api.elevenlabs.io/v1",
+            "model": "eleven_v3_conversational",
+            "api_key_env": "ELEVENLABS_API_KEY",
+            "timeout_seconds": 45,
+            "voice_ids": {
+                "female_fast": "",
+                "male_fast": ""
+            },
+            "stability": 0.45,
+            "similarity_boost": 0.8,
+            "style": 0.2,
+            "use_speaker_boost": True
+        },
+        "local_legacy": {
+            "rate": 235,
+            "volume": 1.0
+        }
     },
     "audio": {
         "output_device": "",
