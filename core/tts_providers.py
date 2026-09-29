@@ -15,6 +15,7 @@ from typing import Any
 
 import requests
 
+from core.gemini_tts import GeminiTTSProvider
 from core.integration_contracts import AudioChunk, TTSProvider
 from core.local_kokoro_tts import KokoroLocalTTSProvider
 from core.local_qwen3_tts import Qwen3HQLocalTTSProvider
@@ -290,7 +291,10 @@ class FallbackTTSProvider:
             return chunk
         except Exception:
             chunk = self.fallback.synthesize(text, voice=voice)
-            self.last_provider = self.fallback.name
+            self.last_provider = (
+                getattr(self.fallback, "last_provider", "")
+                or self.fallback.name
+            )
             return chunk
 
     def close(self) -> None:
@@ -308,6 +312,81 @@ def _selected_speed(cfg: dict, profile: dict) -> float:
     if value in (None, ""):
         return float(profile["default_speed"])
     return float(value)
+
+
+def _expressive_enabled(cfg: dict) -> bool:
+    hq_cfg = dict(cfg.get("qwen3_hq") or {})
+    return bool(cfg.get("expressive", hq_cfg.get("expressive", True)))
+
+
+def _expression_strength(cfg: dict) -> float:
+    hq_cfg = dict(cfg.get("qwen3_hq") or {})
+    return float(
+        cfg.get(
+            "expression_strength",
+            hq_cfg.get("expression_strength", 1.0),
+        )
+    )
+
+
+def _style_selection(cfg: dict) -> str:
+    hq_cfg = dict(cfg.get("qwen3_hq") or {})
+    return str(
+        cfg.get("voice_style")
+        or hq_cfg.get("voice_style")
+        or "auto"
+    )
+
+
+def _build_local_hq_chain(cfg: dict, profile: dict) -> TTSProvider:
+    hq_cfg = dict(cfg.get("qwen3_hq") or {})
+    primary = Qwen3HQLocalTTSProvider(
+        profile_id=profile["id"],
+        speed=_selected_speed(cfg, profile),
+        pack_dir=hq_cfg.get("pack_dir") or None,
+        port=int(hq_cfg.get("port", 18765)),
+        startup_timeout_seconds=float(
+            hq_cfg.get("startup_timeout_seconds", 120)
+        ),
+        request_timeout_seconds=float(
+            hq_cfg.get("request_timeout_seconds", 60)
+        ),
+        expressive=_expressive_enabled(cfg),
+        expression_strength=_expression_strength(cfg),
+    )
+    local_cfg = dict(cfg.get("kokoro") or {})
+    fallback = KokoroLocalTTSProvider(
+        profile_id=profile["id"],
+        speed=_selected_speed(cfg, profile),
+        model_dir=local_cfg.get("model_dir") or None,
+    )
+    return FallbackTTSProvider(primary, fallback)
+
+
+def _build_gemini(cfg: dict, profile: dict) -> GeminiTTSProvider:
+    api = dict(cfg.get("gemini") or {})
+    return GeminiTTSProvider(
+        api_key=get_secret(
+            str(api.get("api_key_env") or "GEMINI_API_KEY")
+        ),
+        model=str(
+            api.get("model") or "gemini-3.8-flash-lite-tts"
+        ),
+        profile_id=profile["id"],
+        voice_override=str(
+            cfg.get("voice_override")
+            or api.get("voice_override")
+            or ""
+        ),
+        base_url=str(
+            api.get("base_url")
+            or "https://generativelanguage.googleapis.com"
+        ),
+        timeout_seconds=float(api.get("timeout_seconds", 45)),
+        speed=_selected_speed(cfg, profile),
+        expressive=_expressive_enabled(cfg),
+        expression_strength=_expression_strength(cfg),
+    )
 
 
 def _build_openai(cfg: dict, profile: dict) -> OpenAITTSProvider:
@@ -373,30 +452,7 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
     profile = get_voice_profile(cfg.get("profile"))
 
     if provider in {"qwen3_hq_auto", "qwen3_auto", "agcn_hq"}:
-        hq_cfg = dict(cfg.get("qwen3_hq") or {})
-        primary = Qwen3HQLocalTTSProvider(
-            profile_id=profile["id"],
-            speed=_selected_speed(cfg, profile),
-            pack_dir=hq_cfg.get("pack_dir") or None,
-            port=int(hq_cfg.get("port", 18765)),
-            startup_timeout_seconds=float(
-                hq_cfg.get("startup_timeout_seconds", 120)
-            ),
-            request_timeout_seconds=float(
-                hq_cfg.get("request_timeout_seconds", 60)
-            ),
-            expressive=bool(hq_cfg.get("expressive", True)),
-            expression_strength=float(
-                hq_cfg.get("expression_strength", 1.0)
-            ),
-        )
-        local_cfg = dict(cfg.get("kokoro") or {})
-        fallback = KokoroLocalTTSProvider(
-            profile_id=profile["id"],
-            speed=_selected_speed(cfg, profile),
-            model_dir=local_cfg.get("model_dir") or None,
-        )
-        return FallbackTTSProvider(primary, fallback)
+        return _build_local_hq_chain(cfg, profile)
 
     if provider in {"qwen3_hq", "quality_max", "maximum"}:
         hq_cfg = dict(cfg.get("qwen3_hq") or {})
@@ -411,10 +467,15 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
             request_timeout_seconds=float(
                 hq_cfg.get("request_timeout_seconds", 60)
             ),
-            expressive=bool(hq_cfg.get("expressive", True)),
-            expression_strength=float(
-                hq_cfg.get("expression_strength", 1.0)
-            ),
+            expressive=_expressive_enabled(cfg),
+            expression_strength=_expression_strength(cfg),
+        )
+
+    if provider in {"gemini_premium", "gemini", "gemini_tts"}:
+        primary = _build_gemini(cfg, profile)
+        return FallbackTTSProvider(
+            primary,
+            _build_local_hq_chain(cfg, profile),
         )
 
     if provider in {"kokoro_local", "local_neural", "agcn_local"}:

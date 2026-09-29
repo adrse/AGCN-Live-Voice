@@ -30,7 +30,9 @@ def build_voice_service(
             tts_cfg.get("voice_override") or ""
         ) or None,
         style_selection=str(
-            (tts_cfg.get("qwen3_hq") or {}).get("voice_style") or "auto"
+            tts_cfg.get("voice_style")
+            or (tts_cfg.get("qwen3_hq") or {}).get("voice_style")
+            or "auto"
         ),
         max_queue=int(tts_cfg.get("max_queue", 30)),
     )
