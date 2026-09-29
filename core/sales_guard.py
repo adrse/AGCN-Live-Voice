@@ -44,20 +44,14 @@ class SalesGuard:
         return str(text or "Oferta cadastrada para esta LIVE.").strip()
 
     def grounded_urgency(self) -> list[str]:
+        """Retorna apenas urgência explicitamente cadastrada.
+
+        Um número de estoque, sozinho, NÃO significa escassez. Isso evita
+        frases como "está acabando" quando existem muitas unidades.
+        """
         reasons = []
-
-        stock = self.get("stock")
-        if stock is not None:
-            try:
-                stock_n = int(float(stock))
-                if stock_n >= 0:
-                    reasons.append(f"stock:{stock_n}")
-            except Exception:
-                pass
-
         if self.live_offer():
             reasons.append("live_offer")
-
         return reasons
 
     def fact_for_topic(self, topic: str):
@@ -82,5 +76,5 @@ class SalesGuard:
         if claim == "live_exclusive":
             return bool(self.live_offer())
         if claim == "scarcity":
-            return any(x.startswith("stock:") for x in self.grounded_urgency())
+            return bool(self.grounded_urgency())
         return self.get(claim) is not None
