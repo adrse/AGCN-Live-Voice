@@ -137,7 +137,7 @@ class DesktopController:
             chunk = tts.synthesize(
                 text,
                 voice=str(
-                    (self.config.get("tts") or {}).get("voice")
+                    (self.config.get("tts") or {}).get("voice_override")
                     or ""
                 ) or None,
             )
