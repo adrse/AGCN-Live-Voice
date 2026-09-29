@@ -151,12 +151,23 @@ class DesktopController:
                 ),
                 volume=float(audio_cfg.get("volume", 1.0)),
             )
+            tts_cfg = dict(self.config.get("tts") or {})
+            hq_cfg = dict(tts_cfg.get("qwen3_hq") or {})
+            style = str(hq_cfg.get("voice_style") or "auto")
+            configure = getattr(tts, "configure_for_job", None)
+            if callable(configure):
+                configure({
+                    "type": "proactive",
+                    "topic": "benefits",
+                    "tactic": "benefit_translation",
+                    "voice_style": (
+                        style if style not in {"", "auto"} else "sales_energy"
+                    ),
+                })
+
             chunk = tts.synthesize(
                 text,
-                voice=str(
-                    (self.config.get("tts") or {}).get("voice_override")
-                    or ""
-                ) or None,
+                voice=str(tts_cfg.get("voice_override") or "") or None,
             )
             sink.play(chunk)
             return True, f"Voz testada com {tts.name}."
