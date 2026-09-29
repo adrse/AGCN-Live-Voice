@@ -1071,6 +1071,11 @@ class VoiceAudioPage(QWidget):
         self._update_voice_provider_controls()
 
     def _patch(self) -> dict:
+        """Salva somente controles expostos na UI.
+
+        Campos técnicos ocultos (URLs, timeouts, pack_dir etc.) permanecem
+        intactos no ConfigStore graças ao deep-merge.
+        """
         return {
             "tts": {
                 "provider": (
@@ -1082,7 +1087,6 @@ class VoiceAudioPage(QWidget):
                     or "female_fast"
                 ),
                 "speed": self.speed_slider.value() / 100.0,
-                "voice_override": "",
                 "expressive": self.expression_slider.value() > 0,
                 "expression_strength": (
                     self.expression_slider.value() / 100.0
@@ -1091,10 +1095,6 @@ class VoiceAudioPage(QWidget):
                     self.voice_style_combo.currentData() or "auto"
                 ),
                 "qwen3_hq": {
-                    "pack_dir": "",
-                    "port": 18765,
-                    "startup_timeout_seconds": 120,
-                    "request_timeout_seconds": 60,
                     "expressive": self.expression_slider.value() > 0,
                     "expression_strength": (
                         self.expression_slider.value() / 100.0
@@ -1103,20 +1103,12 @@ class VoiceAudioPage(QWidget):
                         self.voice_style_combo.currentData() or "auto"
                     ),
                 },
-                "kokoro": {
-                    "model_dir": "",
-                },
                 "gemini": {
                     "model": (
                         self.gemini_model.currentData()
                         or "gemini-3.8-flash-lite-tts"
                     ),
-                    "base_url": (
-                        "https://generativelanguage.googleapis.com"
-                    ),
                     "api_key_env": "GEMINI_API_KEY",
-                    "timeout_seconds": 45,
-                    "voice_override": "",
                 },
                 "openai_live": {
                     "model": (
@@ -1127,15 +1119,7 @@ class VoiceAudioPage(QWidget):
                         self.openai_live_mode.currentData()
                         or "strict_speech"
                     ),
-                    "websocket_url": (
-                        "wss://api.openai.com/v1/live/sessions"
-                    ),
-                    "models_base_url": "https://api.openai.com/v1",
                     "api_key_env": "OPENAI_API_KEY",
-                    "timeout_seconds": 45,
-                    "startup_timeout_seconds": 12,
-                    "completion_grace_seconds": 0.70,
-                    "voice_override": "",
                 },
             },
             "audio": {
