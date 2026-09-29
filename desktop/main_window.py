@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.voice_profiles import list_voice_profiles
 from desktop.app_controller import DesktopController
 
 
@@ -478,13 +479,23 @@ class SettingsPage(QWidget):
         voice_form = QFormLayout(voice_box)
         self.tts_provider = QComboBox()
         self.tts_provider.addItems(["local", "openai"])
+        self.voice_profile = QComboBox()
+        for profile in list_voice_profiles():
+            self.voice_profile.addItem(
+                profile["label"],
+                profile["id"],
+            )
         self.voice_name = QLineEdit()
+        self.voice_name.setPlaceholderText(
+            "Opcional: nome/ID exato de uma voz instalada"
+        )
         self.device = QComboBox()
         self.device.setEditable(True)
         self.refresh_devices_btn = QPushButton("Atualizar dispositivos")
         self.test_voice_btn = QPushButton("Testar voz")
         voice_form.addRow("TTS", self.tts_provider)
-        voice_form.addRow("Voz", self.voice_name)
+        voice_form.addRow("Perfil de voz", self.voice_profile)
+        voice_form.addRow("Override de voz", self.voice_name)
         voice_form.addRow("Saída de áudio", self.device)
 
         voice_actions = QHBoxLayout()
@@ -537,7 +548,13 @@ class SettingsPage(QWidget):
         self.tts_provider.setCurrentText(
             str(tts.get("provider") or "local")
         )
-        self.voice_name.setText(str(tts.get("voice") or ""))
+        profile_id = str(tts.get("profile") or "female_fast")
+        profile_index = self.voice_profile.findData(profile_id)
+        if profile_index >= 0:
+            self.voice_profile.setCurrentIndex(profile_index)
+        self.voice_name.setText(
+            str(tts.get("voice_override") or "")
+        )
         self.device.setCurrentText(
             str(audio.get("output_device") or "")
         )
@@ -564,7 +581,11 @@ class SettingsPage(QWidget):
             },
             "tts": {
                 "provider": self.tts_provider.currentText(),
-                "voice": self.voice_name.text().strip(),
+                "profile": (
+                    self.voice_profile.currentData()
+                    or "female_fast"
+                ),
+                "voice_override": self.voice_name.text().strip(),
                 "fallback_local": True,
                 "api": {
                     "api_key_env": "OPENAI_API_KEY",
