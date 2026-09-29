@@ -74,6 +74,14 @@ class CommentIntelligence:
         )):
             intent, topic = "buying_intent", "buying"
 
+        # Bateria precisa vir antes de preço: "quanto dura a bateria?"
+        # é autonomia, não pergunta de valor.
+        elif any(k in t for k in (
+            "bateria", "dura quanto", "quanto dura", "carrega",
+            "carregamento", "autonomia"
+        )):
+            intent, topic = "battery", "battery"
+
         elif any(k in t for k in (
             "quanto", "preço", "preco", "valor", "custa", "por quanto"
         )):
@@ -143,12 +151,6 @@ class CommentIntelligence:
             "litros", "altura", "largura"
         )):
             intent, topic = "size", "size"
-
-        elif any(k in t for k in (
-            "bateria", "dura quanto", "quanto dura", "carrega",
-            "carregamento", "autonomia"
-        )):
-            intent, topic = "battery", "battery"
 
         elif any(k in t for k in (
             "quais benefícios", "quais beneficios", "benefícios quais",
