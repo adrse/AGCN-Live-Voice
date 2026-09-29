@@ -6,6 +6,7 @@ para qualquer LLM. Assim Qwen e API recebem a mesma fonte da verdade.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from core.integration_contracts import (
@@ -121,7 +122,31 @@ def build_allowed_facts(product: dict | None) -> list[str]:
         if field not in permanent:
             continue
         label = FACT_LABELS.get(field, field)
-        facts.append(f"{label}: {_format_value(field, permanent[field])}")
+        value = permanent[field]
+
+        # Descrição e listas textuais podem ser cadastradas em vários tópicos.
+        # Cada tópico vira um fato separado para o Brain não despejar a ficha
+        # inteira em uma única fala.
+        if field in {
+            "description",
+            "key_benefits",
+            "differentials",
+            "problems_solved",
+            "included_items",
+        }:
+            if isinstance(value, (list, tuple, set)):
+                items = [str(x).strip() for x in value if str(x).strip()]
+            else:
+                items = [
+                    x.strip()
+                    for x in re.split(r"[\n;|]+", str(value or ""))
+                    if x.strip()
+                ]
+            if items:
+                facts.extend(f"{label}: {item}" for item in items)
+                continue
+
+        facts.append(f"{label}: {_format_value(field, value)}")
 
     for field in LIVE_FIELDS:
         if field not in live:
