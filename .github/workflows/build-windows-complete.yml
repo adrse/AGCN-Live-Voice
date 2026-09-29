@@ -141,6 +141,13 @@ jobs:
           if ($p.HasExited) { throw "AGCN executable exited early. ExitCode=$($p.ExitCode)" }
           Stop-Process -Id $p.Id -Force
 
+      - name: Prepare offline Windows prerequisite
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "installer_payload" | Out-Null
+          curl.exe -L --fail --retry 3 "https://aka.ms/vs/17/release/vc_redist.x64.exe" -o "installer_payload\vc_redist.x64.exe"
+          if ((Get-Item "installer_payload\vc_redist.x64.exe").Length -lt 10000000) { throw "VC++ runtime download is unexpectedly small" }
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: |
