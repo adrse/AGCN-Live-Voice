@@ -183,3 +183,14 @@ Não entregar relatório longo. Entregar:
 - Dora (feminina) e Alex (masculina);
 - modelo + vozes fazem parte do pacote Windows;
 - API não deve ser exigida nem oferecida como dependência para a voz principal.
+
+
+## Importante sobre código legado de voz
+
+Pode haver arquivos/classes experimentais antigos de TTS por API no histórico/árvore.
+Eles NÃO fazem parte da arquitetura oficial do MVP.
+
+Não gastar tokens integrando OpenAI TTS/ElevenLabs TTS.
+A API OpenAI só interessa ao Presenter Brain.
+
+Provider oficial de voz: `kokoro_local`.
