@@ -384,6 +384,7 @@ class PresenterV3:
             "intent": plan.get("intent"),
             "category": plan.get("intent"),
             "topic": result.topic or plan.get("topic"),
+            "tactic": plan.get("tactic"),
             "label": plan.get("label"),
             "priority": plan.get("priority", 0),
             "user": plan.get("user"),
