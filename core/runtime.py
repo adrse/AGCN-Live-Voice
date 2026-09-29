@@ -17,10 +17,8 @@ from core.voice_service import VoiceService
 class AGCNVoiceRuntime:
     """Runtime integrado da LIVE.
 
-    - sem brain_config: mantém PresenterV2 para compatibilidade;
-    - com brain_config: usa PresenterV3 + Qwen/API;
-    - com voice_config/voice_service: fala aprovada entra na fila TTS e sai
-      pelo dispositivo de áudio escolhido (incluindo VB-CABLE).
+    O Presenter roda em worker próprio. Isso evita travar a UI enquanto
+    Qwen/API/TTS trabalham.
     """
 
     def __init__(
@@ -63,6 +61,10 @@ class AGCNVoiceRuntime:
         self.monitor = TikTokMonitor(
             event_callback=self._on_monitor_event
         )
+
+        self.presenter_stop_event = threading.Event()
+        self.presenter_thread: threading.Thread | None = None
+        self.presenter_worker_error = ""
 
     def _new_presenter(self, product: dict):
         if self.brain_provider is not None:
@@ -120,10 +122,8 @@ class AGCNVoiceRuntime:
 
     def add_product(self, payload: dict) -> dict:
         product = self.store.add(**(payload or {}))
-
         with self.lock:
             self._sync_active_product_locked()
-
         return {
             "ok": True,
             "message": "Produto salvo.",
@@ -142,10 +142,8 @@ class AGCNVoiceRuntime:
 
     def activate_product(self, product_id: str) -> dict:
         product = self.store.activate(product_id)
-
         with self.lock:
             self._sync_active_product_locked()
-
         return {
             "ok": True,
             "message": "Produto ativo alterado.",
@@ -154,10 +152,8 @@ class AGCNVoiceRuntime:
 
     def delete_product(self, product_id: str) -> dict:
         removed = self.store.delete(product_id)
-
         with self.lock:
             self._sync_active_product_locked()
-
         return {
             "ok": bool(removed),
             "message": (
@@ -191,6 +187,28 @@ class AGCNVoiceRuntime:
                 }
             return self.presenter.test_proactive()
 
+    def _ensure_presenter_worker(self) -> None:
+        if self.presenter_thread and self.presenter_thread.is_alive():
+            return
+
+        self.presenter_stop_event.clear()
+        self.presenter_thread = threading.Thread(
+            target=self._presenter_loop,
+            name="agcn-presenter-worker",
+            daemon=True,
+        )
+        self.presenter_thread.start()
+
+    def _presenter_loop(self) -> None:
+        while not self.presenter_stop_event.is_set():
+            try:
+                with self.lock:
+                    self._tick_presenter_locked()
+                self.presenter_worker_error = ""
+            except Exception as exc:
+                self.presenter_worker_error = str(exc)
+            self.presenter_stop_event.wait(0.20)
+
     def start(self, username: str) -> dict:
         if not self.store.active():
             return {
@@ -202,23 +220,36 @@ class AGCNVoiceRuntime:
             self.voice_service.start()
 
         result = self.monitor.start(username)
-        if not result.get("ok", True) and self.voice_service is not None:
+        if result.get("ok", True):
+            self._ensure_presenter_worker()
+        elif self.voice_service is not None:
             self.voice_service.stop()
         return result
 
     def stop(self) -> dict:
+        self.presenter_stop_event.set()
         result = self.monitor.stop()
         if self.voice_service is not None:
             self.voice_service.stop()
         return result
+
+    def close(self) -> None:
+        self.presenter_stop_event.set()
+        try:
+            self.monitor.stop()
+        except Exception:
+            pass
+        if self.voice_service is not None:
+            try:
+                self.voice_service.stop()
+            except Exception:
+                pass
 
     def _queue_voice(self, item: dict) -> None:
         if self.voice_service is None:
             return
 
         if item.get("type") == "reactive":
-            # Não corta a frase já sendo reproduzida; apenas remove proativos
-            # que ainda aguardavam na fila para responder o chat em seguida.
             self.voice_service.clear_pending(proactive_only=True)
 
         self.voice_service.enqueue(
@@ -258,8 +289,6 @@ class AGCNVoiceRuntime:
                 and queue[0].get("priority", 0)
                 > self.current_speech.get("priority", 0)
             ):
-                # Marca a prioridade para a próxima fala, mas o VoiceService
-                # deixa o segmento de áudio corrente terminar naturalmente.
                 self.current_speech_until = 0.0
                 self.interruptions += 1
             else:
@@ -287,8 +316,6 @@ class AGCNVoiceRuntime:
         except Exception as exc:
             item["voice_error"] = str(exc)
 
-        # Estimativa apenas para scheduling/UI. Playback real é controlado
-        # pelo VoiceService quando configurado.
         duration = min(
             12.0,
             max(2.5, len(item["speech"]) / 16.0),
@@ -296,9 +323,8 @@ class AGCNVoiceRuntime:
         self.current_speech_until = now + duration
 
     def snapshot(self) -> dict:
+        """Snapshot somente-leitura: nunca chama LLM/TTS."""
         with self.lock:
-            self._tick_presenter_locked()
-
             live = self.monitor.snapshot()
             active = self.store.active() or {}
             presenter_state = self.presenter.snapshot()
@@ -311,12 +337,12 @@ class AGCNVoiceRuntime:
             data = {
                 **live,
                 "version": (
-                    "0.8-brain-voice"
+                    "0.9-background-runtime"
                     if self.brain_provider is not None
                     and self.voice_service is not None
-                    else "0.7-llm-brain"
+                    else "0.8-background-brain"
                     if self.brain_provider is not None
-                    else "0.6-presenter-brain"
+                    else "0.7-background-presenter"
                 ),
                 "brain_enabled": self.brain_provider is not None,
                 "brain_provider": (
@@ -327,6 +353,13 @@ class AGCNVoiceRuntime:
                 "voice_enabled": self.voice_service is not None,
                 "voice": voice_state,
                 "voice_jobs": self.voice_jobs,
+                "presenter_worker_running": bool(
+                    self.presenter_thread
+                    and self.presenter_thread.is_alive()
+                ),
+                "presenter_worker_error": (
+                    self.presenter_worker_error or None
+                ),
                 "products": self.store.list(),
                 "active_product": active,
                 "comments_analyzed": self.comments_analyzed,
@@ -402,6 +435,7 @@ class AGCNVoiceRuntime:
             f"Produto ativo: {product.get('name') or 'NÃO CARREGADO'}",
             f"Brain: {data.get('brain_provider', '—')}",
             f"Voz: {voice.get('tts') or ('DESATIVADA' if not data.get('voice_enabled') else '—')}",
+            f"Worker: {'ATIVO' if data.get('presenter_worker_running') else 'PARADO'}",
             "",
             "CHECKLIST:",
         ]
@@ -441,6 +475,11 @@ class AGCNVoiceRuntime:
             f"Diagnóstico TikTok: {data.get('diagnostic', '—')}",
         ]
 
+        if data.get("presenter_worker_error"):
+            lines += [
+                "",
+                f"ERRO DO WORKER: {data.get('presenter_worker_error')}",
+            ]
         if voice.get("last_error"):
             lines += ["", f"ERRO DE VOZ: {voice.get('last_error')}"]
         if data.get("error"):
