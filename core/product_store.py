@@ -117,6 +117,7 @@ class ProductStore:
         *,
         name,
         description="",
+        description_points=None,
         regular_price=None,
         current_price=None,
         discount=None,
@@ -132,6 +133,7 @@ class ProductStore:
             "id": uuid.uuid4().hex[:12],
             "name": name,
             "description": str(description or "").strip(),
+            "description_points": self._clean_points(description_points),
             "regular_price": self._number_or_none(regular_price),
             "current_price": self._number_or_none(current_price),
             "discount": self._number_or_none(discount),
@@ -168,6 +170,7 @@ class ProductStore:
             allowed = {
                 "name",
                 "description",
+                "description_points",
                 "regular_price",
                 "current_price",
                 "discount",
@@ -186,6 +189,8 @@ class ProductStore:
                     "discount",
                 }:
                     product[key] = self._number_or_none(value)
+                elif key == "description_points":
+                    product[key] = self._clean_points(value)
                 else:
                     product[key] = str(value or "").strip()
 
@@ -228,6 +233,22 @@ class ProductStore:
             return self.active()
 
     @staticmethod
+    def _clean_points(value) -> list[str]:
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            value = [value]
+        result = []
+        seen = set()
+        for item in value:
+            text = str(item or "").strip()
+            key = text.casefold()
+            if text and key not in seen:
+                result.append(text)
+                seen.add(key)
+        return result
+
+    @staticmethod
     def _number_or_none(value):
         if value in (None, ""):
             return None
@@ -263,6 +284,7 @@ class ProductStore:
                 "id": product.get("id"),
                 "name": product.get("name"),
                 "description": product.get("description"),
+                "description_points": product.get("description_points") or [],
                 "regular_price": product.get("regular_price"),
                 "current_price": product.get("current_price"),
                 "discount": product.get("discount"),
