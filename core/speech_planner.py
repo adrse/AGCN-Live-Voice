@@ -199,10 +199,6 @@ class SpeechPlanner:
                 return "buy_now"
             return None
 
-        if guard.live_offer() and not memory.recently_used_cta(
-            "live_offer",
-            within=35,
-        ):
-            return "live_offer"
-
+        # Respostas factuais ficam curtas. Oferta/CTA não é colada em toda
+        # pergunta; a venda continua nas falas proativas do Presenter.
         return None
