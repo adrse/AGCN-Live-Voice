@@ -5,7 +5,7 @@
 Presenter: STOPPED | STARTING | RUNNING | PAUSED | ERROR
 TikTok: DISCONNECTED | CONNECTING | LIVE | ENDED | ERROR
 Brain: LOCAL_QWEN | API
-TTS: KOKORO_LOCAL_PTBR
+TTS: QWEN3_HQ_AUTO
 
 ## Pipeline
 
@@ -121,16 +121,21 @@ Falha:
 
 ## TTS
 
-Oficial e obrigatório:
-- Kokoro-82M ONNX local;
-- PT-BR;
-- feminina: `pf_dora`;
-- masculina: `pm_alex`;
-- modelo e vozes empacotados no programa;
+Principal:
+- Qwen3-TTS 1.7B CustomVoice Q8 local via qwentts.cpp/GGML;
+- feminina: Vivian;
+- masculina: Ryan;
+- idioma: Portuguese, com instruções de estilo para PT-BR/live commerce;
+- Voice Pack HQ empacotado na distribuição HQ;
 - nenhuma API necessária;
 - nenhuma voz/SAPI instalada no Windows necessária;
-- slider de velocidade na UI;
-- padrão rápido de LIVE commerce.
+- modelo residente em servidor localhost;
+- slider de velocidade 0,80x–1,60x com FFmpeg/atempo.
+
+Fallback:
+- Kokoro-82M ONNX local;
+- Dora (feminina) e Alex (masculina);
+- usado somente se o Voice Pack HQ estiver ausente ou falhar.
 
 API é uma opção de **Brain/inteligência**, não de voz.
 
