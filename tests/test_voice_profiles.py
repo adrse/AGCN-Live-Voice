@@ -1,6 +1,7 @@
 import io
 import wave
 
+from core.neural_tts import ElevenLabsTTSProvider
 from core.tts_providers import OpenAITTSProvider, build_tts_provider
 from core.voice_profiles import get_voice_profile, list_voice_profiles
 
@@ -28,23 +29,28 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self):
+    def __init__(self, *, raw_pcm=False):
         self.calls = []
+        self.raw_pcm = raw_pcm
 
     def post(self, url, **kwargs):
         self.calls.append((url, kwargs))
-        return FakeResponse(content=wav_bytes())
+        return FakeResponse(
+            content=(
+                b"\x00\x00" * 100
+                if self.raw_pcm
+                else wav_bytes()
+            )
+        )
 
     def get(self, url, **kwargs):
-        return FakeResponse(payload={"id": "model"})
+        return FakeResponse(payload={"id": "model", "name": "Voice"})
 
 
 def test_two_required_fast_voice_profiles_exist():
     profiles = {item["id"]: item for item in list_voice_profiles()}
     assert "female_fast" in profiles
     assert "male_fast" in profiles
-    assert profiles["female_fast"]["local_rate"] >= 220
-    assert profiles["male_fast"]["local_rate"] >= 220
     assert profiles["female_fast"]["openai_speed"] > 1.0
     assert profiles["male_fast"]["openai_speed"] > 1.0
 
@@ -77,12 +83,29 @@ def test_openai_tts_sends_speed_and_fast_sales_instructions():
     assert "rápido" in body["instructions"]
 
 
-def test_local_factory_uses_selected_profile_rate():
+def test_elevenlabs_tts_uses_pcm_and_clamps_speed():
+    session = FakeSession(raw_pcm=True)
+    provider = ElevenLabsTTSProvider(
+        api_key="test",
+        voice_id="voice-1",
+        speed=1.50,
+        session=session,
+    )
+    chunk = provider.synthesize("Oferta rápida.")
+    assert chunk.sample_rate == 24000
+    assert chunk.format == "pcm_s16le"
+
+    _, kwargs = session.calls[0]
+    assert kwargs["params"]["output_format"] == "pcm_24000"
+    assert kwargs["json"]["voice_settings"]["speed"] == 1.2
+
+
+def test_local_legacy_is_explicit_not_default():
     provider = build_tts_provider({
         "tts": {
-            "provider": "local",
+            "provider": "local_legacy",
             "profile": "male_fast",
-            "local": {"volume": 1.0},
+            "local_legacy": {"volume": 1.0},
         }
     })
     profile = get_voice_profile("male_fast")
