@@ -1,4 +1,5 @@
 name: AGCN Full Test Suite
+# branch validation: cadence/comments/currency
 
 on:
   push:
