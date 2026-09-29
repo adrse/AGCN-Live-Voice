@@ -721,19 +721,9 @@ class SettingsPage(QWidget):
             "gemini_premium",
         )
         self.voice_engine.addItem(
-            "OpenAI Live — em breve",
+            "OpenAI Live — GPT-Live 1",
             "openai_live",
         )
-        voice_model = self.voice_engine.model()
-        item_getter = getattr(voice_model, "item", None)
-        for index in (2,):
-            item = item_getter(index) if callable(item_getter) else None
-            if item is not None:
-                item.setEnabled(False)
-                item.setToolTip(
-                    "A opção já está prevista na interface e será ativada "
-                    "quando a integração por API estiver pronta."
-                )
 
         self.gemini_model = QComboBox()
         self.gemini_model.addItem(
@@ -751,6 +741,41 @@ class SettingsPage(QWidget):
         )
         self.gemini_status = QLabel("")
         self.gemini_status.setStyleSheet("color:#6B7280;font-size:12px;")
+
+        self.openai_live_model = QComboBox()
+        self.openai_live_model.addItem(
+            "GPT-Live 1 — voz mais natural/expressiva",
+            "gpt-live-1",
+        )
+        self.openai_live_mode = QComboBox()
+        self.openai_live_mode.addItem(
+            "Controlado — texto validado pelo AGCN",
+            "strict_speech",
+        )
+        self.openai_live_mode.addItem(
+            "Agente guiado — em breve",
+            "guided_agent",
+        )
+        live_mode_model = self.openai_live_mode.model()
+        live_item_getter = getattr(live_mode_model, "item", None)
+        guided_item = (
+            live_item_getter(1)
+            if callable(live_item_getter)
+            else None
+        )
+        if guided_item is not None:
+            guided_item.setEnabled(False)
+            guided_item.setToolTip(
+                "Será liberado depois dos testes do modo controlado."
+            )
+
+        self.openai_live_status = QLabel(
+            "Usa a mesma Chave OpenAI do Presenter Brain."
+        )
+        self.openai_live_status.setWordWrap(True)
+        self.openai_live_status.setStyleSheet(
+            "color:#6B7280;font-size:12px;"
+        )
 
         self.voice_profile = QComboBox()
         for profile in list_voice_profiles():
@@ -806,6 +831,9 @@ class SettingsPage(QWidget):
         voice_form.addRow("Modelo Gemini", self.gemini_model)
         voice_form.addRow("Chave Gemini", self.gemini_key)
         voice_form.addRow("", self.gemini_status)
+        voice_form.addRow("Modelo OpenAI Live", self.openai_live_model)
+        voice_form.addRow("Modo OpenAI Live", self.openai_live_mode)
+        voice_form.addRow("", self.openai_live_status)
         voice_form.addRow("Perfil de voz", self.voice_profile)
         voice_form.addRow("Velocidade", speed_row)
         voice_form.addRow("Expressividade", expression_row)
@@ -847,6 +875,7 @@ class SettingsPage(QWidget):
         api = brain.get("api") or {}
         tts = config.get("tts") or {}
         gemini = tts.get("gemini") or {}
+        openai_live = tts.get("openai_live") or {}
         audio = config.get("audio") or {}
 
         self.brain_provider.setCurrentText(
@@ -875,6 +904,19 @@ class SettingsPage(QWidget):
         gemini_index = self.gemini_model.findData(gemini_model)
         if gemini_index >= 0:
             self.gemini_model.setCurrentIndex(gemini_index)
+
+        live_model = str(openai_live.get("model") or "gpt-live-1")
+        live_index = self.openai_live_model.findData(live_model)
+        if live_index >= 0:
+            self.openai_live_model.setCurrentIndex(live_index)
+
+        live_mode = str(
+            openai_live.get("mode") or "strict_speech"
+        )
+        live_mode_index = self.openai_live_mode.findData(live_mode)
+        self.openai_live_mode.setCurrentIndex(
+            live_mode_index if live_mode_index >= 0 else 0
+        )
 
         profile_id = str(tts.get("profile") or "female_fast")
         profile_index = self.voice_profile.findData(profile_id)
@@ -917,6 +959,17 @@ class SettingsPage(QWidget):
             "Chave Gemini salva com segurança"
             if self.controller.gemini_key_saved()
             else "Chave Gemini ainda não configurada"
+        )
+        self.openai_live_status.setText(
+            (
+                "Chave OpenAI salva · modo controlado valida a "
+                "transcrição antes de tocar o áudio."
+            )
+            if self.controller.api_key_saved()
+            else (
+                "Configure a Chave OpenAI acima. O modo controlado "
+                "bloqueia fala alterada e cai para Qwen."
+            )
         )
         self._update_voice_provider_controls()
 
@@ -981,6 +1034,25 @@ class SettingsPage(QWidget):
                     "timeout_seconds": 45,
                     "voice_override": "",
                 },
+                "openai_live": {
+                    "model": (
+                        self.openai_live_model.currentData()
+                        or "gpt-live-1"
+                    ),
+                    "mode": (
+                        self.openai_live_mode.currentData()
+                        or "strict_speech"
+                    ),
+                    "websocket_url": (
+                        "wss://api.openai.com/v1/live/sessions"
+                    ),
+                    "models_base_url": "https://api.openai.com/v1",
+                    "api_key_env": "OPENAI_API_KEY",
+                    "timeout_seconds": 45,
+                    "startup_timeout_seconds": 12,
+                    "completion_grace_seconds": 0.70,
+                    "voice_override": "",
+                },
             },
             "audio": {
                 "output_device": self.device.currentText().strip(),
@@ -1008,10 +1080,17 @@ class SettingsPage(QWidget):
             QMessageBox.critical(self, "Erro ao salvar", str(exc))
 
     def _update_voice_provider_controls(self) -> None:
-        is_gemini = self.voice_engine.currentData() == "gemini_premium"
+        provider = self.voice_engine.currentData()
+        is_gemini = provider == "gemini_premium"
+        is_openai_live = provider == "openai_live"
+
         self.gemini_model.setEnabled(is_gemini)
         self.gemini_key.setEnabled(is_gemini)
         self.gemini_status.setEnabled(is_gemini)
+
+        self.openai_live_model.setEnabled(is_openai_live)
+        self.openai_live_mode.setEnabled(is_openai_live)
+        self.openai_live_status.setEnabled(is_openai_live)
 
     def _devices(self) -> None:
         try:
@@ -1087,6 +1166,18 @@ class SettingsPage(QWidget):
                 self.gemini_key.clear()
                 self.gemini_status.setText(
                     "Chave Gemini salva com segurança"
+                )
+
+            if (
+                self.voice_engine.currentData() == "openai_live"
+                and self.api_key.text().strip()
+            ):
+                self.controller.set_openai_key(
+                    self.api_key.text().strip()
+                )
+                self.api_key.clear()
+                self.openai_live_status.setText(
+                    "Chave OpenAI salva · pronta para GPT-Live."
                 )
 
             ok, message = self.controller.test_voice(

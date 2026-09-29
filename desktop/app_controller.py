@@ -120,6 +120,9 @@ class DesktopController:
         self.runtime = self._build_runtime()
         return self.config
 
+    def set_openai_key(self, value: str) -> None:
+        set_secret("OPENAI_API_KEY", value)
+
     def api_key_saved(self) -> bool:
         return has_secret("OPENAI_API_KEY")
 
@@ -167,7 +170,11 @@ class DesktopController:
             )
             tts_cfg = dict(config.get("tts") or {})
             hq_cfg = dict(tts_cfg.get("qwen3_hq") or {})
-            style = str(hq_cfg.get("voice_style") or "auto")
+            style = str(
+                tts_cfg.get("voice_style")
+                or hq_cfg.get("voice_style")
+                or "auto"
+            )
             configure = getattr(tts, "configure_for_job", None)
             if callable(configure):
                 configure({
@@ -184,7 +191,8 @@ class DesktopController:
                 voice=str(tts_cfg.get("voice_override") or "") or None,
             )
             sink.play(chunk)
-            return True, f"Voz testada com {tts.name}."
+            active = getattr(tts, "last_provider", "") or tts.name
+            return True, f"Voz testada com {active}."
         except Exception as exc:
             return False, str(exc)
 

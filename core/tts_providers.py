@@ -20,6 +20,7 @@ from core.integration_contracts import AudioChunk, TTSProvider
 from core.local_kokoro_tts import KokoroLocalTTSProvider
 from core.local_qwen3_tts import Qwen3HQLocalTTSProvider
 from core.neural_tts import ElevenLabsTTSProvider
+from core.openai_live_voice import OpenAILiveVoiceProvider
 from core.secret_store import get_secret
 from core.voice_profiles import get_voice_profile
 
@@ -389,6 +390,43 @@ def _build_gemini(cfg: dict, profile: dict) -> GeminiTTSProvider:
     )
 
 
+def _build_openai_live(
+    cfg: dict,
+    profile: dict,
+) -> OpenAILiveVoiceProvider:
+    api = dict(cfg.get("openai_live") or {})
+    return OpenAILiveVoiceProvider(
+        api_key=get_secret(
+            str(api.get("api_key_env") or "OPENAI_API_KEY")
+        ),
+        model=str(api.get("model") or "gpt-live-1"),
+        profile_id=profile["id"],
+        voice_override=str(
+            cfg.get("voice_override")
+            or api.get("voice_override")
+            or ""
+        ),
+        websocket_url=str(
+            api.get("websocket_url")
+            or "wss://api.openai.com/v1/live/sessions"
+        ),
+        models_base_url=str(
+            api.get("models_base_url")
+            or "https://api.openai.com/v1"
+        ),
+        timeout_seconds=float(api.get("timeout_seconds", 45)),
+        startup_timeout_seconds=float(
+            api.get("startup_timeout_seconds", 12)
+        ),
+        completion_grace_seconds=float(
+            api.get("completion_grace_seconds", 0.70)
+        ),
+        speed=_selected_speed(cfg, profile),
+        expressive=_expressive_enabled(cfg),
+        expression_strength=_expression_strength(cfg),
+    )
+
+
 def _build_openai(cfg: dict, profile: dict) -> OpenAITTSProvider:
     api = dict(cfg.get("openai") or cfg.get("api") or {})
     return OpenAITTSProvider(
@@ -473,6 +511,13 @@ def build_tts_provider(config: dict | None = None) -> TTSProvider:
 
     if provider in {"gemini_premium", "gemini", "gemini_tts"}:
         primary = _build_gemini(cfg, profile)
+        return FallbackTTSProvider(
+            primary,
+            _build_local_hq_chain(cfg, profile),
+        )
+
+    if provider in {"openai_live", "gpt_live", "gpt-live-1"}:
+        primary = _build_openai_live(cfg, profile)
         return FallbackTTSProvider(
             primary,
             _build_local_hq_chain(cfg, profile),

@@ -46,6 +46,17 @@
       "api_key_env": "GEMINI_API_KEY",
       "timeout_seconds": 45,
       "voice_override": ""
+    },
+    "openai_live": {
+      "model": "gpt-live-1",
+      "mode": "strict_speech",
+      "websocket_url": "wss://api.openai.com/v1/live/sessions",
+      "models_base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "timeout_seconds": 45,
+      "startup_timeout_seconds": 12,
+      "completion_grace_seconds": 0.7,
+      "voice_override": ""
     }
   },
   "audio": {
