@@ -1,6 +1,6 @@
 """TTS neural local do AGCN Live Voice.
 
-Kokoro-82M + ONNX + Misaki/eSpeak embarcados no pacote.
+Kokoro-82M + ONNX + eSpeak NG embarcados no pacote.
 Não usa API e não depende das vozes instaladas no Windows.
 """
 
@@ -57,15 +57,14 @@ class KokoroLocalTTSProvider:
         self.model_path = self.model_dir / "kokoro-v1.0.onnx"
         self.voices_path = self.model_dir / "voices-v1.0.bin"
         self._kokoro = None
-        self._g2p = None
         self._lock = threading.RLock()
 
     @property
     def name(self) -> str:
         label = (
-            "Feminina — Vendas rápidas"
+            "Feminina — Dora"
             if self.profile_id == "female_fast"
-            else "Masculina — Vendas rápidas"
+            else "Masculina — Alex"
         )
         return f"AGCN Local Neural / Kokoro / {label}"
 
@@ -82,41 +81,42 @@ class KokoroLocalTTSProvider:
             )
 
     def _load(self) -> None:
-        if self._kokoro is not None and self._g2p is not None:
+        if self._kokoro is not None:
             return
 
         with self._lock:
-            if self._kokoro is not None and self._g2p is not None:
+            if self._kokoro is not None:
                 return
 
             self._check_assets()
 
-            # eSpeak NG é empacotado como biblioteca/dados do próprio programa.
             import espeakng_loader
-            from phonemizer.backend.espeak.wrapper import EspeakWrapper
+            from kokoro_onnx import EspeakConfig, Kokoro
 
-            EspeakWrapper.set_library(
-                espeakng_loader.get_library_path()
+            espeak_config = EspeakConfig(
+                lib_path=espeakng_loader.get_library_path(),
+                data_path=espeakng_loader.get_data_path(),
             )
-            EspeakWrapper.set_data_path(
-                espeakng_loader.get_data_path()
-            )
-
-            from kokoro_onnx import Kokoro
-            from misaki.espeak import EspeakG2P
-
-            self._g2p = EspeakG2P(language="pt-br")
             self._kokoro = Kokoro(
                 str(self.model_path),
                 str(self.voices_path),
+                espeak_config=espeak_config,
             )
 
     def healthcheck(self) -> tuple[bool, str]:
         try:
             self._load()
+            voices = set(self._kokoro.get_voices())
+            required = {"pf_dora", "pm_alex"}
+            if not required.issubset(voices):
+                return (
+                    False,
+                    "Modelo Kokoro carregou, mas as vozes PT-BR "
+                    "Dora/Alex não foram encontradas.",
+                )
             return (
                 True,
-                f"Kokoro local pronto; voz={self.voice_id}; "
+                f"Kokoro PT-BR local pronto; voz={self.voice_id}; "
                 f"velocidade={self.speed:.2f}x.",
             )
         except Exception as exc:
@@ -136,12 +136,14 @@ class KokoroLocalTTSProvider:
         voice_id = str(voice or self.voice_id).strip()
 
         with self._lock:
-            phonemes, _ = self._g2p(text)
             samples, sample_rate = self._kokoro.create(
-                phonemes,
-                voice_id,
+                text,
+                voice=voice_id,
                 speed=self.speed,
-                is_phonemes=True,
+                lang="pt-br",
+                trim=True,
+                sentence_pause=0.12,
+                clause_pause=0.05,
             )
 
         audio = np.asarray(samples, dtype=np.float32)
