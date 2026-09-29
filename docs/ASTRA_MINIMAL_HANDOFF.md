@@ -7,7 +7,7 @@ Branch: astra-handoff-2026-09-29
 
 ## Estado já verificado antes do handoff
 
-- suíte completa do repositório após os perfis de voz: **91 passed, 2 warnings**;
+- suíte completa do repositório após os perfis de voz: **99 passed, 2 warnings**;
 - Qwen3-TTS 1.7B HQ: **Vivian + Ryan sintetizaram Português no Windows, sem API**;
 - build Windows HQ com Voice Pack Q8 embarcado: **SUCCESS**;
 - Kokoro Dora/Alex continua validado como fallback local;
@@ -317,5 +317,26 @@ Web lab sincronizado:
 - serve apenas para testar fluxo/comportamento; voz do navegador NÃO é Vivian/Ryan real.
 
 Validação da consolidação:
-- AGCN Full Test Suite: **91 passed, 2 warnings**;
+- AGCN Full Test Suite: **99 passed, 2 warnings**;
 - run verde: `36527827725`.
+
+
+## Comportamento comercial congelado
+
+Antes de alterar Presenter/planner/policy, ler:
+- `docs/LIVE_COMMERCE_BEHAVIOR.md`
+
+Regras novas validadas a partir das cinco análises reais de TikTok Shop:
+- postura de vendedor com ancoragem, dor->solução, value stack, prova social e CTA;
+- escassez somente com fato verificável;
+- estoque real baixo (1-10) pode ser verbalizado pelo número exato;
+- estoque alto não autoriza "está acabando";
+- bloco de conversão aproximadamente a cada 3 falas proativas;
+- barreira determinística contra fala proativa repetida;
+- não repetir a mesma abertura/estrutura em sequência;
+- social proof somente com compra realmente confirmada;
+- sem falsa experiência pessoal do Presenter.
+
+Validação atual:
+- **99 passed, 2 warnings**;
+- web lab sincronizado e publicado no Railway.
