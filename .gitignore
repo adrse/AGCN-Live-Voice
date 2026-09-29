@@ -10,3 +10,5 @@ data/runtime/*.json
 # Modelos de voz baixados/empacotados durante o build
 models/kokoro/*.onnx
 models/kokoro/*.bin
+voice_hq/
+models/qwen3_tts/*.gguf
