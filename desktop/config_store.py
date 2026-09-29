@@ -43,6 +43,9 @@ BUILTIN_DEFAULTS = {
         "profile": "female_fast",
         "speed": 1.28,
         "voice_override": "",
+        "expressive": True,
+        "expression_strength": 1.0,
+        "voice_style": "auto",
         "qwen3_hq": {
             "pack_dir": "",
             "port": 18765,
@@ -54,6 +57,13 @@ BUILTIN_DEFAULTS = {
         },
         "kokoro": {
             "model_dir": ""
+        },
+        "gemini": {
+            "model": "gemini-3.8-flash-lite-tts",
+            "base_url": "https://generativelanguage.googleapis.com",
+            "api_key_env": "GEMINI_API_KEY",
+            "timeout_seconds": 45,
+            "voice_override": "",
         }
     },
     "audio": {
