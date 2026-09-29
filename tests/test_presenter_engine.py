@@ -5,10 +5,11 @@ from core.presenter_engine import PresenterEngine
 
 PRODUCT = {
     "name": "SmartBand X",
-    "description": (
-        "A bateria dura até 6 dias. "
-        "Ela monitora passos, sono e frequência cardíaca."
-    ),
+    "description": "Compatibilidade com produtos antigos.",
+    "description_points": [
+        "A bateria dura até 6 dias",
+        "Monitora passos, sono e frequência cardíaca",
+    ],
     "regular_price": 199.90,
     "current_price": 149.90,
     "discount": 25,
@@ -40,17 +41,22 @@ class PresenterBehaviorTests(unittest.TestCase):
         self.assertIn("6 dias", reply)
         self.assertNotIn("cadastr", reply.casefold())
 
-    def test_unknown_answer_is_human_and_does_not_invent(self):
+    def test_unknown_question_is_silently_ignored(self):
         engine = PresenterEngine(PRODUCT)
+
         reply = engine.build_response(
             "Ana",
             "ele tem gps integrado?",
             "direct_question",
         )
+        queued = engine.enqueue_comment(
+            "Ana",
+            "ele tem gps integrado?",
+        )
 
-        self.assertIn("prefiro não te passar errado", reply.casefold())
-        self.assertNotIn("cadastr", reply.casefold())
-        self.assertNotIn("gps integrado", reply.casefold())
+        self.assertIsNone(reply)
+        self.assertIsNone(queued)
+        self.assertEqual(engine.queue_snapshot(), [])
 
     def test_three_reactive_answers_force_thirty_seconds_of_product_talk(self):
         engine = PresenterEngine(PRODUCT)
@@ -85,6 +91,8 @@ class PresenterBehaviorTests(unittest.TestCase):
 
         self.assertEqual(item["type"], "proactive")
         self.assertIn("SmartBand X", item["speech"])
+        self.assertIn("6 dias", item["speech"])
+        self.assertNotIn("monitora passos", item["speech"].casefold())
         self.assertNotIn("cadastr", item["speech"].casefold())
 
 
