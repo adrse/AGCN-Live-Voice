@@ -29,7 +29,9 @@
       "pack_dir": "",
       "port": 18765,
       "startup_timeout_seconds": 120,
-      "request_timeout_seconds": 60
+      "request_timeout_seconds": 60,
+      "expressive": true,
+      "expression_strength": 1.0
     },
     "kokoro": {
       "model_dir": ""
