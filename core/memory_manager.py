@@ -30,6 +30,7 @@ class MemoryManager:
             "topic": item.get("topic"),
             "intent": item.get("intent") or item.get("category"),
             "cta": item.get("cta"),
+            "tactic": item.get("tactic"),
             "user": item.get("user"),
             "type": item.get("type"),
         }
@@ -60,6 +61,9 @@ class MemoryManager:
                 "cta": record["cta"],
                 "at": now,
             })
+
+        if record.get("tactic"):
+            self.remember_tactic(record["tactic"])
 
         if record["intent"] == "purchase_confirmation":
             self.purchase_confirmations.append({
