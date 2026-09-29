@@ -18,7 +18,7 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index_v054.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.6-presenter-brain",
+    version="0.6.1-natural-presenter",
 )
 
 runtime = AGCNVoiceRuntime()
@@ -95,7 +95,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.6-presenter-brain",
+        "version": "0.6.1-natural-presenter",
     }
 
 
@@ -151,7 +151,7 @@ def presenter_test_comment(req: PresenterTestRequest):
     if not result.get("ok"):
         raise HTTPException(
             status_code=400,
-            detail=result.get("message") or "Não foi possível gerar a resposta.",
+            detail=result.get("message") or "Não foi possível analisar o comentário.",
         )
     return result
 
