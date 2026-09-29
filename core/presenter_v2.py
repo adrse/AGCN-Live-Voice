@@ -387,6 +387,21 @@ class PresenterV2:
         # Assim a resposta ao espectador fica curta e natural.
         return speech
 
+    def _casual_fact(self, value) -> str:
+        text = as_text(value).strip().rstrip(" .;")
+        replacements = (
+            ("O produto possui ", "tem "),
+            ("Este produto possui ", "tem "),
+            ("Possui ", "tem "),
+            ("O produto conta com ", "tem "),
+            ("É compatível com ", "funciona com "),
+        )
+        for prefix, replacement in replacements:
+            if text.casefold().startswith(prefix.casefold()):
+                text = replacement + text[len(prefix):]
+                break
+        return text
+
     def _fact_answer(
         self,
         user,
