@@ -414,14 +414,17 @@ class PresenterV2:
         if not value:
             return None
 
-        negative = any(
-            marker in value.casefold()
-            for marker in ("não ", "nao ", "sem ")
+        value_fold = value.casefold().strip()
+        negative = (
+            value_fold in {"não", "nao", "não possui", "nao possui"}
+            or value_fold.startswith(("não ", "nao ", "sem "))
         )
 
         if question.startswith(("tem ", "vem ", "possui ")):
             if negative:
-                return f"{address}não. {value}."
+                if value_fold in {"não", "nao"}:
+                    return f"{address}não."
+                return f"{address}{value}."
             if value.casefold().startswith("tem "):
                 tail = value[4:].strip()
                 return f"{address}tem sim, {tail}."
@@ -433,7 +436,9 @@ class PresenterV2:
 
         if question.startswith(("serve ", "funciona ")):
             if negative:
-                return f"{address}não. {value}."
+                if value_fold in {"não", "nao"}:
+                    return f"{address}não."
+                return f"{address}{value}."
             if value.casefold().startswith("funciona "):
                 return f"{address}sim, {value}."
             return f"{address}serve sim. {value}."
