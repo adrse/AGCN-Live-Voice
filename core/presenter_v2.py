@@ -425,8 +425,10 @@ class PresenterV2:
             if value.casefold().startswith("tem "):
                 tail = value[4:].strip()
                 return f"{address}tem sim, {tail}."
-            if intent == "warranty" and "garantia" in value.casefold():
-                return f"{address}tem sim, {value}."
+            if intent == "warranty":
+                if "garantia" in value.casefold():
+                    return f"{address}tem sim, {value}."
+                return f"{address}tem sim, garantia de {value}."
             return f"{address}tem sim. {value}."
 
         if question.startswith(("serve ", "funciona ")):
