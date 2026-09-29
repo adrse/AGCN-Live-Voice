@@ -7,9 +7,9 @@ from collections import deque
 class CommentFusion:
     """Agrupa comentários próximos e relacionados antes da decisão."""
 
-    def __init__(self, window_seconds: float = 1.4):
+    def __init__(self, window_seconds: float = 1.4, max_pending: int = 80):
         self.window_seconds = window_seconds
-        self.pending = deque()
+        self.pending = deque(maxlen=max(10, int(max_pending)))
 
     def add(self, analyzed: dict) -> None:
         item = dict(analyzed)
