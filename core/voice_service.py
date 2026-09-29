@@ -120,6 +120,11 @@ class VoiceService:
                 else None
             ),
             "tts": self.tts.name,
+            "current_style": (
+                self.current_job.metadata.get("voice_style")
+                if self.current_job
+                else None
+            ),
             "active_provider": (
                 getattr(self.tts, "last_provider", "")
                 or self.tts.name
