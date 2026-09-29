@@ -7,8 +7,8 @@ on:
     paths:
       - "core/**"
       - "desktop/**"
+      - "scripts/**"
       - "requirements-desktop.txt"
-      - "scripts/build_windows.bat"
       - ".github/workflows/build-windows.yml"
   workflow_dispatch:
 
@@ -38,10 +38,24 @@ jobs:
           python -m pip install -r requirements-desktop.txt
           python -m pip install pyinstaller
 
+      - name: Download bundled Kokoro voices
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "models\kokoro" | Out-Null
+          curl.exe -L --fail --retry 3 "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx" -o "models\kokoro\kokoro-v1.0.onnx"
+          curl.exe -L --fail --retry 3 "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin" -o "models\kokoro\voices-v1.0.bin"
+          Get-Item "models\kokoro\kokoro-v1.0.onnx"
+          Get-Item "models\kokoro\voices-v1.0.bin"
+
       - name: Smoke imports
         shell: pwsh
         run: |
-          python -c "import core.runtime, core.presenter_v3, core.tts_providers, core.audio_output, desktop.main_window; print('imports ok')"
+          python -c "import core.runtime, core.presenter_v3, core.tts_providers, core.local_kokoro_tts, core.audio_output, desktop.main_window; print('imports ok')"
+
+      - name: Smoke two offline PT-BR voices
+        shell: pwsh
+        run: |
+          python scripts\smoke_kokoro.py
 
       - name: Smoke UI
         shell: pwsh
@@ -51,19 +65,21 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --collect-all TikTokLive --collect-all keyring desktop\main.py
+          pyinstaller --noconfirm --clean --windowed --name "AGCN Live Voice" --paths . --add-data "models\kokoro;models\kokoro" --collect-all TikTokLive --collect-all keyring --collect-all kokoro_onnx --collect-all espeakng_loader --collect-all phonemizer --collect-all onnxruntime desktop\main.py
 
       - name: Verify build
         shell: pwsh
         run: |
           if (!(Test-Path "dist\AGCN Live Voice\AGCN Live Voice.exe")) { throw "Executavel nao encontrado" }
+          if (!(Test-Path "dist\AGCN Live Voice\_internal\models\kokoro\kokoro-v1.0.onnx")) { throw "Modelo Kokoro nao empacotado" }
+          if (!(Test-Path "dist\AGCN Live Voice\_internal\models\kokoro\voices-v1.0.bin")) { throw "Vozes Kokoro nao empacotadas" }
           Get-ChildItem "dist\AGCN Live Voice" | Select-Object Name,Length
 
       - name: Smoke executable
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "dist\AGCN Live Voice\AGCN Live Voice.exe" -PassThru
-          Start-Sleep -Seconds 4
+          Start-Sleep -Seconds 5
           if ($p.HasExited) { throw "Executavel encerrou logo apos abrir. ExitCode=$($p.ExitCode)" }
           Stop-Process -Id $p.Id -Force
 
