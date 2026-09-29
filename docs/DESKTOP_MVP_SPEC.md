@@ -5,7 +5,7 @@
 Presenter: STOPPED | STARTING | RUNNING | PAUSED | ERROR
 TikTok: DISCONNECTED | CONNECTING | LIVE | ENDED | ERROR
 Brain: LOCAL_QWEN | API
-TTS: OPENAI_NEURAL | ELEVENLABS_NEURAL
+TTS: KOKORO_LOCAL_PTBR
 
 ## Pipeline
 
@@ -121,16 +121,18 @@ Falha:
 
 ## TTS
 
-Oficial:
-- neural;
-- independente das vozes/SAPI instaladas no Windows;
-- dois perfis fixos do AGCN: Feminina — Vendas rápidas e Masculina — Vendas rápidas;
-- OpenAI Neural como padrão;
-- ElevenLabs Neural como alternativa;
-- controle de velocidade na UI;
-- perfil de estilo rápido/proativo em ambos.
+Oficial e obrigatório:
+- Kokoro-82M ONNX local;
+- PT-BR;
+- feminina: `pf_dora`;
+- masculina: `pm_alex`;
+- modelo e vozes empacotados no programa;
+- nenhuma API necessária;
+- nenhuma voz/SAPI instalada no Windows necessária;
+- slider de velocidade na UI;
+- padrão rápido de LIVE commerce.
 
-O Windows é somente o destino do áudio. Vozes locais/SAPI não são requisito do produto.
+API é uma opção de **Brain/inteligência**, não de voz.
 
 ## Áudio Windows
 
