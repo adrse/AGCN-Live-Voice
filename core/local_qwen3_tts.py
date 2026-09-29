@@ -23,6 +23,7 @@ from pathlib import Path
 import requests
 
 from core.integration_contracts import AudioChunk
+from core.voice_profiles import get_voice_profile
 
 
 QWEN_PROFILE_SPEAKERS = {
@@ -323,6 +324,7 @@ class Qwen3HQLocalTTSProvider:
                 "input": text,
                 "voice": speaker,
                 "language": "Portuguese",
+                "instructions": self.instructions,
                 "response_format": "wav",
                 "seed": 42,
                 "temperature": 0.75,
