@@ -15,7 +15,7 @@ WEB_FILE = PROJECT_ROOT / "test_web" / "index.html"
 
 app = FastAPI(
     title="AGCN Live Voice",
-    version="0.5.0-presenter-behavior",
+    version="0.5.1-product-details",
 )
 
 runtime = AGCNVoiceRuntime()
@@ -28,6 +28,7 @@ class LiveStartRequest(BaseModel):
 class ProductRequest(BaseModel):
     name: str
     description: str = ""
+    description_points: list[str] = []
     regular_price: str | float | None = None
     current_price: str | float | None = None
     discount: str | float | None = None
@@ -46,7 +47,7 @@ def health():
     return {
         "ok": True,
         "service": "AGCN Live Voice",
-        "version": "0.5.0-presenter-behavior",
+        "version": "0.5.1-product-details",
     }
 
 
