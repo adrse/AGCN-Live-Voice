@@ -4,9 +4,21 @@ Apresentador inteligente por voz para TikTok LIVE.
 
 ## Status atual
 
-**Baseline V0.4.1 migrada do Colab para uma arquitetura reutilizável.**
+**V0.5 Presenter Behavior: ritmo de LIVE, respostas naturais e prioridade contínua para o produto.**
 
-Objetivo desta baseline: preservar o que já foi validado no Colab antes de iniciar a V0.5 Presenter Behavior.
+Nesta versão, o apresentador deixa de se comportar como chatbot. Comentários continuam sendo analisados e priorizados, mas a LIVE mantém uma linha própria de apresentação e venda do produto.
+
+### Regras de comportamento V0.5
+
+- no máximo 3 respostas consecutivas a comentários;
+- depois disso, 30 segundos obrigatórios de apresentação do produto;
+- comentários continuam entrando na fila durante essa janela, sem interromper a fala;
+- quando não há pergunta para responder, a apresentadora continua falando do produto;
+- linguagem curta, informal e natural;
+- nunca expõe termos internos como "cadastro", "base de dados" ou "contexto";
+- quando uma informação não está disponível, responde naturalmente sem inventar;
+- perguntas repetidas são filtradas e a fila de respostas é limitada;
+- a mesma lógica de ritmo deve ser reaproveitada pelos futuros modos de voz local e por API.
 
 ### Já validado no Colab
 
@@ -56,16 +68,13 @@ Start command:
 uvicorn backend.app:app --host 0.0.0.0 --port $PORT
 ```
 
-## Próxima versão
+## Próximas evoluções
 
-**V0.5 — Presenter Behavior V1**
-
-- Memory Manager
-- Comment Intelligence
-- Comment Fusion
-- Decision Engine V2
-- Silence Watchdog
-- Speech Planner
-- Sales Guard
-- Anti-repetição
-- AGCN Presenter Dataset V1
+- integração do planejador com voz local;
+- integração opcional com API de voz/modelo;
+- Memory Manager;
+- Comment Fusion;
+- Decision Engine V2;
+- Sales Guard;
+- anti-repetição semântica;
+- AGCN Presenter Dataset V1.
