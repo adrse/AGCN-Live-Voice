@@ -13,12 +13,14 @@ class CountingBrain:
 
     def __init__(self):
         self.calls = 0
+        self.modes = []
 
     def healthcheck(self):
         return True, "ok"
 
     def generate(self, context):
         self.calls += 1
+        self.modes.append(context.mode)
         fact = context.allowed_facts[0] if context.allowed_facts else None
         return BrainResult(
             speech="Resposta curta.",
@@ -106,3 +108,30 @@ def test_runtime_forces_thirty_second_product_window(tmp_path):
     assert runtime._product_window_active(start + 30.1) is False
     assert runtime.reactive_streak == 0
     runtime.close()
+
+
+def test_comment_can_wait_as_plan_without_spending_brain():
+    brain = CountingBrain()
+    presenter = PresenterV3(
+        {
+            "name": "SmartBand X",
+            "battery_info": "até 6 dias",
+        },
+        brain,
+    )
+    presenter.fusion.window_seconds = 0
+
+    presenter.ingest_comment(
+        "Maria",
+        "quanto dura a bateria?",
+    )
+    added = presenter.collect_pending_comments()
+
+    assert added == 1
+    assert brain.calls == 0
+    assert len(presenter.plan_queue) == 1
+
+    created = presenter.process_pending_comments(max_generate=1)
+    assert len(created) == 1
+    assert brain.calls == 1
+    assert brain.modes == ["comment_reply"]
