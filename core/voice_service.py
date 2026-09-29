@@ -42,6 +42,8 @@ class VoiceService:
 
     def start(self) -> None:
         if self.thread and self.thread.is_alive():
+            if self.stop_event.is_set():
+                self.stop_event.clear()
             return
         self.stop_event.clear()
         self.thread = threading.Thread(
