@@ -50,6 +50,6 @@ def test_builtin_defaults_use_local_voice_without_api(tmp_path):
     )
     loaded = store.load()
     assert loaded["brain"]["provider"] == "qwen_local"
-    assert loaded["tts"]["provider"] == "kokoro_local"
+    assert loaded["tts"]["provider"] == "qwen3_hq_auto"
     assert loaded["tts"]["profile"] == "female_fast"
     assert loaded["tts"]["speed"] == 1.28
