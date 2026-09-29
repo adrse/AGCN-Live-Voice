@@ -60,51 +60,28 @@ def run_diagnostics(
         "openai_responses",
     }:
         add(
-            "Chave OpenAI Brain",
+            "API da inteligência",
             has_secret("OPENAI_API_KEY"),
             (
-                "Disponível"
+                "Chave OpenAI disponível"
                 if has_secret("OPENAI_API_KEY")
-                else "Não configurada"
+                else "Chave não configurada"
             ),
         )
 
     profiles = {item["id"] for item in list_voice_profiles()}
     add(
-        "Perfis de voz AGCN",
+        "Duas vozes AGCN",
         {"female_fast", "male_fast"}.issubset(profiles),
-        "Feminina — Vendas rápidas + Masculina — Vendas rápidas",
+        "Dora (feminina) + Alex (masculina), PT-BR local",
     )
-
-    tts_cfg = dict(config.get("tts") or {})
-    tts_provider = str(tts_cfg.get("provider") or "openai").casefold()
-    if tts_provider in {"openai", "neural", "premium", "neural_auto", "auto"}:
-        add(
-            "Chave OpenAI Voice",
-            has_secret("OPENAI_API_KEY"),
-            (
-                "Disponível"
-                if has_secret("OPENAI_API_KEY")
-                else "Não configurada"
-            ),
-        )
-    if tts_provider in {"elevenlabs", "eleven", "neural_auto", "auto"}:
-        add(
-            "Chave ElevenLabs",
-            has_secret("ELEVENLABS_API_KEY"),
-            (
-                "Disponível"
-                if has_secret("ELEVENLABS_API_KEY")
-                else "Não configurada"
-            ),
-        )
 
     try:
         tts = build_tts_provider(config)
         ok, detail = tts.healthcheck()
-        add("TTS neural", ok, detail)
+        add("Voz neural local", ok, detail)
     except Exception as exc:
-        add("TTS neural", False, str(exc))
+        add("Voz neural local", False, str(exc))
 
     try:
         sink = SoundDeviceAudioSink()
@@ -131,8 +108,8 @@ def run_diagnostics(
     required = [
         "Produto ativo",
         "Presenter Brain",
-        "Perfis de voz AGCN",
-        "TTS neural",
+        "Duas vozes AGCN",
+        "Voz neural local",
         "Dispositivos de áudio",
     ]
     by_name = {item["name"]: item for item in checks}
