@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
+import importlib.metadata
 from pathlib import Path
 
 import torch
@@ -26,6 +28,7 @@ from transformers import (
     BitsAndBytesConfig,
     Trainer,
     TrainingArguments,
+    set_seed,
 )
 
 
@@ -41,6 +44,11 @@ class ChatDataset(Dataset):
                 if raw:
                     self.rows.append(json.loads(raw))
 
+        # Validate every example before spending GPU time. Never silently lose
+        # the assistant answer by truncating a long system/product prompt.
+        lengths = [len(self[index]["input_ids"]) for index in range(len(self.rows))]
+        print(f"Dataset {path}: {len(lengths)} examples; maximum {max(lengths, default=0)} tokens", flush=True)
+
     def __len__(self):
         return len(self.rows)
 
@@ -54,32 +62,22 @@ class ChatDataset(Dataset):
             add_generation_prompt=True,
             enable_thinking=False,
         )
-        full_text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=False,
-            enable_thinking=False,
-        )
-
         prompt_ids = self.tokenizer(
             prompt_text,
             add_special_tokens=False,
-            truncation=True,
-            max_length=self.max_length,
         )["input_ids"]
-
-        full = self.tokenizer(
-            full_text,
+        response_ids = self.tokenizer(
+            messages[-1]["content"] + self.tokenizer.eos_token,
             add_special_tokens=False,
-            truncation=True,
-            max_length=self.max_length,
-        )
-        input_ids = full["input_ids"]
-        attention_mask = full["attention_mask"]
-
-        labels = list(input_ids)
-        prompt_len = min(len(prompt_ids), len(labels))
-        labels[:prompt_len] = [-100] * prompt_len
+        )["input_ids"]
+        input_ids = prompt_ids + response_ids
+        if len(input_ids) > self.max_length:
+            ex_id = (self.rows[index].get("metadata") or {}).get("id", index)
+            raise ValueError(f"Example {ex_id} needs {len(input_ids)} tokens; raise --max-length (no answer truncation allowed)")
+        if not response_ids:
+            raise ValueError(f"Example {index} has no supervised response tokens")
+        attention_mask = [1] * len(input_ids)
+        labels = [-100] * len(prompt_ids) + response_ids
 
         return {
             "input_ids": input_ids,
@@ -123,6 +121,7 @@ def parse_args():
 
 def main() -> int:
     args = parse_args()
+    set_seed(42)
 
     if not torch.cuda.is_available():
         raise RuntimeError(
@@ -147,7 +146,7 @@ def main() -> int:
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         quantization_config=quant,
-        device_map="auto",
+        device_map={"": 0},
         torch_dtype=compute_dtype,
     )
     model.config.use_cache = False
@@ -228,6 +227,13 @@ def main() -> int:
         "max_length": args.max_length,
         "bf16": bf16,
         "thinking_mode": False,
+        "best_checkpoint": trainer.state.best_model_checkpoint,
+        "best_eval_loss": trainer.state.best_metric,
+        "log_history": trainer.state.log_history,
+        "base_model_revision": getattr(model.config, "_commit_hash", None),
+        "train_sha256": hashlib.sha256(Path(args.train).read_bytes()).hexdigest(),
+        "validation_sha256": hashlib.sha256(Path(args.validation).read_bytes()).hexdigest(),
+        "versions": {name: importlib.metadata.version(name) for name in ["torch", "transformers", "peft", "bitsandbytes", "accelerate"]},
         "purpose": "AGCN Presenter v0.1",
     }
     (out / "agcn_training_summary.json").write_text(

@@ -6,11 +6,18 @@ from __future__ import annotations
 import argparse
 import json
 import time
+import sys
+import statistics
+import hashlib
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
 
 from training.evaluation_rules import evaluate_output
 from training.training_policy import build_training_system_instruction
@@ -19,7 +26,7 @@ from training.training_policy import build_training_system_instruction
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--eval", required=True)
-    p.add_argument("--adapter", required=True)
+    p.add_argument("--adapter", help="Omit only for the supplementary base-model control with the same training prompt")
     p.add_argument("--output", required=True)
     p.add_argument("--summary", required=True)
     p.add_argument("--model", default="Qwen/Qwen3-4B")
@@ -60,6 +67,7 @@ def parse_json(text: str) -> dict:
 
 def main() -> int:
     args = parse_args()
+    set_seed(42)
     if not torch.cuda.is_available():
         raise RuntimeError("Avaliação do adapter exige GPU CUDA.")
 
@@ -79,10 +87,10 @@ def main() -> int:
     base = AutoModelForCausalLM.from_pretrained(
         args.model,
         quantization_config=quant,
-        device_map="auto",
+        device_map={"": 0},
         torch_dtype=dtype,
     )
-    model = PeftModel.from_pretrained(base, args.adapter)
+    model = PeftModel.from_pretrained(base, args.adapter) if args.adapter else base
     model.eval()
 
     examples = [
@@ -92,6 +100,9 @@ def main() -> int:
     ]
 
     rows = []
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("", encoding="utf-8")
     for index, ex in enumerate(examples, 1):
         messages = [
             {"role": "system", "content": build_training_system_instruction()},
@@ -139,9 +150,11 @@ def main() -> int:
             "latency_seconds": elapsed,
             "checks": checks,
         })
+        with out_path.open("a", encoding="utf-8") as checkpoint:
+            checkpoint.write(json.dumps(rows[-1], ensure_ascii=False) + "\n")
         print(
             f"[{index:02d}/{len(examples):02d}] {ex.get('id')} "
-            f"{elapsed:.2f}s {'ERRO' if error else str(parsed)[:100]}"
+            f"{elapsed:.2f}s {'ERRO' if error else str(parsed)[:100]}", flush=True
         )
 
     out_path = Path(args.output)
@@ -164,6 +177,16 @@ def main() -> int:
         "adapter": str(args.adapter),
         "total": len(rows),
         "failed": sum(1 for r in rows if r["checks"].get("failed")),
+        "frozen_eval_sha256": hashlib.sha256(Path(args.eval).read_bytes()).hexdigest(),
+        "seed": 42,
+        "thinking_mode": False,
+        "engine": "Transformers NF4; training policy; raw model output (no production retries/validators)",
+        "latency_seconds": {
+            "mean": round(statistics.mean(r["latency_seconds"] for r in rows), 3),
+            "median": round(statistics.median(r["latency_seconds"] for r in rows), 3),
+            "min": min(r["latency_seconds"] for r in rows),
+            "max": max(r["latency_seconds"] for r in rows),
+        },
         "checks": {},
     }
     for name in names:

@@ -90,6 +90,10 @@ def main() -> int:
 
     buckets = {"train": [], "validation": []}
     seen: set[str] = set()
+    frozen = [json.loads(line) for line in (ROOT / "training/evaluation/frozen_eval_v0.1.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    frozen_ids = {example["id"] for example in frozen}
+    fingerprint = lambda inp: json.dumps(inp, sort_keys=True, ensure_ascii=False)
+    frozen_inputs = {fingerprint(example["input"]) for example in frozen}
 
     for path in DEFAULT_INPUTS:
         with path.open("r", encoding="utf-8") as handle:
@@ -105,6 +109,8 @@ def main() -> int:
                 if split not in buckets:
                     continue
                 ex_id = str(example.get("id") or "")
+                if ex_id in frozen_ids or fingerprint(example["input"]) in frozen_inputs:
+                    raise RuntimeError(f"Frozen evaluation case cannot enter SFT: {ex_id}")
                 if not ex_id or ex_id in seen:
                     raise RuntimeError(f"ID duplicado ou vazio: {ex_id!r}")
                 seen.add(ex_id)

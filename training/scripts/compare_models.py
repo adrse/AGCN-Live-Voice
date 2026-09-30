@@ -13,6 +13,8 @@ def load(path: str):
     for raw in Path(path).read_text(encoding="utf-8").splitlines():
         if raw.strip():
             row = json.loads(raw)
+            if row["id"] in rows:
+                raise ValueError(f"Duplicate case ID in {path}: {row['id']}")
             rows[row["id"]] = row
     return rows
 
@@ -24,7 +26,9 @@ def main() -> int:
 
     baseline = load(sys.argv[1])
     lora = load(sys.argv[2])
-    ids = sorted(set(baseline) & set(lora))
+    if set(baseline) != set(lora):
+        raise ValueError("Baseline and LoRA must contain exactly the same case IDs")
+    ids = sorted(baseline)
 
     lines = [
         "# Comparação — Qwen atual vs AGCN Presenter v0.1",
@@ -32,6 +36,7 @@ def main() -> int:
         f"Casos comparáveis: **{len(ids)}**",
         "",
         "A comparação automática é só apoio. A decisão final vem da revisão humana cega.",
+        "O baseline oficial usa GGUF Q4_K_M + prompt/validators de produção. O adapter usa Transformers NF4 + política de treinamento, sem os mesmos validators. Diferenças de latência e comportamento também incluem essas mudanças; não são atribuíveis apenas ao treino.",
         "",
     ]
 
@@ -57,6 +62,8 @@ def main() -> int:
             f"**Qwen atual:** {b_speech}",
             "",
             f"**AGCN v0.1:** {a_speech}",
+            "",
+            f"**Latência:** Qwen atual {b.get('latency_seconds')}s; AGCN v0.1 {a.get('latency_seconds')}s.",
             "",
             f"**Checks AGCN:** {checks}",
             "",
