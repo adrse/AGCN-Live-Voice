@@ -9,6 +9,7 @@ import time
 import sys
 import statistics
 import hashlib
+import importlib.metadata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +63,17 @@ def parse_json(text: str) -> dict:
         value = "\n".join(lines).strip()
         if value.lower().startswith("json"):
             value = value[4:].strip()
-    return json.loads(value)
+    parsed = json.loads(value)
+    if not isinstance(parsed, dict):
+        raise ValueError("Output must be a JSON object")
+    for name in ["speech", "topic", "next_sales_thread"]:
+        if not isinstance(parsed.get(name), str) or not parsed[name].strip():
+            raise ValueError(f"Output requires nonempty {name}")
+    if not isinstance(parsed.get("needs_fact"), bool):
+        raise ValueError("needs_fact must be boolean")
+    if not isinstance(parsed.get("used_facts"), list) or not all(isinstance(x, str) for x in parsed["used_facts"]):
+        raise ValueError("used_facts must be a list of strings")
+    return parsed
 
 
 def main() -> int:
@@ -106,6 +117,7 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("", encoding="utf-8")
     for index, ex in enumerate(examples, 1):
+        set_seed(42 + index - 1)
         messages = [
             {"role": "system", "content": build_training_system_instruction()},
             {"role": "user", "content": build_user_payload(ex["input"])},
@@ -118,6 +130,7 @@ def main() -> int:
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
+        torch.cuda.synchronize()
         started = time.perf_counter()
         error = ""
         parsed = None
@@ -140,6 +153,7 @@ def main() -> int:
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
 
+        torch.cuda.synchronize()
         elapsed = round(time.perf_counter() - started, 3)
         checks = evaluate_output(ex, parsed, error)
         rows.append({
@@ -181,6 +195,14 @@ def main() -> int:
         "failed": sum(1 for r in rows if r["checks"].get("failed")),
         "frozen_eval_sha256": hashlib.sha256(Path(args.eval).read_bytes()).hexdigest(),
         "seed": 42,
+        "case_seed": "42 + zero-based case index; reset independently for each case",
+        "gpu": torch.cuda.get_device_name(0),
+        "compute_dtype": str(dtype),
+        "base_model_revision": getattr(base.config, "_commit_hash", None),
+        "generation": {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "max_new_tokens": args.max_new_tokens},
+        "training_prompt_sha256": hashlib.sha256(build_training_system_instruction().encode()).hexdigest(),
+        "evaluation_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "versions": {name: importlib.metadata.version(name) for name in ["torch", "transformers", "peft", "bitsandbytes", "accelerate"]},
         "thinking_mode": False,
         "engine": "Transformers NF4; training policy; raw model output (no production retries/validators)",
         "latency_seconds": {
