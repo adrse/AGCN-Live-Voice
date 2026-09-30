@@ -104,6 +104,30 @@ class CausalPadCollator:
         return {k: torch.tensor(v, dtype=torch.long) for k, v in batch.items()}
 
 
+class AnswerOnlyTrainer(Trainer):
+    """Skip vocabulary projection for masked prompt tokens, preserving CE loss.
+
+    Qwen3/Transformers supports logits_to_keep and explicit shifted labels.
+    Batch size is one in this experiment. The transform preserves all selected
+    targets and the Trainer's original num_items_in_batch normalization.
+    """
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        labels = inputs["labels"]
+        if labels.shape[0] != 1:
+            raise ValueError("AnswerOnlyTrainer currently requires batch size one")
+        positions = torch.nonzero(labels[0, 1:] != -100, as_tuple=True)[0]
+        if positions.numel() == 0:
+            raise ValueError("No supervised answer tokens")
+        selected = dict(inputs)
+        selected["logits_to_keep"] = positions
+        selected["shift_labels"] = labels[:, positions + 1]
+        return super().compute_loss(
+            model, selected, return_outputs=return_outputs,
+            num_items_in_batch=num_items_in_batch,
+        )
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--train", required=True)
@@ -207,7 +231,7 @@ def main() -> int:
 
     training_args = TrainingArguments(**kwargs)
 
-    trainer = Trainer(
+    trainer = AnswerOnlyTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
@@ -229,6 +253,7 @@ def main() -> int:
         "max_length": args.max_length,
         "bf16": bf16,
         "thinking_mode": False,
+        "loss_optimization": "Vocabulary logits only at supervised answer positions; unchanged shifted CE targets",
         "best_checkpoint": trainer.state.best_model_checkpoint,
         "best_eval_loss": trainer.state.best_metric,
         "log_history": trainer.state.log_history,
