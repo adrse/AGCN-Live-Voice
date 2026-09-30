@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Validador leve do dataset AGCN Presenter.
+"""Validador leve dos datasets AGCN Presenter.
 
 Uso:
-    python training/scripts/validate_dataset.py training/datasets/gold_seed_v0.1.jsonl
+    python training/scripts/validate_dataset.py training/datasets/real_live_gold_v0.2.jsonl
 
-Não usa dependências externas.
+Sem dependências externas.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -23,6 +24,39 @@ REQUIRED_INPUT = {
 REQUIRED_TARGET = {
     "speech", "topic", "used_facts", "needs_fact", "next_sales_thread",
 }
+
+GENERIC_SCARCITY_MARKERS = (
+    "poucas unidades",
+    "últimas unidades",
+    "ultimas unidades",
+    "não vai ter pra todo mundo",
+    "nao vai ter pra todo mundo",
+    "aproveita enquanto tem",
+    "aproveite enquanto tem",
+    "enquanto está disponível",
+    "enquanto esta disponivel",
+    "pode ficar sem",
+)
+
+EXHAUSTED_MARKERS = (
+    "estoque esgotou",
+    "estoque acabou",
+    "já esgotou",
+    "ja esgotou",
+    "acabou o estoque",
+)
+
+COUNT_PATTERNS = (
+    r"\brestam\s+(\d+)\b",
+    r"\bfaltam\s+(\d+)\b",
+    r"\bs[oó]\s+tem\s+(\d+)\b",
+    r"\bagora\s+s[aã]o\s+(\d+)\b",
+    r"\btem\s+(\d+)\s+(?:unidades|agora)\b",
+)
+
+
+def _fold(text: str) -> str:
+    return str(text or "").casefold()
 
 
 def validate(example: dict, line_no: int) -> list[str]:
@@ -42,14 +76,11 @@ def validate(example: dict, line_no: int) -> list[str]:
     metadata = example.get("metadata")
 
     if not isinstance(inp, dict):
-        errors.append(f"{prefix}: input deve ser objeto")
-        return errors
+        return [f"{prefix}: input deve ser objeto"]
     if not isinstance(target, dict):
-        errors.append(f"{prefix}: target deve ser objeto")
-        return errors
+        return [f"{prefix}: target deve ser objeto"]
     if not isinstance(metadata, dict):
-        errors.append(f"{prefix}: metadata deve ser objeto")
-        return errors
+        return [f"{prefix}: metadata deve ser objeto"]
 
     miss_in = REQUIRED_INPUT - set(inp)
     miss_tg = REQUIRED_TARGET - set(target)
@@ -61,10 +92,8 @@ def validate(example: dict, line_no: int) -> list[str]:
     mode = inp.get("mode")
     if mode not in {"proactive", "comment_reply"}:
         errors.append(f"{prefix}: mode inválido: {mode!r}")
-
     if mode == "comment_reply" and not isinstance(inp.get("comment"), dict):
         errors.append(f"{prefix}: comment_reply exige comment objeto")
-
     if mode == "proactive" and inp.get("comment") not in (None, {}):
         errors.append(f"{prefix}: proactive deve usar comment=null")
 
@@ -80,11 +109,10 @@ def validate(example: dict, line_no: int) -> list[str]:
     allowed_set = {str(x).strip().casefold() for x in allowed}
     for fact in used:
         if str(fact).strip().casefold() not in allowed_set:
-            errors.append(
-                f"{prefix}: used_fact não autorizado: {fact!r}"
-            )
+            errors.append(f"{prefix}: used_fact não autorizado: {fact!r}")
 
     speech = str(target.get("speech") or "").strip()
+    speech_fold = _fold(speech)
     needs_fact = bool(target.get("needs_fact"))
 
     if not speech:
@@ -92,17 +120,48 @@ def validate(example: dict, line_no: int) -> list[str]:
 
     if needs_fact:
         if speech != "IGNORAR":
-            errors.append(
-                f'{prefix}: needs_fact=true exige speech="IGNORAR"'
-            )
+            errors.append(f'{prefix}: needs_fact=true exige speech="IGNORAR"')
         if used:
-            errors.append(
-                f"{prefix}: needs_fact=true não deve usar used_facts"
-            )
+            errors.append(f"{prefix}: needs_fact=true não deve usar used_facts")
     elif speech == "IGNORAR":
-        errors.append(
-            f'{prefix}: speech="IGNORAR" exige needs_fact=true'
-        )
+        errors.append(f'{prefix}: speech="IGNORAR" exige needs_fact=true')
+
+    rules = inp.get("commercial_rules") or {}
+    if not isinstance(rules, dict):
+        errors.append(f"{prefix}: commercial_rules deve ser objeto")
+        rules = {}
+
+    limited = bool(rules.get("live_inventory_limited", False))
+    generic_enabled = bool(rules.get("generic_scarcity_enabled", False))
+    stock_quantity = rules.get("stock_quantity")
+    stock_exhausted = bool(rules.get("stock_exhausted", False))
+
+    if any(marker in speech_fold for marker in GENERIC_SCARCITY_MARKERS):
+        if not (limited and generic_enabled):
+            errors.append(
+                f"{prefix}: escassez genérica exige live_inventory_limited=true "
+                "e generic_scarcity_enabled=true"
+            )
+
+    for pattern in COUNT_PATTERNS:
+        match = re.search(pattern, speech_fold)
+        if not match:
+            continue
+        spoken = int(match.group(1))
+        if stock_quantity is None:
+            errors.append(
+                f"{prefix}: contagem de estoque falada ({spoken}) sem stock_quantity"
+            )
+        elif int(stock_quantity) != spoken:
+            errors.append(
+                f"{prefix}: contagem falada {spoken} difere de stock_quantity={stock_quantity}"
+            )
+
+    if any(marker in speech_fold for marker in EXHAUSTED_MARKERS):
+        if not stock_exhausted:
+            errors.append(
+                f"{prefix}: alegação de estoque esgotado exige stock_exhausted=true"
+            )
 
     split = metadata.get("split")
     if split not in {"train", "validation", "test"}:
