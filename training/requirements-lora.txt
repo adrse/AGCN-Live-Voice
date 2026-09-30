@@ -1,7 +1,7 @@
 # AGCN Presenter v0.1 — treino QLoRA
-# Qwen3 exige transformers >= 4.51.
+# Versão validada no Colab; suporta logits_to_keep + shift_labels para loss otimizada.
 torch>=2.4
-transformers>=4.51.0,<5
+transformers==4.57.6
 datasets>=3.2
 accelerate>=1.2
 peft>=0.14
