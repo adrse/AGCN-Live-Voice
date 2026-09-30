@@ -1,79 +1,93 @@
 # Plano — AGCN Presenter Model
 
-Status: laboratório em branch isolada.
+Status: laboratório em branch isolada `research/agcn-presenter-training-v1`.
 
 ## Visão
 
-O AGCN Presenter Model será uma especialização do modelo-base local, focada em condução de LIVE commerce. O objetivo não é ensinar conhecimento geral, e sim comportamento comercial seguro e natural.
+O AGCN Presenter Model será uma especialização do modelo-base local, focada em condução de LIVE commerce. O alvo não é conhecimento geral: é comportamento de venda em fluxo contínuo.
 
-O primeiro caminho de treinamento será:
-1. dataset ouro humano;
-2. expansão sintética revisada;
-3. SFT/LoRA;
-4. avaliação cega contra o modelo-base;
-5. preference tuning somente se houver ganho mensurável;
-6. conversão para formato local compatível com o runtime;
-7. teste de LIVE;
-8. integração na main apenas após aprovação.
+Caminho:
+1. dataset ouro humano e de LIVEs reais;
+2. desduplicação e normalização;
+3. conjunto de teste congelado;
+4. expansão sintética revisada;
+5. SFT/LoRA;
+6. avaliação cega contra o modelo-base;
+7. preference tuning se houver ganho;
+8. conversão para o formato local do runtime;
+9. teste em LIVE;
+10. integração na `main` somente após aprovação.
 
-## O que entra no treino
+## Competências centrais
 
-- resposta a preço, cupom, frete, estoque e garantia;
-- compatibilidade e perguntas técnicas;
-- objeções;
-- intenção de compra;
-- confirmação de compra;
-- comentários irrelevantes;
-- pergunta sem fato autorizado;
-- condução sem comentário;
-- retomada depois de interrupção;
+- responder intenção de compra rapidamente;
+- transformar pergunta técnica em benefício quando fizer sentido;
+- tratar objeções sem travar a LIVE;
+- conduzir a apresentação quando ninguém comenta;
+- escassez e fechamento como técnicas prioritárias;
+- CTA guiado quando o comprador demonstra intenção;
+- celebração curta de compra e prova social;
+- retomada natural;
 - anti-repetição;
-- CTA intercalado;
-- variação de ângulo comercial;
-- uso de táticas como price_anchor, benefit_translation e grounded_scarcity.
+- linguagem oral adequada ao TTS;
+- honestidade sobre limitações reais do produto.
 
-## O que NÃO deve ser "memorizado" pelo modelo
+## Regra operacional de escassez
 
-Preço de produto específico, estoque, cupom, garantia, especificações e condições de LIVE não devem virar conhecimento permanente. Esses dados continuam chegando em tempo de execução por PRODUCT / LIVE_CONDITIONS / ALLOWED_FACTS.
+A aplicação poderá informar uma regra comercial de sessão:
 
-## Estratégia de dados
+- `live_inventory_limited=true`: a LIVE trabalha com inventário limitado;
+- `generic_scarcity_enabled=true`: permite linguagem genérica de escassez mesmo sem contagem;
+- `stock_quantity=N`: quando existir, permite dizer a quantidade exata.
 
-### Fase 1 — Gold Seed
-500–1.000 exemplos feitos/revisados por humanos.
+Assim o modelo não decide sozinho se uma LIVE é limitada: o sistema estabelece a regra. Se houver número, o Presenter usa o número; sem número, trabalha pressão genérica e fechamento.
 
-### Fase 2 — Expansão
-10k–30k exemplos com variações geradas e filtradas.
+Exemplos de repertório genérico:
+- poucas unidades;
+- últimas unidades;
+- não vai ter pra todo mundo;
+- não deixa pra depois;
+- finaliza agora;
+- aproveita enquanto tem;
+- aproveita enquanto está disponível;
+- quem deixar pra depois pode ficar sem.
 
-### Fase 3 — Diversidade
-Produtos e categorias diferentes, gírias, erros de digitação, perguntas curtas, comentários simultâneos e mudanças de contexto.
+## Dados observados em LIVEs
 
-### Fase 4 — Dados reais
-Interações de LIVE revisadas e anonimizadas podem virar exemplos de alta qualidade.
+Os relatórios já mostram padrões recorrentes:
+- contagem regressiva de unidades;
+- respostas nominais a dúvidas;
+- CTA passo a passo;
+- feature -> benefício;
+- dor -> solução;
+- prova social por compras;
+- visualização de uso;
+- demonstração física/sonora;
+- retomada após comentário;
+- erros úteis como exemplos negativos: repetição, preço inconsistente, ignorar intenção de compra e se prender a suporte.
 
-## Papel do usuário/especialista de LIVE
+## Fase atual
 
-O dado mais valioso é informação de comportamento real:
-- "o que uma boa vendedora falaria aqui?";
-- "o que ela não deveria falar?";
-- "qual comentário merece resposta?";
-- "quando é hora de ignorar e continuar?";
-- "qual frase soa robótica?";
-- "qual frase geraria desejo?";
-- "como retomar o produto sem parecer repetitivo?".
+Primeiro objetivo: 100 exemplos Gold bem diferentes entre si. Qualidade e cobertura valem mais do que volume bruto nessa etapa.
 
-Essas decisões viram exemplos ouro.
+Depois:
+- 500–1.000 Gold;
+- 10k–30k exemplos revisados/expandidos;
+- primeiro LoRA;
+- comparação objetiva.
 
 ## Voz
 
-O treinamento do Presenter e o treinamento/ajuste de voz ficam separados.
-O Presenter decide o que dizer e a intenção; a camada de voz decide como entregar.
-Tags como `voice_style` podem ser preservadas no dataset para estudos posteriores de prosódia.
+Brain e voz continuam separados.
+O dataset preserva `voice_style` e observações de prosódia para, no futuro, treinar/ajustar:
+- energia;
+- pausa;
+- respiração;
+- ênfase;
+- ritmo;
+- tom de confiança;
+- celebração de compra.
 
 ## Critério de integração
 
-Nenhuma integração na `main` ocorrerá só porque o fine-tuning terminou. A nova versão precisa:
-- passar validação factual;
-- superar baseline em teste congelado;
-- manter latência prática;
-- funcionar com o runtime local;
-- preservar fallback e segurança existentes.
+O novo modelo só entra na `main` quando superar o atual em teste congelado sem comprometer estabilidade, latência e controle do runtime.
