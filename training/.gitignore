@@ -1,0 +1,11 @@
+# Artefatos locais de treinamento
+checkpoints/
+outputs/
+runs/
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.bin
+wandb/
+.cache/
