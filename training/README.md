@@ -31,6 +31,7 @@ O laboratório **não altera o runtime atual**. O alvo desta fase é transformar
 - `scripts/validate_dataset.py`: validação estrutural e de escassez.
 - `scripts/export_sft.py`: exporta exemplos aprovados para formato de chat SFT.
 - `scripts/dataset_stats.py`: estatísticas de cobertura.
+- `scripts/lint_oral_style.py`: aponta falas formais demais no `target.speech`.
 - `../docs/AGCN_PRESENTER_TRAINING.md`: plano de evolução do modelo.
 
 ## Filosofia dos dados
