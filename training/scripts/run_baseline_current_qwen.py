@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
+import re
 import statistics
 import sys
 import time
@@ -172,6 +174,21 @@ def main() -> int:
         return 1
     print(detail)
 
+    # Fail fast instead of silently benchmarking a CPU fallback on Colab.
+    cuda_verified = False
+    offloaded_layers = None
+    if os.getenv("AGCN_BASELINE_REQUIRE_CUDA") == "1":
+        from core.local_llama_brain import _log_dir
+        log = (_log_dir() / "agcn-local-brain.log").read_text(encoding="utf-8", errors="replace")
+        matches = re.findall(r"offloaded (\d+)/(\d+) layers to GPU", log)
+        cuda_verified = "CUDA" in log and bool(matches) and int(matches[-1][0]) > 0
+        if not cuda_verified:
+            brain.close()
+            print(log[-12000:])
+            raise RuntimeError("CUDA offload not confirmed in llama.cpp logs; baseline aborted")
+        offloaded_layers = {"offloaded": int(matches[-1][0]), "total": int(matches[-1][1])}
+        print("CUDA offload verified:", offloaded_layers, flush=True)
+
     examples = []
     with src.open("r", encoding="utf-8") as handle:
         for raw in handle:
@@ -182,6 +199,7 @@ def main() -> int:
     results = []
     latencies = []
     failed = 0
+    out_path.write_text("", encoding="utf-8")
 
     try:
         for index, example in enumerate(examples, 1):
@@ -215,6 +233,9 @@ def main() -> int:
                 "auto_flags": _auto_flags(example, speech, bool(error)),
             }
             results.append(record)
+            # Preserve completed cases if Colab disconnects mid-run.
+            with out_path.open("a", encoding="utf-8") as checkpoint:
+                checkpoint.write(json.dumps(record, ensure_ascii=False) + "\n")
             if error:
                 print(
                     f"[{index:02d}/{len(examples):02d}] "
@@ -236,13 +257,13 @@ def main() -> int:
 
     valid = [x for x in results if not x["error"]]
     scarcity_rows = [
-        x for x in valid if x["auto_flags"].get("scarcity_expected")
+        x for x in results if x["auto_flags"].get("scarcity_expected")
     ]
     buying_rows = [
-        x for x in valid if x["auto_flags"].get("buying_intent")
+        x for x in results if x["auto_flags"].get("buying_intent")
     ]
     quantity_rows = [
-        x for x in valid if x["auto_flags"].get("quantity_scarcity")
+        x for x in results if x["auto_flags"].get("quantity_scarcity")
     ]
     ignore_rows = [
         x for x in results if x["auto_flags"].get("expected_ignore")
@@ -255,6 +276,10 @@ def main() -> int:
         "total": len(results),
         "completed": len(valid),
         "failed": failed,
+        "cuda_verified": cuda_verified,
+        "offloaded_layers": offloaded_layers,
+        "frozen_eval_sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
+        "timeout_cases": sum(1 for x in results if "timeout" in x["error"].casefold() or "timed out" in x["error"].casefold()),
         "latency_seconds": {
             "mean": round(statistics.mean(latencies), 3) if latencies else None,
             "median": round(statistics.median(latencies), 3) if latencies else None,
@@ -271,6 +296,7 @@ def main() -> int:
                 if x["auto_flags"].get("scarcity_present")
             ),
             "buying_intent_cases": len(buying_rows),
+            "buying_intent_answered": sum(1 for x in buying_rows if x.get("baseline") and not x["baseline"].get("needs_fact") and x["baseline"].get("speech") != "IGNORAR"),
             "purchase_guidance_present": sum(
                 1 for x in buying_rows
                 if x["auto_flags"].get("purchase_guidance_present")
