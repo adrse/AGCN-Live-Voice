@@ -71,8 +71,10 @@ def main() -> int:
     if not torch.cuda.is_available():
         raise RuntimeError("Avaliação do adapter exige GPU CUDA.")
 
-    bf16 = torch.cuda.is_bf16_supported()
+    bf16 = torch.cuda.is_bf16_supported(including_emulation=False)
     dtype = torch.bfloat16 if bf16 else torch.float16
+
+    print(f"GPU: {torch.cuda.get_device_name(0)}; native BF16: {bf16}; compute dtype: {compute_dtype if 'compute_dtype' in locals() else dtype}", flush=True)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token_id is None:
