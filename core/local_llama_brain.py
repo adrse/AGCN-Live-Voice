@@ -128,7 +128,7 @@ class LlamaCppLocalTransport:
             return False
 
     def _command(self) -> list[str]:
-        return [
+        command = [
             str(self.engine_path),
             "-m",
             str(self.model_path),
@@ -146,6 +146,19 @@ class LlamaCppLocalTransport:
             "--reasoning",
             "off",
         ]
+
+        # Laboratório/benchmarks podem ativar offload CUDA sem mudar o
+        # comportamento padrão do aplicativo Windows.
+        gpu_layers = str(os.getenv("AGCN_LLAMA_GPU_LAYERS") or "").strip()
+        if gpu_layers:
+            try:
+                value = max(0, int(gpu_layers))
+            except ValueError:
+                value = 0
+            if value:
+                command.extend(["-ngl", str(value)])
+
+        return command
 
     def _start_server(self) -> None:
         if self._server_ready():
