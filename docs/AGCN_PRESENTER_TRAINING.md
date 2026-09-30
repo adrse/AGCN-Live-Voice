@@ -68,7 +68,20 @@ Os relatórios já mostram padrões recorrentes:
 
 ## Fase atual
 
-Primeiro objetivo: 100 exemplos Gold bem diferentes entre si. Qualidade e cobertura valem mais do que volume bruto nessa etapa.
+Marco atual concluído: **100 exemplos Gold derivados/revisados das LIVEs + 25 situações de teste congeladas**.
+
+O conjunto congelado não pode ser usado em SFT, LoRA ou expansão sintética. Ele existe para medir o ganho real do modelo.
+
+### Linguagem alvo
+
+O Presenter deve falar como vendedor brasileiro em LIVE. Preferir oralidade natural:
+
+- "tá" em vez de "está";
+- "tô" em vez de "estou";
+- "pra" em vez de "para" na fala;
+- "ó", "bora" e "cê" quando soarem naturais.
+
+Não transformar isso em caricatura: clareza continua sendo prioridade.
 
 Depois:
 - 500–1.000 Gold;
