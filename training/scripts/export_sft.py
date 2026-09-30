@@ -67,7 +67,11 @@ def main() -> int:
             if not raw:
                 continue
             ex = json.loads(raw)
-            if ex.get("metadata", {}).get("quality") != "gold":
+            meta = ex.get("metadata", {})
+            if meta.get("quality") != "gold":
+                continue
+            # O conjunto congelado nunca entra no SFT.
+            if meta.get("split") == "test":
                 continue
 
             record = {
