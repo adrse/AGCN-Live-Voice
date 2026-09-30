@@ -159,9 +159,9 @@ def main() -> int:
     transport = LlamaCppLocalTransport(
         pack_dir=pack_dir,
         startup_timeout_seconds=240,
-        timeout_seconds=120,
+        timeout_seconds=240,
         temperature=0.25,
-        max_output_tokens=350,
+        max_output_tokens=220,
         context_size=4096,
     )
     brain = PresenterBrain(transport, max_retries=1)
@@ -215,11 +215,18 @@ def main() -> int:
                 "auto_flags": _auto_flags(example, speech, bool(error)),
             }
             results.append(record)
-            print(
-                f"[{index:02d}/{len(examples):02d}] "
-                f"{example.get('id')} {elapsed:.2f}s "
-                f"{'ERRO' if error else speech[:100]}"
-            )
+            if error:
+                print(
+                    f"[{index:02d}/{len(examples):02d}] "
+                    f"{example.get('id')} {elapsed:.2f}s ERRO -> {error}",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"[{index:02d}/{len(examples):02d}] "
+                    f"{example.get('id')} {elapsed:.2f}s {speech[:120]}",
+                    flush=True,
+                )
     finally:
         brain.close()
 
