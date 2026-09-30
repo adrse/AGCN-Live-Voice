@@ -15,6 +15,10 @@ GENERIC_SCARCITY = (
     "aproveita enquanto tem",
     "pra não ficar sem",
     "pra nao ficar sem",
+    "não deixa pra depois",
+    "nao deixa pra depois",
+    "finaliza agora",
+    "quem deixar pra depois pode ficar sem",
 )
 
 FORMAL_MARKERS = (
@@ -28,6 +32,16 @@ FORMAL_MARKERS = (
 )
 
 
+def quantity_spoken(speech: str, stock: int) -> bool:
+    # Avoid matching stock=3 inside a price such as 139. Spellings commonly
+    # used in short TTS answers count too; this is still only a lexical check.
+    words = {0: "zero", 1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez", 11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze", 16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove", 20: "vinte"}
+    numeric = re.search(r"(?<![\d.,])" + re.escape(str(stock)) + r"(?![\d.,])", speech)
+    word = words.get(stock)
+    spoken = bool(word and re.search(r"\b" + re.escape(word) + r"\b", speech.casefold()))
+    return bool(numeric or spoken)
+
+
 def evaluate_output(example: dict, result: dict | None, error: str = "") -> dict:
     target = example.get("target") or {}
     inp = example.get("input") or {}
@@ -36,12 +50,13 @@ def evaluate_output(example: dict, result: dict | None, error: str = "") -> dict
     allowed = {str(x).strip().casefold() for x in inp.get("allowed_facts") or []}
     tags = set(meta.get("tags") or [])
 
-    if not result:
+    if not isinstance(result, dict) or not result:
         return {
             "valid_json": False,
             "failed": True,
             "error": error,
             "reported_facts_ok": False,
+            "numeric_claims_ok": False,
             "ignore_ok": False,
             "oral_style_ok": False,
             "scarcity_ok": False if "scarcity" in tags else None,
@@ -57,7 +72,7 @@ def evaluate_output(example: dict, result: dict | None, error: str = "") -> dict
 
     expected_ignore = target.get("speech") == "IGNORAR"
     if expected_ignore:
-        ignore_ok = speech == "IGNORAR" or bool(result.get("needs_fact"))
+        ignore_ok = speech == "IGNORAR" and bool(result.get("needs_fact"))
     else:
         ignore_ok = speech != "IGNORAR" and not bool(result.get("needs_fact"))
 
@@ -72,13 +87,13 @@ def evaluate_output(example: dict, result: dict | None, error: str = "") -> dict
         scarcity_present = any(x in fold for x in GENERIC_SCARCITY)
         stock = rules.get("stock_quantity")
         if stock is not None:
-            scarcity_present = scarcity_present or str(int(stock)) in speech
+            scarcity_present = scarcity_present or quantity_spoken(speech, int(stock))
         scarcity_ok = bool(generic_allowed and scarcity_present)
 
     quantity_ok = None
     if "quantity_scarcity" in tags:
         stock = rules.get("stock_quantity")
-        quantity_ok = stock is not None and str(int(stock)) in speech
+        quantity_ok = stock is not None and quantity_spoken(speech, int(stock))
 
     buying_ok = None
     if "buying_intent" in tags:
