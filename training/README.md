@@ -85,3 +85,26 @@ A resposta ideal do AGCN deve soar falada, não escrita. O padrão prioriza form
 A informalidade deve ser natural, sem transformar toda frase em gíria ou repetir a mesma muleta.
 
 Esta branch é um laboratório. Nada daqui é enviado automaticamente para a aplicação de produção.
+
+
+## Pipeline v0.1 preparado
+
+A branch agora já contém o caminho completo até a primeira comparação:
+
+1. `scripts/run_baseline_current_qwen.py` — roda o Qwen3-4B atual nas 25 situações congeladas.
+2. `scripts/build_sft_corpus.py` — monta o corpus com 93 exemplos de treino e 7 de validação.
+3. `training_policy.py` — política de treino separada do runtime atual, com oralidade PT-BR e escassez.
+4. `scripts/train_lora_qwen3.py` — primeiro QLoRA em `Qwen/Qwen3-4B`.
+5. `notebooks/AGCN_Presenter_v0_1_Colab.ipynb` — fluxo pronto para Google Colab com GPU e salvamento no Drive.
+6. `scripts/run_lora_frozen_eval.py` — roda o adapter treinado nas mesmas 25 situações.
+7. `scripts/compare_models.py` — gera comparação Qwen atual vs AGCN Presenter v0.1.
+
+### Por que a política de treino está separada?
+
+O prompt/runtime atual precisa continuar intacto enquanto fazemos o baseline "antes".
+A nova política de oralidade/escassez fica no laboratório até o modelo treinado passar na avaliação.
+Só depois as mudanças necessárias entram em `core/` e na `main`.
+
+### Modelo-base
+
+O primeiro experimento usa `Qwen/Qwen3-4B` como modelo de treinamento e mantém `enable_thinking=False`, porque o Presenter precisa de resposta curta e rápida, não raciocínio longo visível.
