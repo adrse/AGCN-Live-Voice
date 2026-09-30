@@ -1,0 +1,9 @@
+# AGCN Presenter v0.1 — treino QLoRA
+# Qwen3 exige transformers >= 4.51.
+torch>=2.4
+transformers>=4.51.0
+datasets>=3.2
+accelerate>=1.2
+peft>=0.14
+bitsandbytes>=0.45
+safetensors>=0.4
