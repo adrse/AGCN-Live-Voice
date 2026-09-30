@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.presenter_policy import build_system_instruction  # noqa: E402
+from training.training_policy import build_training_system_instruction  # noqa: E402
 
 
 def build_user_payload(inp: dict) -> str:
@@ -76,7 +76,7 @@ def main() -> int:
 
             record = {
                 "messages": [
-                    {"role": "system", "content": build_system_instruction()},
+                    {"role": "system", "content": build_training_system_instruction()},
                     {"role": "user", "content": build_user_payload(ex["input"])},
                     {"role": "assistant", "content": target_json(ex["target"])},
                 ],
