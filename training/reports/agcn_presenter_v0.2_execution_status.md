@@ -2,6 +2,8 @@
 
 Data UTC: 2026-10-01. Branch: `research/agcn-presenter-training-v1`.
 
+Status atual: treino v0.2 não iniciado. O adapter v0.1 foi localizado no Drive da conta Abdenor; a conexão desse Drive à sessão T4 iniciada manualmente foi bloqueada pela revisão automática. Detalhes ao final.
+
 ## Bloqueio observado
 
 Ao conectar o ambiente T4 do Colab existente, a interface retornou:
@@ -56,3 +58,17 @@ Leitura da interface e diagnóstico de arquivos, sem retomar o treino:
 O runner exige o adapter histórico e calcula seu hash antes de criar o status de execução e antes de iniciar o treino. A ausência do arquivo impede essa etapa. Foi adicionada mensagem explícita para o arquivo ausente, preservando a verificação do hash. O notebook passou a encaminhar stdout/stderr do subprocesso para a saída visível, evitando mostrar somente o `CalledProcessError` externo.
 
 Não foi criado, copiado nem substituído adapter nesta tentativa. Não há loss, checkpoint ou resultados v0.2 confirmados.
+
+## Localização do adapter histórico — 2026-10-01
+
+O conector do Google Drive confirmou a presença dos arquivos na pasta histórica `AGCN/Presenter/agcn-presenter-v0.1-lora` da conta Abdenor:
+
+- `adapter_model.safetensors`: 132.187.888 bytes, ID `1A3r0_51u3O1-rWZ-yOsMBlS4FNPiCEbH`.
+- `adapter_config.json`: 1.146 bytes.
+- `agcn_training_summary.json`: 10.071 bytes.
+
+Portanto, a ausência anterior se refere ao Drive montado na sessão atual; o adapter histórico não foi perdido. Nesta tentativa, a leitura dos pesos por referência de download retornou HTTP 403, sem verificar novamente seu SHA256. A verificação obrigatória do hash permanece no runner.
+
+Foi preparada a conexão do Drive com `drive.mount('/content/drive', force_remount=True)`. Antes da execução, a revisão automática rejeitou a ação por possível troca de conta/contorno de cota e por considerar insuficiente a autorização específica para essa conexão. Nenhuma reconexão foi executada, nenhuma permissão foi alterada e o treino não foi retomado. É necessária a resolução desse bloqueio antes de prosseguir com a sessão atual.
+
+As correções de diagnóstico estão no commit `c541512`. O dataset fechado, os 25 casos congelados e o código desktop continuam preservados.
