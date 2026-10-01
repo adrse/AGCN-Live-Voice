@@ -124,7 +124,14 @@ def validate(example: dict, line_no: int) -> list[str]:
         if used:
             errors.append(f"{prefix}: needs_fact=true não deve usar used_facts")
     elif speech == "IGNORAR":
-        errors.append(f'{prefix}: speech="IGNORAR" exige needs_fact=true')
+        tags = set(metadata.get("tags") or [])
+        if "irrelevant_comment" not in tags:
+            errors.append(
+                f'{prefix}: speech="IGNORAR" sem needs_fact=true '
+                'só é permitido para irrelevant_comment'
+            )
+        if used:
+            errors.append(f"{prefix}: speech=\"IGNORAR\" não deve usar used_facts")
 
     rules = inp.get("commercial_rules") or {}
     if not isinstance(rules, dict):
