@@ -1,0 +1,44 @@
+{
+  "version": "0.2",
+  "status": "research",
+  "branch": "research/agcn-presenter-training-v1",
+  "created_for": "AGCN Presenter v0.2 QLoRA",
+  "datasets": [
+    {
+      "path": "training/datasets/real_live_gold_v0.2.jsonl",
+      "origin": "gold_real",
+      "items": 28
+    },
+    {
+      "path": "training/datasets/gold_expansion_v0.3.jsonl",
+      "origin": "gold_synthetic",
+      "items": 72
+    },
+    {
+      "path": "training/datasets/gold_synthetic_v0.2.jsonl",
+      "origin": "gold_synthetic",
+      "items": 400,
+      "git_blob_sha": "b4c71321767e94ec25ba21947c8278f943d204ee"
+    }
+  ],
+  "totals": {
+    "gold": 500,
+    "gold_real": 28,
+    "gold_synthetic": 472,
+    "train": 458,
+    "validation": 42
+  },
+  "frozen_evaluation": {
+    "path": "training/evaluation/frozen_eval_v0.1.jsonl",
+    "items": 25,
+    "excluded_from_training": true,
+    "git_blob_sha": "d28899152c416d41cae71be485e88985060f55ae"
+  },
+  "rules": {
+    "unanswered_fact_question": "IGNORAR internally; say nothing about the unanswered question and continue the LIVE",
+    "irrelevant_comment": "May use IGNORAR with needs_fact=false; do not let irrelevant chat hijack the LIVE",
+    "oral_style": "PT-BR informal/oral",
+    "scarcity": "Generic scarcity only when commercial_rules authorizes it; numeric stock only from stock_quantity"
+  },
+  "builder": "training/scripts/build_sft_corpus_v0_2.py"
+}
