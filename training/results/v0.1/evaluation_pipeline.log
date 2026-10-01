@@ -1,0 +1,197 @@
+GPU: Tesla T4; native BF16: False; compute dtype: torch.float16
+`torch_dtype` is deprecated! Use `dtype` instead!
+
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]
+Loading checkpoint shards:  33%|███▎      | 1/3 [00:18<00:36, 18.41s/it]
+Loading checkpoint shards:  67%|██████▋   | 2/3 [00:36<00:18, 18.46s/it]
+Loading checkpoint shards: 100%|██████████| 3/3 [00:37<00:00, 10.23s/it]
+Loading checkpoint shards: 100%|██████████| 3/3 [00:37<00:00, 12.45s/it]
+[01/25] eval-001 16.66s {'speech': 'Vem o minizero, o shaver, o cabeçote de corte, o cabo USB e a vassourinha.', 'topic': 'i
+[02/25] eval-002 7.78s {'speech': 'IGNORAR', 'topic': 'retomar fechamento', 'used_facts': [], 'needs_fact': True, 'next_sal
+[03/25] eval-003 12.71s {'speech': 'Pra quem já pensou em colocar no carrinho, não deixa pra depois. São poucas unidades na 
+[04/25] eval-004 18.24s {'speech': 'O tamanho: o Item 1 é 42 cm e o Item 2 é 52 cm. Ambos têm 1000 RPM.', 'topic': 'diferenç
+[05/25] eval-005 12.38s {'speech': 'Não, o ventilador é silencioso. Foi o principal benefício que colocamos no produto.', 't
+[06/25] eval-006 13.95s {'speech': 'Ó, e cê já consegue escolher a velocidade e a cor da luz pelo controle.', 'topic': 'demo
+[07/25] eval-007 12.81s {'speech': 'Agora restam quatro unidades, então se cê colocar no carrinho e finalizar, não deixa pra
+[08/25] eval-008 10.28s {'speech': 'É de quatorze litros, Rosa.', 'topic': 'capacity', 'used_facts': ['Capacidade: 14 litros
+[09/25] eval-009 12.72s {'speech': 'O valor mudou, Ana. E o frete pode variar conforme a região.', 'topic': 'preço e frete',
+[10/25] eval-010 12.05s {'speech': 'Ó, não deixa pra depois. São poucas unidades nessa LIVE, então se cê já decidiu, finaliz
+[11/25] eval-011 12.56s {'speech': 'A Thi, consegue sim. Esse modelo aguenta até cento e noventa e cinco quilos.', 'topic': 
+[12/25] eval-012 16.12s {'speech': 'Se cê tem gato, cuidado com unha afiada. Uma manta ajuda a proteger.', 'topic': 'dor->so
+[13/25] eval-013 18.55s {'speech': 'Então abre o produto fixado e escolhe a opção A. É a que vem com a poltrona, o apoio de 
+[14/25] eval-014 11.26s {'speech': 'Ó, eu não deixo pra depois. São poucas unidades e não vai ter pra todo mundo. Finaliza e
+[15/25] eval-015 13.81s {'speech': 'Agora restam quarenta e cinco poltronas. Quem já colocou no carrinho, finaliza e não dei
+[16/25] eval-016 14.87s {'speech': 'Pega sim. É pra indução, gás, elétrico, vitrocerâmico, lenha e forno.', 'topic': 'compat
+[17/25] eval-017 11.40s {'speech': 'Pode sim. Vai ao forno com a tampa.', 'topic': 'compatibility', 'used_facts': ['Compatib
+[18/25] eval-018 7.64s {'speech': 'IGNORAR', 'topic': 'retomar', 'used_facts': [], 'needs_fact': True, 'next_sales_thread':
+[19/25] eval-019 9.11s {'speech': 'Não, não tem NFC pra pagamento.', 'topic': 'limitações', 'used_facts': ['Limitações: não
+[20/25] eval-020 11.03s {'speech': 'Sim, ele faz e atende as ligações.', 'topic': 'compatibilidade', 'used_facts': ['Informa
+[21/25] eval-021 12.07s {'speech': 'Agora restam três unidades. Quem já colocou no carrinho não deixa pra depois.', 'topic':
+[22/25] eval-022 12.29s {'speech': 'Não, Bia. Esse conjunto serve só para fogão convencional a gás.', 'topic': 'compatibilit
+[23/25] eval-023 10.74s {'speech': 'Ó, abre o produto fixado e finaliza. Se tava em carrinho, finaliza agora.', 'topic': 're
+[24/25] eval-024 8.90s {'speech': 'Aí sim, Lalita. Parabéns pela compra.', 'topic': 'retomar compra', 'used_facts': [], 'ne
+[25/25] eval-025 10.49s {'speech': 'Ó, então abre o produto fixado e finaliza. Não vai ter pra todo mundo.', 'topic': 'retom
+{
+  "model": "Qwen/Qwen3-4B",
+  "adapter": "/content/drive/MyDrive/AGCN/Presenter/agcn-presenter-v0.1-lora",
+  "total": 25,
+  "failed": 0,
+  "frozen_eval_sha256": "09f7f0cb0e9fb2847a37c93ea58a5724460a88af4d5b2cf469d493feb6083bae",
+  "seed": 42,
+  "case_seed": "42 + zero-based case index; reset independently for each case",
+  "gpu": "Tesla T4",
+  "compute_dtype": "torch.float16",
+  "base_model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "generation": {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "max_new_tokens": 350
+  },
+  "training_prompt_sha256": "7bf502d9de1fed81193d5224f6bd891b4a0f39d3e8d72be3a661efddaf2b3af6",
+  "evaluation_script_sha256": "57fc11dfd6dd28b0dfd67f84079c94d0998d10db00d36527356b5f48f0defd7e",
+  "versions": {
+    "torch": "2.11.0+cu128",
+    "transformers": "4.57.6",
+    "peft": "0.20.0",
+    "bitsandbytes": "0.50.2",
+    "accelerate": "1.14.0"
+  },
+  "thinking_mode": false,
+  "engine": "Transformers NF4; training policy; raw model output (no production retries/validators)",
+  "latency_seconds": {
+    "mean": 12.417,
+    "median": 12.29,
+    "min": 7.644,
+    "max": 18.553
+  },
+  "checks": {
+    "reported_facts_ok": {
+      "passed": 25,
+      "total": 25
+    },
+    "numeric_claims_ok": {
+      "passed": 25,
+      "total": 25
+    },
+    "ignore_ok": {
+      "passed": 25,
+      "total": 25
+    },
+    "oral_style_ok": {
+      "passed": 25,
+      "total": 25
+    },
+    "scarcity_ok": {
+      "passed": 6,
+      "total": 6
+    },
+    "quantity_ok": {
+      "passed": 2,
+      "total": 3
+    },
+    "buying_guidance_ok": {
+      "passed": 3,
+      "total": 3
+    }
+  }
+}
+GPU: Tesla T4; native BF16: False; compute dtype: torch.float16
+`torch_dtype` is deprecated! Use `dtype` instead!
+
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]
+Loading checkpoint shards:  33%|███▎      | 1/3 [00:18<00:36, 18.02s/it]
+Loading checkpoint shards:  67%|██████▋   | 2/3 [00:36<00:18, 18.06s/it]
+Loading checkpoint shards: 100%|██████████| 3/3 [00:36<00:00, 10.02s/it]
+Loading checkpoint shards: 100%|██████████| 3/3 [00:36<00:00, 12.19s/it]
+[01/25] eval-001 16.53s {'speech': 'Vem na caixa tudo de praia! Minizero, shaver, cabeçote de corte, cabo USB e vassourinha.
+[02/25] eval-002 14.11s {'speech': 'Ó, Leo, aí sim! Aí sim, é a prova da água! Tá com a prova da água, tá com a garantia! Aí
+[03/25] eval-003 9.60s {'speech': 'Ó, gente! Essa é a cara do que você precisa! Aparador multifuncional 3 em 1, que faz tud
+[04/25] eval-004 15.25s {'speech': 'Aí sim, Julia! Parabéns pela compra. O tamanho do item 2 é 52 cm, mais alto, pra quem qu
+[05/25] eval-005 18.22s {'speech': 'Cê acha que é barulhento? Vai ver, o ventilador é silencioso, tá certo? A gente não quer
+[06/25] eval-006 12.42s {'speech': 'Ó, gente! Esse ventilador de teto LED é um must-have! Tá ai pra resfriar o ambiente e ai
+[07/25] eval-007 12.86s {'speech': 'Ó, gente! Esse ventilador de teto LED 60W é um verdadeiro must-have pra quem quer fresco
+[08/25] eval-008 7.92s {'speech': 'Aí sim, Maria! Parabéns pela compra.', 'topic': 'Compra confirmada', 'used_facts': ['Cap
+[09/25] eval-009 11.15s {'speech': 'Aí sim, Ana! Parabéns pela compra. O novo valor tá aqui pra você. Vai na opção A, finali
+[10/25] eval-010 7.22s {'speech': 'Aí sim, Maria! Parabéns pela compra.', 'topic': 'Compra confirmada', 'used_facts': [], '
+[11/25] eval-011 16.95s {'speech': 'Tá cê pesado? Aí sim, a capacidade é até 195 kg. Não vai dar problema, tá certo! Aí sim,
+[12/25] eval-012 16.84s {'speech': 'Ó, Bia! Tá tudo bem, a gente tem que cuidar do gato. Mas a gente tem a manta pra protege
+[13/25] eval-013 15.92s {'speech': 'Cê quer com apoio? Tá no modelo A! Vai na opção A, tem apoio de pé e inflador. Aí sim, c
+[14/25] eval-014 10.01s {'speech': 'Ó, gente! Essa é a última unidade do sofá inflável 3 em 1! Tá aí pra aproveitar enquanto
+[15/25] eval-015 7.87s {'speech': 'Aí sim, Maria! Parabéns pela compra.', 'topic': 'Compra confirmada', 'used_facts': ['Est
+[16/25] eval-016 12.66s {'speech': 'Tá com indução? Aí sim, o Berlin é perfeito pra isso! Restam 9 unidades, gente! Não deix
+[17/25] eval-017 13.27s {'speech': 'Aí sim, Maria! Parabéns pela compra. O conjunto Berlin 13 peças pode realmente ir ao for
+[18/25] eval-018 9.84s {'speech': 'Ó Brenda, cê quer saber se é pra lavar louças? Tá na hora de mostrar pra cê!', 'topic': 
+[19/25] eval-019 12.11s {'speech': 'Lu, tá tudo certo! Não tem NFC, mas tá tudo em ordem pra você pagar por aproximação. Aí 
+[20/25] eval-020 13.74s {'speech': 'Cê sabe, a gente tem essa função de atender chamadas direto no smartwatch. É pra quem qu
+[21/25] eval-021 7.63s {'speech': 'Aí sim, Maria! Parabéns pela compra.', 'topic': 'Compra confirmada', 'used_facts': ['Est
+[22/25] eval-022 12.85s {'speech': 'Cê tá perguntando se serve indução? Não, só fogão convencional a gás. A gente tem poucas
+[23/25] eval-023 12.91s {'speech': 'Aí sim, Rosa! Parabéns pela compra. Vai na opção A, é o conjunto 3 frigideiras Alegrete 
+[24/25] eval-024 7.58s {'speech': 'Aí sim, Lalita! Parabéns pela compra.', 'topic': 'Compra confirmada', 'used_facts': [], 
+[25/25] eval-025 12.83s {'speech': 'Aí sim, Davi! Parabéns pela compra. Vai na opção A, é o produto fixado, disponível pra c
+{
+  "model": "Qwen/Qwen3-4B",
+  "adapter": "None",
+  "total": 25,
+  "failed": 0,
+  "frozen_eval_sha256": "09f7f0cb0e9fb2847a37c93ea58a5724460a88af4d5b2cf469d493feb6083bae",
+  "seed": 42,
+  "case_seed": "42 + zero-based case index; reset independently for each case",
+  "gpu": "Tesla T4",
+  "compute_dtype": "torch.float16",
+  "base_model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "generation": {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "max_new_tokens": 350
+  },
+  "training_prompt_sha256": "7bf502d9de1fed81193d5224f6bd891b4a0f39d3e8d72be3a661efddaf2b3af6",
+  "evaluation_script_sha256": "57fc11dfd6dd28b0dfd67f84079c94d0998d10db00d36527356b5f48f0defd7e",
+  "versions": {
+    "torch": "2.11.0+cu128",
+    "transformers": "4.57.6",
+    "peft": "0.20.0",
+    "bitsandbytes": "0.50.2",
+    "accelerate": "1.14.0"
+  },
+  "thinking_mode": false,
+  "engine": "Transformers NF4; training policy; raw model output (no production retries/validators)",
+  "latency_seconds": {
+    "mean": 12.332,
+    "median": 12.828,
+    "min": 7.224,
+    "max": 18.217
+  },
+  "checks": {
+    "reported_facts_ok": {
+      "passed": 24,
+      "total": 25
+    },
+    "numeric_claims_ok": {
+      "passed": 18,
+      "total": 25
+    },
+    "ignore_ok": {
+      "passed": 23,
+      "total": 25
+    },
+    "oral_style_ok": {
+      "passed": 25,
+      "total": 25
+    },
+    "scarcity_ok": {
+      "passed": 1,
+      "total": 6
+    },
+    "quantity_ok": {
+      "passed": 1,
+      "total": 3
+    },
+    "buying_guidance_ok": {
+      "passed": 2,
+      "total": 3
+    }
+  }
+}
+OK: 25 casos -> training/outputs/agcn_presenter_v0.1_comparison.md

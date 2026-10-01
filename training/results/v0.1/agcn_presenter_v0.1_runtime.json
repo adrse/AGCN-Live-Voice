@@ -1,0 +1,9 @@
+{
+  "gpu": "Tesla T4",
+  "adapter_bytes": 132187888,
+  "adapter_sha256": "5652197ef5f1bc212822d071ed28cd5a9802fea62aa3f5f802e88896486a6524",
+  "training_script_sha256": "9ad337288a8fd2f4619a8980b93318cc924c167f1710f976b086171d29fd4bfd",
+  "frozen_eval_sha256": "09f7f0cb0e9fb2847a37c93ea58a5724460a88af4d5b2cf469d493feb6083bae",
+  "adapter_location": "/content/drive/MyDrive/AGCN/Presenter/agcn-presenter-v0.1-lora",
+  "training_duration_seconds": 2761.4033
+}
