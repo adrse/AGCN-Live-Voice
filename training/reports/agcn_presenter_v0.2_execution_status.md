@@ -41,3 +41,18 @@ O relatório gerado pelo runner separa falhas automáticas de revisão semântic
 ## Próximo passo necessário
 
 Disponibilizar novamente uma GPU no Colab e executar o notebook. O bloqueio é de disponibilidade/quota, não um erro corrigível no script. Nada foi integrado à main, e o programa desktop não foi alterado.
+
+## Diagnóstico da tentativa iniciada manualmente — 2026-10-01
+
+Leitura da interface e diagnóstico de arquivos, sem retomar o treino:
+
+- T4 conectada; branch e commit `03a8367` confirmados.
+- Preflight retornou código 0.
+- A célula de execução terminou com `CalledProcessError`, código 1, após aproximadamente 8 segundos.
+- `/content/drive/MyDrive` existe.
+- `/content/drive/MyDrive/AGCN/Presenter/agcn-presenter-v0.1-lora/adapter_model.safetensors` não existe.
+- `Results-v0.2/status.json` não existe nesse Drive.
+
+O runner exige o adapter histórico e calcula seu hash antes de criar o status de execução e antes de iniciar o treino. A ausência do arquivo impede essa etapa. Foi adicionada mensagem explícita para o arquivo ausente, preservando a verificação do hash. O notebook passou a encaminhar stdout/stderr do subprocesso para a saída visível, evitando mostrar somente o `CalledProcessError` externo.
+
+Não foi criado, copiado nem substituído adapter nesta tentativa. Não há loss, checkpoint ou resultados v0.2 confirmados.

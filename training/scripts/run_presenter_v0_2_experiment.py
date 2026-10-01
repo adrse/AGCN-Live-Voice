@@ -190,7 +190,14 @@ def main():
     if not Path("/content/drive/MyDrive").is_dir() or not drive_root.is_relative_to(Path("/content/drive/MyDrive")):
         raise RuntimeError("Mount Google Drive first; refusing to save weights in scratch")
     old_adapter = drive_root / "agcn-presenter-v0.1-lora"
-    if sha(old_adapter / "adapter_model.safetensors") != V1_ADAPTER_SHA:
+    old_weights = old_adapter / "adapter_model.safetensors"
+    if not old_weights.is_file():
+        raise RuntimeError(
+            f"Adapter validado v0.1 ausente: {old_weights}. "
+            "O treino v0.2 não foi iniciado. A comparação exige o adapter "
+            "original verificado; confira a montagem e os arquivos do Drive."
+        )
+    if sha(old_weights) != V1_ADAPTER_SHA:
         raise RuntimeError("v0.1 adapter differs from validated experiment")
     adapter = drive_root / "agcn-presenter-v0.2-lora"
     result_dir = drive_root / "Results-v0.2"
