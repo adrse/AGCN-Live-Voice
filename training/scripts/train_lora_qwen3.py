@@ -134,6 +134,9 @@ def parse_args():
     p.add_argument("--validation", required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--model", default="Qwen/Qwen3-4B")
+    p.add_argument("--model-revision", default=None)
+    p.add_argument("--version", default="0.1")
+    p.add_argument("--resume-from-checkpoint", default=None)
     p.add_argument("--epochs", type=float, default=4.0)
     p.add_argument("--learning-rate", type=float, default=2e-4)
     p.add_argument("--max-length", type=int, default=2048)
@@ -157,7 +160,7 @@ def main() -> int:
 
     print(f"GPU: {torch.cuda.get_device_name(0)}; native BF16: {bf16}; compute dtype: {compute_dtype if 'compute_dtype' in locals() else dtype}", flush=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.model_revision)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
@@ -171,6 +174,7 @@ def main() -> int:
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
+        revision=args.model_revision,
         quantization_config=quant,
         device_map={"": 0},
         torch_dtype=compute_dtype,
@@ -238,12 +242,14 @@ def main() -> int:
         eval_dataset=val_ds,
         data_collator=CausalPadCollator(tokenizer),
     )
-    trainer.train()
+    train_result = trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     trainer.save_model(str(out))
     tokenizer.save_pretrained(str(out))
 
     summary = {
         "base_model": args.model,
+        "version": args.version,
+        "train_metrics": train_result.metrics,
         "train_examples": len(train_ds),
         "validation_examples": len(val_ds),
         "epochs": args.epochs,
@@ -261,7 +267,7 @@ def main() -> int:
         "train_sha256": hashlib.sha256(Path(args.train).read_bytes()).hexdigest(),
         "validation_sha256": hashlib.sha256(Path(args.validation).read_bytes()).hexdigest(),
         "versions": {name: importlib.metadata.version(name) for name in ["torch", "transformers", "peft", "bitsandbytes", "accelerate"]},
-        "purpose": "AGCN Presenter v0.1",
+        "purpose": f"AGCN Presenter v{args.version}",
     }
     (out / "agcn_training_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",

@@ -31,6 +31,7 @@ def parse_args():
     p.add_argument("--output", required=True)
     p.add_argument("--summary", required=True)
     p.add_argument("--model", default="Qwen/Qwen3-4B")
+    p.add_argument("--model-revision", default=None)
     p.add_argument("--max-new-tokens", type=int, default=350)
     return p.parse_args()
 
@@ -87,7 +88,7 @@ def main() -> int:
 
     print(f"GPU: {torch.cuda.get_device_name(0)}; native BF16: {bf16}; compute dtype: {compute_dtype if 'compute_dtype' in locals() else dtype}", flush=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.model_revision)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -99,6 +100,7 @@ def main() -> int:
     )
     base = AutoModelForCausalLM.from_pretrained(
         args.model,
+        revision=args.model_revision,
         quantization_config=quant,
         device_map={"": 0},
         torch_dtype=dtype,
