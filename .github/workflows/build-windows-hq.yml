@@ -1,31 +1,6 @@
 name: Build Windows HQ Voice
 
 on:
-  push:
-    branches:
-      - main
-      - astra-handoff-2026-09-29
-    paths:
-      - "core/local_qwen3_tts.py"
-      - "core/tts_providers.py"
-      - "core/voice_profiles.py"
-      - "core/runtime.py"
-      - "core/presenter_v3.py"
-      - "core/presenter_policy.py"
-      - "core/speech_planner.py"
-      - "core/comment_intelligence.py"
-      - "core/comment_fusion.py"
-      - "core/brain_context_builder.py"
-      - "core/brain_orchestrator.py"
-      - "core/sales_guard.py"
-      - "core/product_knowledge.py"
-      - "core/product_profile.py"
-      - "core/product_store.py"
-      - "desktop/**"
-      - "scripts/setup_qwen3_hq_voice.ps1"
-      - "requirements-desktop.txt"
-      - "requirements-voice-hq.txt"
-      - ".github/workflows/build-windows-hq.yml"
   workflow_dispatch:
 
 concurrency:
