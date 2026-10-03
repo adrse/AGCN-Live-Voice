@@ -2,16 +2,6 @@ name: Build Windows Product Identity Tester
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - v0.5.2-product-research
-    paths:
-      - "core/product_enrichment.py"
-      - "core/product_research_v054.py"
-      - "core/visual_product_discovery.py"
-      - "tools/product_identity_tester_gui.py"
-      - "requirements.txt"
-      - ".github/workflows/build-product-identity-windows.yml"
 
 jobs:
   build:
