@@ -260,10 +260,9 @@ class LlamaCppLocalTransport:
                 timeout=min(self.timeout_seconds, 8.0),
             )
             _raise_for_status(response, provider="AGCN Local Brain")
-            return (
-                True,
-                f"AGCN Local Brain pronto com {self.model_alias}.",
-            )
+            # Preserve o diagnóstico real: Presenter quando o LoRA está
+            # ativo; Qwen base quando o adapter ainda não foi instalado.
+            return True, detail
         except Exception as exc:
             return False, f"AGCN Local Brain indisponível: {exc}"
 
