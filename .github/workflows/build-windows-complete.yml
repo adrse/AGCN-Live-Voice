@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - ".ci/build-complete-once.txt"
+      - ".ci/visual-product-test.txt"
 
 concurrency:
   group: agcn-windows-complete-installer
