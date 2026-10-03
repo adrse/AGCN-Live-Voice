@@ -60,7 +60,22 @@ Sem quantidade exata, o modelo aprende linguagem genérica de escassez e fechame
 
 A quantidade exata nunca deve ser criada pelo modelo; ela vem do contexto.
 
-## Estado atual
+## Estado atual — CONGELADO EM v0.1
+
+**Decisão de 02/10/2026:** pausar novos treinos e novas baterias de avaliação por enquanto.
+
+O estado que deve ser preservado é o experimento **AGCN Presenter v0.1** já concluído:
+
+- base Gold usada no primeiro treino: **100 exemplos**;
+- split do treino: **93 train + 7 validation**;
+- avaliação já realizada: **25 casos congelados** em `evaluation/frozen_eval_v0.1.jsonl`;
+- adapter/resultados do v0.1 permanecem como referência de pesquisa;
+- próximo passo prático: **testar manualmente no computador o comportamento do programa** antes de qualquer novo treino.
+
+Os materiais v0.2/500 Gold que já foram preparados **não devem disparar novo treino automaticamente**. Eles ficam preservados apenas como trabalho futuro, sem integração na `main` e sem nova avaliação até nova decisão.
+
+A `main` continua sendo a branch do programa funcional. A branch `research/agcn-presenter-training-v1` fica como o único laboratório ativo de pesquisa do Presenter.
+
 
 A base principal já chegou a **100 exemplos Gold derivados/revisados a partir das LIVEs**:
 
