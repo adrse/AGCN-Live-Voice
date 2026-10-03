@@ -2,6 +2,11 @@ name: Build Windows Complete Offline Installer
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".ci/build-complete-once.txt"
 
 concurrency:
   group: agcn-windows-complete-installer
