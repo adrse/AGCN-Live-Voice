@@ -20,7 +20,8 @@ from core.model_transports import BRAIN_RESULT_SCHEMA, TransportError, _raise_fo
 
 
 DEFAULT_MODEL_FILE = "Qwen3-4B-Q4_K_M.gguf"
-DEFAULT_MODEL_ALIAS = "agcn-qwen3-4b"
+DEFAULT_LORA_FILE = "AGCN-Presenter-v0.1-F16.gguf"
+DEFAULT_MODEL_ALIAS = "agcn-presenter-v0.1"
 DEFAULT_PORT = 18766
 
 
@@ -33,6 +34,16 @@ def _resource_root() -> Path:
 
 def default_local_brain_dir() -> Path:
     return _resource_root() / "brain_local"
+
+
+def user_brain_model_dir() -> Path:
+    base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+    if base:
+        path = Path(base) / "AGCN Live Voice" / "models"
+    else:
+        path = Path.home() / ".agcn-live-voice" / "models"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _log_dir() -> Path:
@@ -53,6 +64,8 @@ class LlamaCppLocalTransport:
         *,
         pack_dir: str | Path | None = None,
         model_file: str = DEFAULT_MODEL_FILE,
+        lora_file: str | Path | None = DEFAULT_LORA_FILE,
+        require_lora: bool = False,
         model_alias: str = DEFAULT_MODEL_ALIAS,
         host: str = "127.0.0.1",
         port: int = DEFAULT_PORT,
@@ -73,6 +86,9 @@ class LlamaCppLocalTransport:
             "llama-server.exe" if os.name == "nt" else "llama-server"
         )
         self.model_path = self.model_dir / str(model_file or DEFAULT_MODEL_FILE)
+        self.lora_file = str(lora_file or "").strip()
+        self.require_lora = bool(require_lora)
+        self.lora_path = self._resolve_lora_path(self.lora_file)
         self.model_alias = str(model_alias or DEFAULT_MODEL_ALIAS)
         self.host = str(host or "127.0.0.1")
         self.port = int(port or DEFAULT_PORT)
@@ -93,9 +109,33 @@ class LlamaCppLocalTransport:
         self._lock = threading.RLock()
         self._log_handle = None
 
+    def _resolve_lora_path(self, lora_file: str) -> Path | None:
+        if not lora_file:
+            return None
+        raw = Path(lora_file).expanduser()
+        if raw.is_absolute():
+            return raw.resolve()
+
+        bundled = (self.model_dir / raw).resolve()
+        if bundled.exists():
+            return bundled
+
+        user_copy = (user_brain_model_dir() / raw.name).resolve()
+        if user_copy.exists():
+            return user_copy
+
+        # Mantém um caminho determinístico para diagnostics/require_lora.
+        return bundled
+
+    @property
+    def lora_active(self) -> bool:
+        return bool(self.lora_path and self.lora_path.exists())
+
     @property
     def name(self) -> str:
-        return f"AGCN Local Brain / Qwen3-4B / llama.cpp"
+        if self.lora_active:
+            return "AGCN Presenter v0.1 / Qwen3-4B / llama.cpp"
+        return "AGCN Local Brain / Qwen3-4B base / llama.cpp"
 
     @property
     def base_url(self) -> str:
@@ -107,14 +147,25 @@ class LlamaCppLocalTransport:
             missing.append(str(self.engine_path))
         if not self.model_path.exists():
             missing.append(str(self.model_path))
+        if self.require_lora and not self.lora_active:
+            missing.append(str(self.lora_path or DEFAULT_LORA_FILE))
         if missing:
             return (
                 False,
                 "Pacote do Brain local incompleto: " + ", ".join(missing),
             )
+        if self.lora_active:
+            return (
+                True,
+                "AGCN Presenter v0.1 pronto: "
+                f"{self.model_path.name} + {self.lora_path.name} + llama.cpp.",
+            )
         return (
             True,
-            f"Brain local incluído: {self.model_path.name} + llama.cpp.",
+            "Brain local pronto com Qwen3 base. "
+            "O adapter AGCN Presenter v0.1 ainda não está instalado; "
+            f"coloque {DEFAULT_LORA_FILE} em "
+            f"{user_brain_model_dir()} para ativá-lo.",
         )
 
     def _server_ready(self) -> bool:
@@ -128,7 +179,7 @@ class LlamaCppLocalTransport:
             return False
 
     def _command(self) -> list[str]:
-        return [
+        command = [
             str(self.engine_path),
             "-m",
             str(self.model_path),
@@ -146,6 +197,9 @@ class LlamaCppLocalTransport:
             "--reasoning",
             "off",
         ]
+        if self.lora_active:
+            command.extend(["--lora", str(self.lora_path)])
+        return command
 
     def _start_server(self) -> None:
         if self._server_ready():
