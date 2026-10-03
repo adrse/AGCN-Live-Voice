@@ -78,7 +78,7 @@ def test_local_brain_uses_openai_compatible_schema(tmp_path, monkeypatch):
     url, kwargs = session.post_calls[0]
     assert url.endswith("/v1/chat/completions")
     body = kwargs["json"]
-    assert body["model"] == "agcn-qwen3-4b"
+    assert body["model"] == "agcn-presenter-v0.1"
     assert body["messages"][0]["content"] == "SYSTEM AGCN"
     assert body["response_format"]["type"] == "json_schema"
 
