@@ -22,6 +22,20 @@ Os resultados completos da avaliação ficam em:
 - `docs/presenter_v0.1/COMPARISON.md`
 - `docs/presenter_v0.1/CONTROL_COMPARISON.md`
 
+
+## Inventário preservado na main
+
+Além dos 100 Gold e dos 25 casos congelados, a `main` guarda:
+- saída e resumo do baseline Qwen nos mesmos 25 casos;
+- resultados do AGCN Presenter v0.1 nos 25 casos;
+- manifesto de resultados;
+- manifesto das fontes;
+- schema dos exemplos;
+- configuração PEFT do adapter;
+- comparações e políticas de oralidade/escassez.
+
+Assim, a exclusão das branches antigas não apaga o estado essencial do experimento v0.1.
+
 ## Adapter
 
 A configuração PEFT usada no adapter está em `adapter_config.json`.
