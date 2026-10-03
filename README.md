@@ -1,96 +1,81 @@
 # AGCN Live Voice
 
-Apresentador inteligente por voz para TikTok LIVE.
+Aplicativo Windows local para apresentação e apoio de vendas em LIVE commerce, com foco em TikTok LIVE.
 
-## Status atual
+## Estado atual
 
-**Baseline V0.4.1 migrada do Colab para uma arquitetura reutilizável.**
+A `main` é a fonte canônica do projeto.
 
-Objetivo desta baseline: preservar o que já foi validado no Colab antes de iniciar a V0.5 Presenter Behavior.
+O programa já reúne:
+- conexão e monitoramento de TikTok LIVE;
+- comentários, likes, viewers e eventos;
+- cadastro e contexto de produto;
+- Presenter com continuidade comercial, fila e priorização de comentários;
+- Brain local com Qwen3-4B via `llama.cpp`;
+- suporte ao **AGCN Presenter v0.1** treinado por LoRA;
+- voz local HQ com Qwen3-TTS e fallback Kokoro;
+- aplicativo desktop PySide6;
+- instalador Windows offline completo.
 
-### Já validado no Colab
+## AGCN Presenter v0.1
 
-- conexão com TikTok LIVE por `@username`;
-- Room ID;
-- viewers;
-- likes;
-- comentários;
-- shares;
-- Product Store;
-- produto ativo;
-- classificação básica de comentários;
-- prioridade;
-- fila;
-- geração de fala sugerida;
-- atualização automática da interface.
+O primeiro treinamento especializado foi preservado na própria `main` em:
 
-## Regra de arquitetura
+- `data/training/presenter_v0.1/`
+- `docs/presenter_v0.1/`
 
-O projeto é dividido para que o núcleo possa ser reaproveitado no aplicativo Windows final.
+O experimento usou **100 Gold (93 treino + 7 validação)** e foi avaliado em **25 casos congelados**.
+
+O runtime local procura automaticamente o adapter convertido:
+
+`AGCN-Presenter-v0.1-F16.gguf`
+
+Ele pode ficar:
+- em `brain_local/models/` dentro do pacote; ou
+- em `%LOCALAPPDATA%\AGCN Live Voice\models\`.
+
+Quando encontrado, o `llama-server` recebe `--lora` e usa o AGCN Presenter v0.1. Sem o arquivo, o aplicativo continua funcionando com o Qwen3-4B base.
+
+Os pesos do adapter PEFT original não são versionados no repositório público. O snapshot registra configuração, hash, datasets e resultados para preservar o estado do treinamento.
+
+## Estrutura
 
 ```text
-core/        -> lógica definitiva/reutilizável
-backend/     -> ponte temporária para o site de teste
-test_web/    -> interface web temporária
-data/        -> dados locais e dataset do Presenter
-tests/       -> testes automáticos
-desktop/     -> será criado na fase final com PySide6
+core/        -> lógica principal, Presenter, Brain, voz e integrações
+desktop/     -> aplicativo Windows PySide6
+backend/     -> backend usado por ferramentas/testes web
+data/        -> dados locais e snapshot de treinamento
+docs/        -> documentação técnica e histórico essencial
+tests/       -> testes automatizados
+scripts/     -> utilitários de desenvolvimento e diagnóstico
+installer/   -> instalador Windows
+tools/       -> ferramentas auxiliares
 ```
 
-O site e o Railway são apenas ferramentas temporárias de teste. O produto final será um programa Windows local.
-
-## Executar localmente
+## Desenvolvimento local
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install -r requirements-desktop.txt
+python -m desktop.main
+```
+
+Para o backend de teste:
+
+```bash
 uvicorn backend.app:app --host 0.0.0.0 --port 8000
 ```
 
-Depois abra `http://localhost:8000`.
+## Builds Windows
 
-## Railway
+Os workflows em `.github/workflows/` cobrem:
+- build desktop;
+- build com voz HQ;
+- build do instalador offline completo;
+- testes do Presenter Brain.
 
-Start command:
+O instalador offline completo baixa e empacota o Qwen3-4B base e os runtimes locais durante o build.
 
-```bash
-uvicorn backend.app:app --host 0.0.0.0 --port $PORT
-```
+## Regra de trabalho
 
-## Próxima versão
-
-**V0.5 — Presenter Behavior V1**
-
-- Memory Manager
-- Comment Intelligence
-- Comment Fusion
-- Decision Engine V2
-- Silence Watchdog
-- Speech Planner
-- Sales Guard
-- Anti-repetição
-- AGCN Presenter Dataset V1
-
-
-## Branch de desenvolvimento V0.5
-
-A branch `v0.5-presenter-behavior` implementa o primeiro Presenter Behavior V1:
-memória operacional, inteligência e fusão de comentários, Decision Engine V2,
-Silence Watchdog, Speech Planner, Sales Guard e contexto comercial ampliado do produto.
-
-Esta branch é testada em um serviço Railway separado antes de qualquer alteração da baseline `main`.
-
-
-## V0.5.1 — Ficha Inteligente do Produto
-
-A branch `v0.5.1-product-intelligence` separa dados permanentes do produto das condições temporárias da LIVE, registra origem/confiança dos campos e permite edição manual com prioridade sobre futuras pesquisas automáticas.
-
-A análise automática do link será ativada na V0.5.2.
-
-
-## V0.5.2 — Product Research
-
-A branch `v0.5.2-product-research` ativa o botão **Analisar produto**.
-O sistema resolve o link, tenta extrair dados estruturados, procura fontes públicas relacionadas,
-monta um rascunho com origem/confiança e preserva qualquer campo travado manualmente pelo usuário.
-
-A pesquisa é conservadora: não contorna login, CAPTCHA ou bloqueios de sites.
+Mudanças estáveis entram na `main`. Novos experimentos de treinamento estão pausados até o teste manual do AGCN Presenter v0.1 no programa Windows.
