@@ -53,7 +53,7 @@ def test_local_brain_assets_are_self_contained(tmp_path):
     ok, detail = transport.assets_status()
 
     assert ok is True
-    assert "Qwen3-4B-Q4_K_M.gguf" in detail
+    assert "Qwen3 base" in detail
 
 
 def test_local_brain_uses_openai_compatible_schema(tmp_path, monkeypatch):
