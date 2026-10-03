@@ -25,7 +25,9 @@ BUILTIN_DEFAULTS = {
         "local_brain": {
             "pack_dir": "",
             "model_file": "Qwen3-4B-Q4_K_M.gguf",
-            "model_alias": "agcn-qwen3-4b",
+            "lora_file": "AGCN-Presenter-v0.1-F16.gguf",
+            "require_lora": False,
+            "model_alias": "agcn-presenter-v0.1",
             "port": 18766,
             "context_size": 4096,
             "threads": None,
