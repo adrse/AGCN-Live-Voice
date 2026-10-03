@@ -81,3 +81,42 @@ def test_local_brain_uses_openai_compatible_schema(tmp_path, monkeypatch):
     assert body["model"] == "agcn-qwen3-4b"
     assert body["messages"][0]["content"] == "SYSTEM AGCN"
     assert body["response_format"]["type"] == "json_schema"
+
+def test_local_brain_applies_presenter_lora_when_installed(tmp_path):
+    pack = tmp_path / "brain_local"
+    (pack / "bin").mkdir(parents=True)
+    (pack / "models").mkdir(parents=True)
+
+    transport = LlamaCppLocalTransport(pack_dir=pack)
+    transport.engine_path.write_bytes(b"engine")
+    transport.model_path.write_bytes(b"model")
+    lora = pack / "models" / "AGCN-Presenter-v0.1-F16.gguf"
+    lora.write_bytes(b"lora")
+
+    # Recria depois que o arquivo existe para resolver o caminho default.
+    transport = LlamaCppLocalTransport(pack_dir=pack)
+    command = transport._command()
+
+    assert transport.lora_active is True
+    assert "--lora" in command
+    assert str(lora.resolve()) in command
+    assert "Presenter v0.1" in transport.name
+
+
+def test_local_brain_can_require_presenter_lora(tmp_path):
+    pack = tmp_path / "brain_local"
+    (pack / "bin").mkdir(parents=True)
+    (pack / "models").mkdir(parents=True)
+
+    transport = LlamaCppLocalTransport(
+        pack_dir=pack,
+        require_lora=True,
+    )
+    transport.engine_path.write_bytes(b"engine")
+    transport.model_path.write_bytes(b"model")
+
+    ok, detail = transport.assets_status()
+
+    assert ok is False
+    assert "AGCN-Presenter-v0.1-F16.gguf" in detail
+
