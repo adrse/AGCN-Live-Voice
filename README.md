@@ -1,58 +1,60 @@
 # AGCN Live Voice
 
-Aplicativo Windows local para apresentação e apoio de vendas em LIVE commerce, com foco em TikTok LIVE.
+Aplicativo Windows para LIVE commerce com Presenter inteligente, monitoramento de TikTok LIVE, produto ativo e voz.
 
 ## Estado atual
 
-A `main` é a fonte canônica do projeto.
+A `main` é a versão funcional do programa Windows.
 
-O programa já reúne:
+Ela já contém:
+- aplicativo desktop em PySide6;
 - conexão e monitoramento de TikTok LIVE;
-- comentários, likes, viewers e eventos;
-- cadastro e contexto de produto;
-- Presenter com continuidade comercial, fila e priorização de comentários;
-- Brain local com Qwen3-4B via `llama.cpp`;
-- suporte ao **AGCN Presenter v0.1** treinado por LoRA;
-- voz local HQ com Qwen3-TTS e fallback Kokoro;
-- aplicativo desktop PySide6;
-- instalador Windows offline completo.
+- comentários, fila, prioridade e retomada da venda;
+- Product Store e produto ativo;
+- Brain local com Qwen3-4B via llama.cpp;
+- suporte ao AGCN Presenter v0.1 por LoRA GGUF;
+- Qwen3-TTS HQ com Kokoro como fallback;
+- opções de provedores por API;
+- build e instalador Windows;
+- testes automatizados.
 
 ## AGCN Presenter v0.1
 
-O primeiro treinamento especializado foi preservado na própria `main` em:
+O primeiro treino especializado foi concluído e o snapshot essencial está preservado na própria `main` em:
 
 - `data/training/presenter_v0.1/`
 - `docs/presenter_v0.1/`
 
-O experimento usou **100 Gold (93 treino + 7 validação)** e foi avaliado em **25 casos congelados**.
+Esse experimento usou 100 exemplos Gold, com 93 de treino e 7 de validação, e foi avaliado em 25 casos congelados.
 
-O runtime local procura automaticamente o adapter convertido:
+O runtime procura o adapter convertido como:
 
 `AGCN-Presenter-v0.1-F16.gguf`
 
-Ele pode ficar:
-- em `brain_local/models/` dentro do pacote; ou
-- em `%LOCALAPPDATA%\AGCN Live Voice\models\`.
+Ele pode ficar no pacote em `brain_local/models/` ou, no Windows, em:
 
-Quando encontrado, o `llama-server` recebe `--lora` e usa o AGCN Presenter v0.1. Sem o arquivo, o aplicativo continua funcionando com o Qwen3-4B base.
+`%LOCALAPPDATA%\AGCN Live Voice\models\`
 
-Os pesos do adapter PEFT original não são versionados no repositório público. O snapshot registra configuração, hash, datasets e resultados para preservar o estado do treinamento.
+Quando o adapter está presente, o Brain local inicia com o AGCN Presenter v0.1. Sem ele, o programa continua usando o Qwen3-4B base como fallback.
+
+## Regra para pergunta sem resposta
+
+Se a informação necessária não estiver nos fatos permitidos do produto, o Presenter não inventa e não fala que o dado está ausente. A pergunta é ignorada internamente e a LIVE continua.
 
 ## Estrutura
 
 ```text
-core/        -> lógica principal, Presenter, Brain, voz e integrações
-desktop/     -> aplicativo Windows PySide6
-backend/     -> backend usado por ferramentas/testes web
-data/        -> dados locais e snapshot de treinamento
-docs/        -> documentação técnica e histórico essencial
-tests/       -> testes automatizados
-scripts/     -> utilitários de desenvolvimento e diagnóstico
-installer/   -> instalador Windows
-tools/       -> ferramentas auxiliares
+core/        lógica do Presenter, Brain, TikTok, produto e voz
+desktop/     aplicativo Windows
+installer/   instalador
+data/        dados locais e snapshots essenciais
+docs/        documentação
+scripts/     utilitários
+tests/       testes automatizados
+.github/     pipelines de teste e build
 ```
 
-## Desenvolvimento local
+## Executar em desenvolvimento
 
 ```bash
 python -m pip install -r requirements.txt
@@ -60,22 +62,16 @@ python -m pip install -r requirements-desktop.txt
 python -m desktop.main
 ```
 
-Para o backend de teste:
+No Windows também existe:
 
-```bash
-uvicorn backend.app:app --host 0.0.0.0 --port 8000
+```bat
+scripts\run_desktop.bat
 ```
 
-## Builds Windows
+## Build principal
 
-Os workflows em `.github/workflows/` cobrem:
-- build desktop;
-- build com voz HQ;
-- build do instalador offline completo;
-- testes do Presenter Brain.
+Use o workflow **Build Windows Complete Offline Installer** para gerar o pacote completo do aplicativo.
 
-O instalador offline completo baixa e empacota o Qwen3-4B base e os runtimes locais durante o build.
+## Estado da pesquisa
 
-## Regra de trabalho
-
-Mudanças estáveis entram na `main`. Novos experimentos de treinamento estão pausados até o teste manual do AGCN Presenter v0.1 no programa Windows.
+Novos treinos estão pausados. O próximo passo é testar manualmente o AGCN Presenter v0.1 no programa Windows antes de decidir qualquer nova rodada de treinamento.
