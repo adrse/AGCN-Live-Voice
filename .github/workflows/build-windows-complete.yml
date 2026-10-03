@@ -2,11 +2,6 @@ name: Build Windows Complete Offline Installer
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".ci/visual-product-test.txt"
 
 concurrency:
   group: agcn-windows-complete-installer
