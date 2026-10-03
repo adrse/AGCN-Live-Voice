@@ -1,18 +1,6 @@
 name: Build Windows Complete Offline Installer
 
 on:
-  push:
-    branches:
-      - main
-      - feat/full-offline-installer-local-brain
-    paths:
-      - "core/**"
-      - "desktop/**"
-      - "installer/**"
-      - "tests/**"
-      - "requirements-desktop.txt"
-      - "requirements-voice-hq.txt"
-      - ".github/workflows/build-windows-complete.yml"
   workflow_dispatch:
 
 concurrency:
