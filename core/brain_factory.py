@@ -88,9 +88,15 @@ def _build_agcn_local(cfg: dict[str, Any], *, session=None) -> PresenterBrain:
                 local.get("model_file")
                 or "Qwen3-4B-Q4_K_M.gguf"
             ),
+            lora_file=(
+                local.get("lora_file")
+                if "lora_file" in local
+                else "AGCN-Presenter-v0.1-F16.gguf"
+            ),
+            require_lora=bool(local.get("require_lora", False)),
             model_alias=str(
                 local.get("model_alias")
-                or "agcn-qwen3-4b"
+                or "agcn-presenter-v0.1"
             ),
             port=int(local.get("port", 18766)),
             context_size=int(local.get("context_size", 4096)),
