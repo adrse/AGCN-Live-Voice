@@ -7,14 +7,16 @@
     "local_brain": {
       "pack_dir": "",
       "model_file": "Qwen3-4B-Q4_K_M.gguf",
-      "model_alias": "agcn-qwen3-4b",
+      "model_alias": "agcn-presenter-v0.1",
       "port": 18766,
       "context_size": 4096,
       "threads": null,
       "startup_timeout_seconds": 180,
       "timeout_seconds": 45,
       "temperature": 0.25,
-      "max_output_tokens": 500
+      "max_output_tokens": 500,
+      "lora_file": "AGCN-Presenter-v0.1-F16.gguf",
+      "require_lora": false
     },
     "ollama": {
       "base_url": "http://127.0.0.1:11434",
