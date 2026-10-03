@@ -1,11 +1,6 @@
 name: Test Visual Product Discovery
 
 on:
-  push:
-    branches:
-      - v0.5.2-product-research
-    paths-ignore:
-      - .ci/visual-product-test.txt
   workflow_dispatch:
 
 permissions:
