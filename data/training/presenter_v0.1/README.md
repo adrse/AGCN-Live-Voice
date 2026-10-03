@@ -41,6 +41,12 @@ A `main` está preparada para usar o adapter pelo `llama.cpp`.
 O runtime procura por:
 `AGCN-Presenter-v0.1-F16.gguf`
 
+GGUF canônico para teste:
+- tamanho: **66.095.008 bytes**
+- SHA256: `19298caf2b03b90fbbc215786df16e5ea83fa005dc9a595125cac20376585ee5`
+- conversor reproduzível: `scripts/convert_agcn_presenter_v01_to_gguf.py`
+- instalador local: `scripts/install_agcn_presenter_v01.ps1`
+
 Locais aceitos:
 1. dentro do pacote: `brain_local/models/`
 2. instalação local do usuário: `%LOCALAPPDATA%\AGCN Live Voice\models\`
