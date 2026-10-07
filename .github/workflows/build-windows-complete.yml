@@ -2,6 +2,11 @@ name: Build Windows Complete Offline Installer
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".ci/build-presenter-all-in-one.txt"
 
 concurrency:
   group: agcn-windows-complete-installer
@@ -31,7 +36,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-desktop.txt
           python -m pip install -r requirements-voice-hq.txt
-          python -m pip install pytest pyinstaller
+          python -m pip install pytest pyinstaller safetensors numpy
 
       - name: Run repository tests
         shell: pwsh
@@ -91,10 +96,25 @@ jobs:
           if ($model.Length -lt 2000000000) { throw "Qwen3 model download is unexpectedly small: $($model.Length)" }
           Write-Host "Qwen3 Brain model bytes: $($model.Length)"
 
+      - name: Bundle trained AGCN Presenter v0.1
+        shell: pwsh
+        run: |
+          $adapterUrl = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-70a8-820e-b912-b988e1626504/raw?se=2026-10-07T22%3A35%3A39Z&sp=r&sv=2026-02-06&sr=b&scid=853fc9a0-9124-5ab0-9fe5-d36d84611599&skoid=127c13cb-e695-43ea-b6b2-0a863d41dbf7&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-07T11%3A18%3A13Z&ske=2026-10-08T11%3A18%3A13Z&sks=b&skv=2026-02-06&sig=Gp2%2BmqtQySGdOCpwfWqDat2izwUIrawiqHnB8uMqZ2U%3D'
+          curl.exe -L --fail --retry 3 "$adapterUrl" -o "adapter_model.safetensors"
+          $sourceHash = (Get-FileHash -Algorithm SHA256 "adapter_model.safetensors").Hash.ToLower()
+          if ($sourceHash -ne "5652197ef5f1bc212822d071ed28cd5a9802fea62aa3f5f802e88896486a6524") { throw "Presenter adapter SHA256 mismatch: $sourceHash" }
+          python scripts\convert_agcn_presenter_v01_to_gguf.py "adapter_model.safetensors" --output "brain_local\models\AGCN-Presenter-v0.1-F16.gguf"
+          $gguf = Get-Item "brain_local\models\AGCN-Presenter-v0.1-F16.gguf"
+          $ggufHash = (Get-FileHash -Algorithm SHA256 $gguf.FullName).Hash.ToLower()
+          if ($gguf.Length -ne 66095008) { throw "Presenter GGUF size mismatch: $($gguf.Length)" }
+          if ($ggufHash -ne "19298caf2b03b90fbbc215786df16e5ea83fa005dc9a595125cac20376585ee5") { throw "Presenter GGUF SHA256 mismatch: $ggufHash" }
+          Remove-Item "adapter_model.safetensors" -Force
+          Write-Host "AGCN Presenter v0.1 bundled: $($gguf.Length) bytes / $ggufHash"
+
       - name: Smoke bundled local Brain
         shell: pwsh
         run: |
-          python -c "import json; from core.local_llama_brain import LlamaCppLocalTransport; p=LlamaCppLocalTransport(pack_dir='brain_local',startup_timeout_seconds=180,timeout_seconds=120,max_output_tokens=120); print(p.assets_status()); assert p.assets_status()[0]; ok,msg=p.healthcheck(); print(msg); assert ok; raw=p.complete(system_instruction='Responda em JSON conforme o schema. Seja curto.',user_payload='Crie uma fala de teste sem fatos comerciais. topic deve ser test, used_facts vazio, needs_fact false e next_sales_thread benefits.'); data=json.loads(raw); print(data); assert data.get('speech'); assert data.get('needs_fact') is False; p.close()"
+          python -c "import json; from core.local_llama_brain import LlamaCppLocalTransport; p=LlamaCppLocalTransport(pack_dir='brain_local',require_lora=True,startup_timeout_seconds=180,timeout_seconds=120,max_output_tokens=120); print(p.assets_status()); assert p.assets_status()[0]; assert p.lora_active; assert '--lora' in p._command(); ok,msg=p.healthcheck(); print(msg); assert ok; assert 'Presenter v0.1' in msg; raw=p.complete(system_instruction='Responda em JSON conforme o schema. Seja curto.',user_payload='Crie uma fala de teste sem fatos comerciais. topic deve ser test, used_facts vazio, needs_fact false e next_sales_thread benefits.'); data=json.loads(raw); print(data); assert data.get('speech'); assert data.get('needs_fact') is False; p.close()"
 
       - name: Smoke HQ voice assets
         shell: pwsh
@@ -121,6 +141,7 @@ jobs:
           Copy-Item "voice_hq\*" "dist\AGCN Live Voice\_internal\voice_hq\" -Recurse -Force
           if (!(Test-Path "dist\AGCN Live Voice\_internal\brain_local\bin\llama-server.exe")) { throw "Local Brain engine missing" }
           if (!(Test-Path "dist\AGCN Live Voice\_internal\brain_local\models\Qwen3-4B-Q4_K_M.gguf")) { throw "Local Brain model missing" }
+          if (!(Test-Path "dist\AGCN Live Voice\_internal\brain_local\models\AGCN-Presenter-v0.1-F16.gguf")) { throw "AGCN Presenter v0.1 adapter missing" }
           if (!(Test-Path "dist\AGCN Live Voice\_internal\voice_hq\bin\tts-server.exe")) { throw "HQ voice engine missing" }
           if (!(Test-Path "dist\AGCN Live Voice\_internal\voice_hq\models\qwen-talker-1.7b-customvoice-Q8_0.gguf")) { throw "HQ voice model missing" }
 
@@ -175,8 +196,8 @@ jobs:
       - name: Upload complete installer
         uses: actions/upload-artifact@v4
         with:
-          name: AGCN-Live-Voice-Complete-Installer
+          name: AGCN-Live-Voice-All-In-One-Presenter-v0.1
           path: installer_output/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
           compression-level: 0
