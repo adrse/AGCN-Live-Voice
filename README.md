@@ -72,6 +72,19 @@ scripts\run_desktop.bat
 
 Use o workflow **Build Windows Complete Offline Installer** para gerar o pacote completo do aplicativo.
 
+O build **All-In-One** inclui no mesmo instalador:
+- aplicativo Windows;
+- Qwen3-4B base;
+- llama.cpp;
+- AGCN Presenter v0.1 treinado (`AGCN-Presenter-v0.1-F16.gguf`);
+- Qwen3-TTS HQ;
+- Kokoro fallback;
+- pré-requisito do Windows.
+
+Para preservar os pesos do treinamento fora do repositório público, o workflow recebe uma URL autenticada temporária do `adapter_model.safetensors` somente durante o build. O adapter é verificado por SHA256, convertido para LoRA GGUF, testado com o Qwen3-4B e então incorporado ao instalador.
+
+O usuário final **não precisa instalar o Presenter separadamente**: basta baixar o pacote All-In-One, extrair o artifact e executar `AGCN-Live-Voice-Setup.exe` mantendo os arquivos de instalação que vierem junto dele.
+
 ## Estado da pesquisa
 
 Novos treinos estão pausados. O próximo passo é testar manualmente o AGCN Presenter v0.1 no programa Windows antes de decidir qualquer nova rodada de treinamento.
