@@ -2,11 +2,11 @@ name: Build Windows Complete Offline Installer
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".ci/build-presenter-all-in-one.txt"
+    inputs:
+      presenter_adapter_url:
+        description: "Temporary authenticated download URL for adapter_model.safetensors"
+        required: true
+        type: string
 
 concurrency:
   group: agcn-windows-complete-installer
@@ -99,7 +99,7 @@ jobs:
       - name: Bundle trained AGCN Presenter v0.1
         shell: pwsh
         run: |
-          $adapterUrl = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-70a8-820e-b912-b988e1626504/raw?se=2026-10-07T22%3A35%3A39Z&sp=r&sv=2026-02-06&sr=b&scid=853fc9a0-9124-5ab0-9fe5-d36d84611599&skoid=127c13cb-e695-43ea-b6b2-0a863d41dbf7&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-07T11%3A18%3A13Z&ske=2026-10-08T11%3A18%3A13Z&sks=b&skv=2026-02-06&sig=Gp2%2BmqtQySGdOCpwfWqDat2izwUIrawiqHnB8uMqZ2U%3D'
+          $adapterUrl = '${{ inputs.presenter_adapter_url }}'
           curl.exe -L --fail --retry 3 "$adapterUrl" -o "adapter_model.safetensors"
           $sourceHash = (Get-FileHash -Algorithm SHA256 "adapter_model.safetensors").Hash.ToLower()
           if ($sourceHash -ne "5652197ef5f1bc212822d071ed28cd5a9802fea62aa3f5f802e88896486a6524") { throw "Presenter adapter SHA256 mismatch: $sourceHash" }
